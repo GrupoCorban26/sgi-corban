@@ -1,0 +1,65 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+
+  /* Colores de la empresa */
+  --azul-100: #E4F0F5;
+  --azul-200: #B7D9E7;
+  --azul-300: #8AAED9;
+  --azul-400: #5F8EAE;
+  --azul-500: #013F5E;
+  --azul-600: #013752;
+  --azul-700: #012E46;
+  --azul-800: #01253A;
+  --azul-900: #001B2E;
+  --naranja-100: #FDE7E3;
+  --naranja-200: #FBCACB;
+  --naranja-300: #F8AD97;
+  --naranja-400: #F38D7D;
+  --naranja-500: #EA7C63;
+  --naranja-600: #C76C55;
+  --naranja-700: #9E5642;
+  --naranja-800: #744131;
+  --naranja-900: #492B1E;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --color-azul-100: var(--azul-100);
+  --color-azul-200: var(--azul-200);
+  --color-azul-300: var(--azul-300);
+  --color-azul-400: var(--azul-400);
+  --color-azul-500: var(--azul-500);
+  --color-azul-600: var(--azul-600);
+  --color-azul-700: var(--azul-700);
+  --color-azul-800: var(--azul-800);
+  --color-azul-900: var(--azul-900);
+  --color-naranja-100: var(--naranja-100);
+  --color-naranja-200: var(--naranja-200);
+  --color-naranja-300: var(--naranja-300);
+  --color-naranja-400: var(--naranja-400);
+  --color-naranja-500: var(--naranja-500);
+  --color-naranja-600: var(--naranja-600);
+  --color-naranja-700: var(--naranja-700);
+  --color-naranja-800: var(--naranja-800);
+  --color-naranja-900: var(--naranja-900);
+}
+
+/* @media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+} */
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
