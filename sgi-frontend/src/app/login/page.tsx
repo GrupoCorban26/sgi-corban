@@ -1,18 +1,24 @@
+"use client";
 import Form from 'next/form';
 import Image from 'next/image';
 import InputLogin from '../../components/ui/input';
+import { useActionState } from 'react'
+import { handleLoginAction } from './process'
 
 export default function Page() {
+  // state capturará lo que retorne handleLoginAction (ej: { error: "..." })
+  const [state, formAction, isPending] = useActionState(handleLoginAction, null);
+
   return (
     <main className="min-h-screen flex flex-col md:flex-row bg-white">
-      {/* Sección Izquierda: Visual (Oculta en móviles pequeños si prefieres) */}
+      {/* Sección Izquierda: Visual */}
       <section className="relative hidden md:block w-[60%] lg:w-[65%] overflow-hidden">
         <div className="absolute inset-0 bg-azul-900/90 z-10" />
         <Image
           src="/flota-transportistas.webp"
           alt="Logística Grupo Corban"
           fill
-          priority // Carga esta imagen de inmediato (LCP)
+          priority
           className="object-cover"
         />
         <div className="absolute inset-0 flex items-center justify-center z-20 p-12">
@@ -39,10 +45,17 @@ export default function Page() {
             </div>
           </header>
 
-          <Form action="/api/login" className="space-y-6">
+          <Form action={formAction} className="space-y-6">
+            {/* 1. MOSTRAR ERROR SI EXISTE */}
+            {state?.error && (
+              <div className="bg-red-50 border-l-4 border-red-500 p-4 text-red-700 text-sm animate-in fade-in slide-in-from-top-2">
+                {state.error}
+              </div>
+            )}
+
             <InputLogin 
               label="Correo electrónico" 
-              name="email" 
+              name="correo" // CAMBIADO: Coincide con el Backend
               type="email" 
               required 
             />
@@ -55,9 +68,12 @@ export default function Page() {
             
             <button 
               type="submit"
-              className="w-full bg-naranja-500 hover:bg-naranja-600 text-white font-bold uppercase py-4 rounded-xl transition-all transform active:scale-[0.98] shadow-lg shadow-naranja-500/20"
+              disabled={isPending} // 2. EVITAR DOBLE CLICK
+              className={`w-full bg-naranja-500 hover:bg-naranja-600 text-white font-bold uppercase py-4 rounded-xl transition-all transform shadow-lg shadow-naranja-500/20 
+                ${isPending ? "opacity-70 cursor-not-allowed scale-100" : "active:scale-[0.98]"}`}
             >
-              Iniciar sesión
+              {/* 3. FEEDBACK VISUAL DE CARGA */}
+              {isPending ? "Validando..." : "Iniciar sesión"}
             </button>
           </Form>
         </div>

@@ -1,9 +1,17 @@
 export const MENU_ROLES = {
   comercial: [
-    { label: 'Inicio', href: '/comercial/', icon: 'HomeIcon' },
-    { label: 'Base', href: '/comercial/base', icon: 'DatabaseIcon' },
-    { label: 'Ordenes', href: '/comercial/ordenes', icon: 'ClipboardIcon' },
-    { label: 'Cartera', href: '/comercial/cartera', icon: 'UsersIcon' },
+    { label: 'Inicio', href: '/comercial/' },
+    { label: 'Base', href: '/comercial/base' },
+    { label: 'Cotizaciones', href: '/comercial/cotizaciones' },
+    { label: 'Ordenes', href: '/comercial/ordenes' },
+    { label: 'Cartera', href: '/comercial/cartera' },
+  ],
+  administrador: [
+    { label: 'Inicio', href: '/administracion/' },
+    { label: 'Inventario', href: '/administracion/inventario' },
+    { label: 'Empleados', href: '/administracion/empleados' },
+    { label: 'Areas', href: '/administracion/areas' },
+    { label: 'Cargos', href: '/administracion/cargos' },
   ],
   jefa_comercial: [
     { label: 'Inicio', href: '/dashboard', icon: 'HomeIcon' },
