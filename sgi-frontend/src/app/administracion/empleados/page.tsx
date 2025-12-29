@@ -1,21 +1,35 @@
-export default function Page() {
+// src/app/administracion/empleados/page.tsx
+"use client";
+import { useEmpleados } from "@/hooks/useEmpleado";
+
+export default function EmpleadosPage() {
+  const { empleados, loading, pagination, setSearch } = useEmpleados();
+
+  if (loading) return <p>Cargando empleados de Corban...</p>;
+
   return (
-    <main className="space-y-8">
-      <h1 className="text-azul-500 font-extrabold uppercase text-3xl">Empleados</h1>
-      <div className="flex gap-8 items-center">
-        <button className="border-2 p-2 rounded-xl border-naranja-500">Agregar empleado</button>
-      </div>
-      <table className="w-full">
+    <div>
+      <input 
+        onChange={(e) => setSearch(e.target.value)} 
+        placeholder="Buscar por DNI o Nombre..." 
+      />
+      
+      <table>
         <thead>
           <tr>
-            <th>CÓDIGO</th>
-            <th>NOMBRES</th>
-            <th>APELLIDOS</th>
-            <th>FECHA DE INICIO</th>
-            <th>ESTADO</th>
+            <th>Apellido paterno</th>
+            <th>Nombre</th>
           </tr>
         </thead>
+        {empleados.map(emp => (
+          <tr key={emp.id}>
+            <td>{emp.nombres} {emp.apellido_paterno}</td>
+            <td>{emp.cargo_nombre}</td>
+          </tr>
+        ))}
       </table>
-    </main>
+
+      {/* Botones de paginación usando pagination.setPage */}
+    </div>
   );
 }

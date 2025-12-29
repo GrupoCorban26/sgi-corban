@@ -37,3 +37,9 @@ export async function handleLoginAction( prevState: ActionState | null, formData
   
   redirect('/comercial/')
 }
+
+export async function handleLogoutAction() {
+  const coockieStore = await cookies();
+  coockieStore.delete('token');
+  redirect('/login');
+}
