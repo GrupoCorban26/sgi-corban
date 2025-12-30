@@ -84,14 +84,11 @@ BEGIN
 END
 GO
 
-CREATE USER AdminGeneral FOR LOGIN AdminGeneral;
+ALTER ROLE [db_datareader] ADD MEMBER UsuarioGeneral;
+ALTER ROLE [db_datawriter] ADD MEMBER UsuarioGeneral;
 GO
 
-ALTER ROLE [db_datareader] ADD MEMBER AdminGeneral;
-ALTER ROLE [db_datawriter] ADD MEMBER AdminGeneral;
-GO
-
-GRANT EXECUTE TO AdminGeneral; 
+GRANT EXECUTE TO UsuarioGeneral; 
 GO
 
 select * from seg.usuarios

@@ -10,7 +10,7 @@ GO
 -- SP: rrhh.sp_listar_empleados
 -- Descripción: Lista empleados con paginación
 -- =====================================================
-CREATE OR ALTER PROCEDURE rrhh.sp_listar_empleados
+CREATE OR ALTER PROCEDURE adm.sp_listar_empleados
     @page INT = 1,
     @page_size INT = 20,
     @busqueda NVARCHAR(100) = NULL,
@@ -26,7 +26,7 @@ BEGIN
     DECLARE @total INT;
     
     SELECT @total = COUNT(*)
-    FROM rrhh.empleados e
+    FROM adm.empleados e
     WHERE (@busqueda IS NULL OR 
            e.nombres LIKE '%' + @busqueda + '%' OR
            e.apellido_paterno LIKE '%' + @busqueda + '%' OR
@@ -61,10 +61,10 @@ BEGIN
                        CASE WHEN jefe.apellido_materno IS NOT NULL 
                             THEN ' ' + jefe.apellido_materno 
                             ELSE '' END) AS jefe_nombre_completo
-            FROM rrhh.empleados e
-            INNER JOIN rrhh.cargos c ON e.cargo_id = c.id
-            INNER JOIN rrhh.areas a ON e.area_id = a.id
-            LEFT JOIN rrhh.empleados jefe ON e.jefe_id = jefe.id
+            FROM adm.empleados e
+            INNER JOIN adm.cargos c ON e.cargo_id = c.id
+            INNER JOIN adm.areas a ON e.area_id = a.id
+            LEFT JOIN adm.empleados jefe ON e.jefe_id = jefe.id
             WHERE (@busqueda IS NULL OR 
                    e.nombres LIKE '%' + @busqueda + '%' OR
                    e.apellido_paterno LIKE '%' + @busqueda + '%' OR
@@ -86,14 +86,14 @@ GO
 -- SP: rrhh.sp_obtener_empleado
 -- Descripción: Obtiene un empleado por ID
 -- =====================================================
-CREATE OR ALTER PROCEDURE rrhh.sp_obtener_empleado
+CREATE OR ALTER PROCEDURE adm.sp_obtener_empleado
     @id INT
 AS
 BEGIN
     SET NOCOUNT ON;
     
     -- Validar que el empleado existe
-    IF NOT EXISTS (SELECT 1 FROM rrhh.empleados WHERE id = @id)
+    IF NOT EXISTS (SELECT 1 FROM adm.empleados WHERE id = @id)
     BEGIN
         RAISERROR('Empleado no encontrado', 16, 1);
         RETURN;
@@ -128,10 +128,10 @@ BEGIN
                     ELSE '' END) AS jefe_nombre_completo,
         e.created_at,
         e.updated_at
-    FROM rrhh.empleados e
-    INNER JOIN rrhh.cargos c ON e.cargo_id = c.id
-    INNER JOIN rrhh.areas a ON e.area_id = a.id
-    LEFT JOIN rrhh.empleados jefe ON e.jefe_id = jefe.id
+    FROM adm.empleados e
+    INNER JOIN adm.cargos c ON e.cargo_id = c.id
+    INNER JOIN adm.areas a ON e.area_id = a.id
+    LEFT JOIN adm.empleados jefe ON e.jefe_id = jefe.id
     WHERE e.id = @id
     FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
 END
@@ -141,7 +141,7 @@ GO
 -- SP: rrhh.sp_crear_empleado
 -- Descripción: Crea un nuevo empleado
 -- =====================================================
-CREATE OR ALTER PROCEDURE rrhh.sp_crear_empleado
+CREATE OR ALTER PROCEDURE adm.sp_crear_empleado
     @codigo_empleado VARCHAR(20),
     @nombres NVARCHAR(100),
     @apellido_paterno NVARCHAR(75),
@@ -164,35 +164,35 @@ BEGIN
     SET NOCOUNT ON;
     
     -- Validar que el código de empleado no exista
-    IF EXISTS (SELECT 1 FROM rrhh.empleados WHERE codigo_empleado = @codigo_empleado)
+    IF EXISTS (SELECT 1 FROM adm.empleados WHERE codigo_empleado = @codigo_empleado)
     BEGIN
         RAISERROR('El código de empleado ya existe', 16, 1);
         RETURN;
     END
     
     -- Validar que el número de documento no exista
-    IF EXISTS (SELECT 1 FROM rrhh.empleados WHERE nro_documento = @nro_documento)
+    IF EXISTS (SELECT 1 FROM adm.empleados WHERE nro_documento = @nro_documento)
     BEGIN
         RAISERROR('El número de documento ya está registrado', 16, 1);
         RETURN;
     END
     
     -- Validar que el cargo existe
-    IF NOT EXISTS (SELECT 1 FROM rrhh.cargos WHERE id = @cargo_id AND is_active = 1)
+    IF NOT EXISTS (SELECT 1 FROM adm.cargos WHERE id = @cargo_id AND is_active = 1)
     BEGIN
         RAISERROR('El cargo especificado no existe o está inactivo', 16, 1);
         RETURN;
     END
     
     -- Validar que el área existe
-    IF NOT EXISTS (SELECT 1 FROM rrhh.areas WHERE id = @area_id AND is_active = 1)
+    IF NOT EXISTS (SELECT 1 FROM adm.areas WHERE id = @area_id AND is_active = 1)
     BEGIN
         RAISERROR('El área especificada no existe o está inactiva', 16, 1);
         RETURN;
     END
     
     -- Validar que el jefe existe (si se especificó)
-    IF @jefe_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM rrhh.empleados WHERE id = @jefe_id AND activo = 1)
+    IF @jefe_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM adm.empleados WHERE id = @jefe_id AND activo = 1)
     BEGIN
         RAISERROR('El jefe especificado no existe o está inactivo', 16, 1);
         RETURN;
@@ -201,7 +201,7 @@ BEGIN
     DECLARE @nuevo_id INT;
     
     -- Insertar empleado
-    INSERT INTO rrhh.empleados (
+    INSERT INTO adm.empleados (
         codigo_empleado, nombres, apellido_paterno, apellido_materno,
         fecha_nacimiento, tipo_documento, nro_documento,
         celular, email_personal, direccion, distrito, provincia,
@@ -219,7 +219,7 @@ BEGIN
     SET @nuevo_id = SCOPE_IDENTITY();
     
     -- Devolver el empleado creado
-    EXEC rrhh.sp_obtener_empleado @id = @nuevo_id;
+    EXEC adm.sp_obtener_empleado @id = @nuevo_id;
 END
 GO
 
@@ -227,7 +227,7 @@ GO
 -- SP: rrhh.sp_actualizar_empleado
 -- Descripción: Actualiza un empleado existente
 -- =====================================================
-CREATE OR ALTER PROCEDURE rrhh.sp_actualizar_empleado
+CREATE OR ALTER PROCEDURE adm.sp_actualizar_empleado
     @id INT,
     @nombres NVARCHAR(100) = NULL,
     @apellido_paterno NVARCHAR(75) = NULL,
@@ -251,7 +251,7 @@ BEGIN
     SET NOCOUNT ON;
     
     -- Validar que el empleado existe
-    IF NOT EXISTS (SELECT 1 FROM rrhh.empleados WHERE id = @id)
+    IF NOT EXISTS (SELECT 1 FROM adm.empleados WHERE id = @id)
     BEGIN
         RAISERROR('Empleado no encontrado', 16, 1);
         RETURN;
@@ -259,7 +259,7 @@ BEGIN
     
     -- Validar documento duplicado (excepto el mismo empleado)
     IF @nro_documento IS NOT NULL AND EXISTS (
-        SELECT 1 FROM rrhh.empleados 
+        SELECT 1 FROM adm.empleados 
         WHERE nro_documento = @nro_documento AND id != @id
     )
     BEGIN
@@ -268,7 +268,7 @@ BEGIN
     END
     
     -- Actualizar solo los campos que no son NULL
-    UPDATE rrhh.empleados
+    UPDATE adm.empleados
     SET 
         nombres = ISNULL(@nombres, nombres),
         apellido_paterno = ISNULL(@apellido_paterno, apellido_paterno),
@@ -291,7 +291,7 @@ BEGIN
     WHERE id = @id;
     
     -- Devolver el empleado actualizado
-    EXEC rrhh.sp_obtener_empleado @id = @id;
+    EXEC adm.sp_obtener_empleado @id = @id;
 END
 GO
 
@@ -299,7 +299,7 @@ GO
 -- SP: rrhh.sp_desactivar_empleado
 -- Descripción: Desactiva un empleado (soft delete)
 -- =====================================================
-CREATE OR ALTER PROCEDURE rrhh.sp_desactivar_empleado
+CREATE OR ALTER PROCEDURE adm.sp_desactivar_empleado
     @id INT,
     @updated_by INT = NULL
 AS
@@ -307,7 +307,7 @@ BEGIN
     SET NOCOUNT ON;
     
     -- Validar que el empleado existe
-    IF NOT EXISTS (SELECT 1 FROM rrhh.empleados WHERE id = @id)
+    IF NOT EXISTS (SELECT 1 FROM adm.empleados WHERE id = @id)
     BEGIN
         RAISERROR('Empleado no encontrado', 16, 1);
         RETURN;
@@ -321,7 +321,7 @@ BEGIN
     END
     
     -- Desactivar empleado
-    UPDATE rrhh.empleados
+    UPDATE adm.empleados
     SET activo = 0,
         fecha_cese = GETDATE(),
         updated_by = @updated_by,
@@ -337,62 +337,57 @@ END
 GO
 
 -- =====================================================
--- SP: rrhh.sp_listar_cargos
--- Descripción: Lista todos los cargos activos
--- =====================================================
-CREATE OR ALTER PROCEDURE rrhh.sp_listar_cargos
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    SELECT 
-        id,
-        nombre,
-        descripcion,
-        is_active,
-        created_at
-    FROM rrhh.cargos
-    WHERE is_active = 1
-    ORDER BY nombre
-    FOR JSON PATH;
-END
-GO
-
--- =====================================================
--- SP: rrhh.sp_listar_areas
--- Descripción: Lista todas las áreas activas
--- =====================================================
-CREATE OR ALTER PROCEDURE rrhh.sp_listar_areas
-AS
-BEGIN
-    SET NOCOUNT ON;
-    
-    SELECT 
-        id,
-        nombre,
-        descripcion,
-        comisiona_ventas,
-        is_active,
-        created_at
-    FROM rrhh.areas
-    WHERE is_active = 1
-    ORDER BY nombre
-    FOR JSON PATH;
-END
-GO
-
--- =====================================================
 -- GRANTS: Dar permisos de EXECUTE al usuario de Python
 -- =====================================================
 -- IMPORTANTE: Reemplaza 'tu_usuario_python' con el usuario real
 
-GRANT EXECUTE ON rrhh.sp_listar_empleados TO AdminGeneral;
-GRANT EXECUTE ON rrhh.sp_obtener_empleado TO AdminGeneral;
-GRANT EXECUTE ON rrhh.sp_crear_empleado TO AdminGeneral;
-GRANT EXECUTE ON rrhh.sp_actualizar_empleado TO AdminGeneral;
-GRANT EXECUTE ON rrhh.sp_desactivar_empleado TO AdminGeneral;
-GRANT EXECUTE ON rrhh.sp_listar_cargos TO AdminGeneral;
-GRANT EXECUTE ON rrhh.sp_listar_areas TO AdminGeneral;
+GRANT EXECUTE ON adm.sp_listar_empleados TO UsuarioGeneral;
+GRANT EXECUTE ON adm.sp_obtener_empleado TO UsuarioGeneral;
+GRANT EXECUTE ON adm.sp_crear_empleado TO UsuarioGeneral;
+GRANT EXECUTE ON adm.sp_actualizar_empleado TO UsuarioGeneral;
+GRANT EXECUTE ON adm.sp_desactivar_empleado TO UsuarioGeneral;
+GRANT EXECUTE ON adm.sp_listar_cargos TO UsuarioGeneral;
+GRANT EXECUTE ON adm.sp_listar_areas TO UsuarioGeneral;
 
 PRINT '✓ Stored Procedures de RRHH creados exitosamente';
 GO
+
+-- CREAR EMPLEADOS
+--CREANDO LAS AREAS
+EXEC adm.sp_crear_empleado
+    @codigo_empleado = 'SYS001',
+    @nombres = 'Branco',
+    @apellido_paterno = 'Arguedas',
+    @apellido_materno = 'Villavicencio',
+    @fecha_nacimiento = '1999-10-10',
+    @tipo_documento = 'DNI',
+    @nro_documento = '74644489',
+    @celular = '907740534',
+    @email_personal = 'bm.arguedasv@gmail.com',
+    @direccion = 'Mz. Z, Lt. 35, Calle 7, Urb. El Alamo',
+    @distrito = 'Comas',
+    @provincia = 'Lima',
+    @fecha_ingreso = '2025-03-15',
+    @area_id = 3,
+    @cargo_id = 1
+GO
+
+EXEC adm.sp_crear_empleado
+    @codigo_empleado = 'ADM001',
+    @nombres = 'Maricielo',
+    @apellido_paterno = 'Nose',
+    @fecha_nacimiento = '1995-10-10',
+    @tipo_documento = 'DNI',
+    @nro_documento = '76543211',
+    @celular = '999999999',
+    @email_personal = 'mari@gmail.com',
+    @direccion = 'Av. 199',
+    @distrito = 'Bocanegra',
+    @provincia = 'Callao',
+    @fecha_ingreso = '2025-03-15',
+    @area_id = 2,
+    @cargo_id = 4
+GO
+
+exec adm.sp_listar_empleados
+go

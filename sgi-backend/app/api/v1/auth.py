@@ -3,12 +3,13 @@ from sqlalchemy.orm import Session
 from app.database.db_connection import get_db 
 from app.core import security
 from app.schemas.auth import UserLoginSchema, Token
+from fastapi import HTTPException
 from app.services.auth import obtener_usuario_por_correo
 
 router = APIRouter()
 
 @router.post("/login")
-def login(payload: UserLoginSchema, db: Session = Depends(get_db)):
+async def login(payload: UserLoginSchema, db: Session = Depends(get_db)):
     # 1. Buscar usuario en DB usando tu SP
     user_data = obtener_usuario_por_correo(db, payload.correo)
     

@@ -1,12 +1,14 @@
 import json
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+import logging
+from sqlalchemy.ext.asyncio import AsyncSession
 
-def obtener_usuario_por_correo(db: Session, correo: str):
+async def obtener_usuario_por_correo(db: AsyncSession, correo: str):
     try:
     # Llamamos a tu SP
         query = text("EXEC seg.sp_obtener_usuario_login @correo_corp = :correo")
-        result = db.execute(query, {"correo": correo}).fetchone()
+        result = await db.execute(query, {"correo": correo}).fetchone()
         
         if result is None or result[0] is None:
             return None
@@ -17,5 +19,5 @@ def obtener_usuario_por_correo(db: Session, correo: str):
     
     except Exception as e:
         # Esto imprimirá el error real en tu terminal de VS Code
-        print(f"Error crítico en obtener_usuario_por_correo: {e}")
-        return None
+        logging.error(f"Error crítico en obtener_usuario_por_correo: {e}")
+        raise ValueError("Error al obtener el usuario por correo.")

@@ -12,8 +12,6 @@
 USE master;
 GO
 
-SELECT @@SERVERNAME;
-
 IF NOT EXISTS (SELECT name FROM sys.databases WHERE name = 'SGI_GrupoCorban')
 BEGIN
     CREATE DATABASE SGI_GrupoCorban;
