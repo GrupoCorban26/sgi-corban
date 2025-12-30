@@ -3,12 +3,15 @@ from fastapi.middleware.cors import CORSMiddleware
 # 1. Importas el router que creamos en el otro archivo
 from app.api.v1.auth import router as auth_router
 from app.api.v1.empleado import router as empleado_router
+from app.api.v1.area import router as areas_router
 
 app = FastAPI(title="SGI Grupo Corban")
 
 origins = [
-    "http://localhost:3000",    # Puerto por defecto de Next.js
+    "http://localhost:3000",
     "http://127.0.0.1:3000",
+    "http://localhost:8000", # Puerto de FastAPI
+    "http://127.0.0.1:8000", # Puerto de FastAPI
 ]
 
 app.add_middleware(
@@ -24,6 +27,7 @@ app.add_middleware(
 app.include_router(auth_router, prefix="/api", tags=["Seguridad"])
 
 app.include_router(empleado_router, prefix="/api", tags=["Empleado"])
+app.include_router(areas_router, prefix="/api", tags=["Areas"])
 
 @app.get("/")
 def read_root():

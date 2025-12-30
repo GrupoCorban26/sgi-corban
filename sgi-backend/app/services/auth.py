@@ -1,21 +1,30 @@
 import json
+import logging
 from sqlalchemy import text
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-def obtener_usuario_por_correo(db: Session, correo: str):
+async def obtener_usuario_por_correo(db: AsyncSession, correo: str):
     try:
-    # Llamamos a tu SP
+        # 1. Definimos la consulta al SP
         query = text("EXEC seg.sp_obtener_usuario_login @correo_corp = :correo")
-        result = db.execute(query, {"correo": correo}).fetchone()
         
-        if result is None or result[0] is None:
+        # 2. Ejecutamos de forma asíncrona
+        result = await db.execute(query, {"correo": correo})
+        
+        # 3. Obtenemos la primera fila (row)
+        row = result.fetchone()
+        
+        # 4. Validamos si hay resultados
+        if row is None or row[0] is None:
             return None
         
-        user_dict = json.loads(result[0])
+        # CORRECCIÓN: Usamos 'row[0]', que es donde está el JSON de SQL Server
+        user_dict = json.loads(row[0])
 
         return user_dict
     
     except Exception as e:
         # Esto imprimirá el error real en tu terminal de VS Code
-        print(f"Error crítico en obtener_usuario_por_correo: {e}")
+        logging.error(f"Error crítico en obtener_usuario_por_correo: {e}")
+        # Es mejor no hacer un raise aquí si quieres que el router maneje el error 401
         return None

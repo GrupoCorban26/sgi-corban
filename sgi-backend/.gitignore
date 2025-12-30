@@ -1,0 +1,39 @@
+# --- Python (Backend) ---
+# Entornos virtuales (¡Esto evitará el error que tuviste hoy!)
+venv/
+env/
+ENV/
+.env
+
+# Archivos compilados y caché
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# --- Node.js / Next.js (Frontend) ---
+node_modules/
+.next/
+out/
+build/
+.vercel
+*.log
+
+# --- Variables de entorno (Seguridad) ---
+# No subas tus contraseñas de SQL Server o llaves de API
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# --- Base de Datos ---
+# Si usas SQL Server localmente y se generan archivos temporales
+*.mdf
+*.ldf
+
+# --- Editores y Sistema ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

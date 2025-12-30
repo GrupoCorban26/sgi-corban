@@ -1,5 +1,6 @@
-DROP PROCEDURE IF EXISTS seg.sp_obtener_usuario_login;
-GO
+exec seg.sp_obtener_usuario_login @correo_corp = 'basededatos@grupocorban.pe'
+go
+
 
 CREATE OR ALTER PROCEDURE seg.sp_obtener_usuario_login
     @correo_corp NVARCHAR(100)
@@ -38,7 +39,7 @@ BEGIN
             FOR JSON PATH
         ) AS permisos
     FROM seg.usuarios u
-    INNER JOIN rrhh.empleados e ON u.empleado_id = e.id
+    INNER JOIN adm.empleados e ON u.empleado_id = e.id
     WHERE u.correo_corp = @correo_corp
     FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
 END
@@ -84,15 +85,9 @@ BEGIN
 END
 GO
 
-CREATE USER AdminGeneral FOR LOGIN AdminGeneral;
+ALTER ROLE [db_datareader] ADD MEMBER UsuarioGeneral;
+ALTER ROLE [db_datawriter] ADD MEMBER UsuarioGeneral;
 GO
 
-ALTER ROLE [db_datareader] ADD MEMBER AdminGeneral;
-ALTER ROLE [db_datawriter] ADD MEMBER AdminGeneral;
+GRANT EXECUTE TO UsuarioGeneral; 
 GO
-
-GRANT EXECUTE TO AdminGeneral; 
-GO
-
-select * from seg.usuarios
-go

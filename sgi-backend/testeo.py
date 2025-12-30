@@ -1,18 +1,10 @@
-import bcrypt
+from passlib.context import CryptContext
 
-# La contraseña que quieres para Grupo Corban
+# Configuración estándar que hemos estado usando
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+# Generamos el hash para 'admin1234'
 password_plana = "admin1234"
+hash_generado = pwd_context.hash(password_plana)
 
-# Convertimos la contraseña a bytes
-password_bytes = password_plana.encode('utf-8')
-
-# Generamos la "sal" y el hash
-salt = bcrypt.gensalt()
-hash_resultado = bcrypt.hashpw(password_bytes, salt)
-
-# Imprimimos el resultado final
-print("\n" + "="*50)
-print("COPIA ESTE HASH PARA TU SQL SERVER:")
-print("="*50)
-print(hash_resultado.decode('utf-8'))
-print("="*50 + "\n")
+print(f"Tu nuevo hash es: {hash_generado}")

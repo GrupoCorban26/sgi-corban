@@ -1,10 +1,10 @@
-import os
+import asyncio
 import urllib.parse
+import os
 from dotenv import load_dotenv
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
-# 1. Cargar variables del archivo .env
+# 1. Cargar variables
 load_dotenv()
 
 DB_USER = os.getenv("DB_USER")
@@ -13,52 +13,42 @@ DB_SERVER = os.getenv("DB_SERVER")
 DB_NAME = os.getenv("DB_NAME")
 DB_DRIVER = os.getenv("DB_DRIVER")
 
-# 2. Codificar la contraseña para evitar errores con caracteres especiales
+# 2. CODIFICAR contraseña y construir URL
+# ¡Importante!: Usamos password_encoded dentro del f-string
 password_encoded = urllib.parse.quote_plus(DB_PASS)
 
-# 3. Construir la cadena de conexión ODBC (Driver 18)
-# Usamos TrustServerCertificate=yes para el entorno local
-connection_string = (
-    f"DRIVER={{{DB_DRIVER}}};"
-    f"SERVER={DB_SERVER};"
-    f"DATABASE={DB_NAME};"
-    f"UID={DB_USER};"
-    f"PWD={DB_PASS};"
-    f"Encrypt=yes;"
-    f"TrustServerCertificate=yes;"
+# Para Driver 18+ es vital 'TrustServerCertificate=yes' en local
+DB_URL = (
+    f"mssql+aioodbc://{DB_USER}:{password_encoded}@{DB_SERVER}/{DB_NAME}?"
+    f"driver={DB_DRIVER}&TrustServerCertificate=yes"
 )
 
-# 4. Crear la URL de conexión para SQLAlchemy
-params = urllib.parse.quote_plus(connection_string)
-SQLALCHEMY_DATABASE_URL = f"mssql+pyodbc:///?odbc_connect={params}"
+# 3. Crear el motor asíncrono
+engine = create_async_engine(DB_URL, echo=True)
 
-# 5. Configurar el motor de la base de datos (Engine)
-# 'pool_pre_ping=True' verifica que la conexión esté viva antes de usarla
-engine = create_engine(
-    SQLALCHEMY_DATABASE_URL, 
-    pool_pre_ping=True
+# Fábrica de sesiones
+AsyncSessionLocal = async_sessionmaker(
+    bind=engine, 
+    class_=AsyncSession, 
+    expire_on_commit=False
 )
 
-# 6. Crear la fábrica de sesiones y la base para los modelos
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+# Generador para FastAPI
+async def get_db():
+    async with AsyncSessionLocal() as session:
+        yield session
 
-# 7. Dependencia para obtener la base de datos en las rutas de FastAPI
-# Esta función asegura que la conexión se cierre al terminar la petición
-def get_db():
-    db = SessionLocal()
+# --- PRUEBA DE CONEXIÓN ASÍNCRONA ---
+async def test_connection():
     try:
-        yield db
-    finally:
-        db.close()
-
-# --- PRUEBA DE CONEXIÓN RÁPIDA ---
-if __name__ == "__main__":
-    try:
-        with engine.connect() as connection:
-            print("✅ ¡Conexión exitosa!")
-            print(f"Conectado como: {DB_USER}")
-            print(f"Servidor: {DB_SERVER}")
+        # En motores asíncronos se usa "async with engine.begin()"
+        async with engine.begin() as conn:
+            print("✅ ¡Conexión asíncrona exitosa!")
+            print(f"Conectado a: {DB_NAME} en {DB_SERVER}")
     except Exception as e:
-        print("❌ Error al conectar a la base de datos:")
+        print("❌ Error en la conexión asíncrona:")
         print(e)
+
+if __name__ == "__main__":
+    # Para probar código 'async' fuera de FastAPI necesitamos asyncio
+    asyncio.run(test_connection())
