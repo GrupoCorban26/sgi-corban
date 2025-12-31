@@ -1,37 +1,83 @@
-// middleware.ts
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { jwtVerify } from 'jose'
 
-export function middleware(request: NextRequest) {
-  const token = request.cookies.get('token')?.value
-  const { pathname } = request.nextUrl
+export async function middleware(request: NextRequest) {
+  const token = request.cookies.get('token')?.value // nos quedamos con el valor del token
+  const { pathname } = request.nextUrl // nos quedamos con el path: grupocorban.pe/path/path2... -> pathname = path/path2...
 
-  // 1. Definimos las rutas protegidas (puedes agregar más aquí luego)
-  const isProtectedRoute = 
-    pathname.startsWith('/administracion') || 
-    pathname.startsWith('/comercial');
+  let payload: any = null; 
 
-  const isLoginRoute = pathname === '/login';
+  // 1. Verificación de Integridad del Token
+  if (token) {
+    try {
+      const secret = new TextEncoder().encode(process.env.JWT_SECRET)
+      const verified = await jwtVerify(token, secret)
+      payload = verified.payload
+    } catch (error) {
+      const loginRedirect = NextResponse.redirect(new URL('/login', request.url))
+      loginRedirect.cookies.delete('token')
+      return loginRedirect
+    }
+  }
 
-  // CASO A: Intenta entrar a zonas privadas sin token
-  if (isProtectedRoute && !token) {
+  // 2. Si no hay token y quiere ir a rutas privadas, al Login
+  const privateModules = ['/comercial', '/administracion', '/operaciones', '/facturacion']
+  const isTargetingModule = privateModules.some(prefix => pathname.startsWith(prefix))
+
+  if (isTargetingModule && !payload) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // CASO B: Ya está logueado e intenta ir al login
-  if (isLoginRoute && token) {
-    // Si ya está dentro, lo mandamos a una de las páginas principales
-    return NextResponse.redirect(new URL('/administracion', request.url))
+  // 3. VALIDACIÓN DE SEGURIDAD: ¿Coincide su área con la URL?
+  if (payload && isTargetingModule) {
+    const userArea = (payload.area as string || '').toLowerCase().trim()
+    
+    // Definimos qué áreas tienen prohibido qué rutas
+    // Un usuario de Comercial no puede entrar a nada que no empiece con /comercial
+    if (pathname.startsWith('/comercial') && !userArea.includes('comercial')) {
+      return redirectToDashboard(userArea, request)
+    }
+
+    if (pathname.startsWith('/operaciones') && !userArea.includes('operaciones')) {
+      return redirectToDashboard(userArea, request)
+    }
+
+    if (pathname.startsWith('/facturacion') && !userArea.includes('facturacion')) {
+      return redirectToDashboard(userArea, request)
+    }
+
+    // El módulo de administración suele ser para Sistemas y Administración
+    if (pathname.startsWith('/administracion') && !userArea.includes('administracion')) {
+       return redirectToDashboard(userArea, request)
+    }
+
+    if (pathname.startsWith('/sistemas') && !userArea.includes('sistemas'))  {
+       return redirectToDashboard(userArea, request)
+    }
+  }
+
+  // 4. Si va al login estando logueado o a la raíz
+  if ((pathname === '/login' || pathname === '/') && payload) {
+    return redirectToDashboard(payload.area.toLowerCase(), request)
   }
 
   return NextResponse.next()
 }
 
-// 2. El Matcher: Aquí incluimos todas tus carpetas de negocio
+// Función auxiliar de redirección (se mantiene igual)
+function redirectToDashboard(area: string, request: NextRequest) {
+  let target = '/login'
+  if (area.includes('comercial')) target = '/comercial'
+  else if (area.includes('administracion')) target = '/administracion'
+  else if (area.includes('sistemas')) target = '/sistemas'
+  else if (area.includes('operaciones')) target = '/operaciones'
+  else if (area.includes('facturacion')) target = '/facturacion'
+  
+  if (request.nextUrl.pathname === target) return NextResponse.next()
+  return NextResponse.redirect(new URL(target, request.url))
+}
+
 export const config = {
-  matcher: [
-    '/administracion/:path*',
-    '/comercial/:path*',
-    '/login'
-  ],
+  matcher: ['/', '/login', '/comercial/:path*', '/administracion/:path*', '/operaciones/:path*', '/facturacion/:path*'],
 }

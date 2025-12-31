@@ -217,3 +217,60 @@ GO
 
 EXEC adm.sp_listar_areas
 go
+
+select * from adm.areas
+go
+
+select * from seg.roles
+go
+
+INSERT INTO seg.permisos (nombre_tecnico, nombre_display, modulo, descripcion)
+VALUES
+  ('adm.cargos.listar', 'Listar Cargos', 'adm', 'Permite ver la lista general de cargos'),
+  ('adm.cargos.ver', 'Ver Detalle de Cargo', 'adm', 'Permite ver la información detallada de un cargo'),
+  ('adm.cargos.crear', 'Crear Cargo', 'adm', 'Permite registrar un nuevo cargo en el sistema'),
+  ('adm.cargos.editar', 'Editar Cargo', 'adm', 'Permite modificar la información de un cargo existente'),
+  ('adm.cargos.desactivar', 'Desactivar Cargo', 'adm', 'Permite dar de baja un cargo sin eliminarlo'),
+  
+  ('adm.areas.listar', 'Listar Áreas', 'adm', 'Permite ver la lista general de áreas'),
+  ('adm.areas.ver', 'Ver Detalle de Área', 'adm', 'Permite ver la información detallada de un área'),
+  ('adm.areas.crear', 'Crear Área', 'adm', 'Permite registrar una nueva área en el sistema'),
+  ('adm.areas.editar', 'Editar Área', 'adm', 'Permite modificar la información de una área existente'),
+  ('adm.areas.desactivar', 'Desactivar Área', 'adm', 'Permite dar de baja una área sin eliminarla');
+GO
+
+insert into seg.roles(nombre, descripcion)
+values
+('Administrador de Jerarquias', 'Este usuario modificará todo el organigrama de la empresa')
+go
+
+DECLARE @RolId INT;
+SELECT @RolId = id FROM seg.roles WHERE nombre = 'Administrador de Jerarquias';
+
+INSERT INTO seg.rol_permiso (rol_id, permiso_id)
+SELECT @RolId, id 
+FROM seg.permisos 
+WHERE nombre_tecnico LIKE 'adm.areas.%' 
+   OR nombre_tecnico LIKE 'adm.cargos.%';
+
+select * from adm.empleados
+go
+
+select * from seg.usuarios
+go
+
+select * from seg.usuarios_roles
+go
+
+insert into seg.usuarios(empleado_id, correo_corp, password_hash)
+values
+(1, 'maricielo@grupocorban.pe', 'mari123')
+
+update seg.usuarios
+set password_hash='$2b$12$wrrSOi/0YlMG.zh1SPKjou8HQqeGNhSSHGGjvJmf7jLPVXbECNYNG'
+where id=3
+go
+
+insert into seg.usuarios_roles(usuario_id, rol_id, asignado_por)
+values
+()

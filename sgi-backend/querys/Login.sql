@@ -1,49 +1,50 @@
 exec seg.sp_obtener_usuario_login @correo_corp = 'basededatos@grupocorban.pe'
 go
 
-
 CREATE OR ALTER PROCEDURE seg.sp_obtener_usuario_login
     @correo_corp NVARCHAR(100)
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Validar existencia del usuario
-    IF NOT EXISTS (SELECT 1 FROM seg.usuarios WHERE correo_corp = @correo_corp AND is_active = 1)
+    IF EXISTS (SELECT 1 FROM seg.usuarios WHERE correo_corp = @correo_corp AND is_active = 1)
     BEGIN
-        RAISERROR('Usuario no encontrado o inactivo', 16, 1);
-        RETURN;
+        SELECT 
+            u.id AS usuario_id,
+            e.id AS empleado_id,
+            u.password_hash,
+            u.is_bloqueado,
+            u.debe_cambiar_password,
+            CONCAT(e.nombres, ' ', e.apellido_paterno) AS nombre_corto,
+            -- Datos para la redirección dinámica
+            a.nombre AS area_nombre,
+            c.nombre AS cargo_nombre,
+            -- Permisos y Roles
+            JSON_QUERY((
+                SELECT r.nombre
+                FROM seg.roles r
+                INNER JOIN seg.usuarios_roles ur ON r.id = ur.rol_id
+                WHERE ur.usuario_id = u.id AND r.is_active = 1
+                FOR JSON PATH
+            )) AS roles,
+            JSON_QUERY((
+                SELECT DISTINCT p.nombre_tecnico
+                FROM seg.permisos p
+                INNER JOIN seg.rol_permiso rp ON p.id = rp.permiso_id
+                INNER JOIN seg.usuarios_roles ur ON rp.rol_id = ur.rol_id
+                WHERE ur.usuario_id = u.id AND p.is_active = 1
+                FOR JSON PATH
+            )) AS permisos
+        FROM seg.usuarios u
+        INNER JOIN adm.empleados e ON u.empleado_id = e.id
+        INNER JOIN adm.areas a ON e.area_id = a.id       -- Join directo
+        INNER JOIN adm.cargos c ON e.cargo_id = c.id    -- Join directo
+        WHERE u.correo_corp = @correo_corp
+        FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
     END
-
-    -- Retornar info completa: Usuario + Empleado + Roles + Permisos
-    SELECT 
-        u.id AS usuario_id,
-        e.id AS empleado_id,
-        u.password_hash,
-        u.is_bloqueado,
-        u.debe_cambiar_password,
-        CONCAT(e.nombres, ' ', e.apellido_paterno) AS nombre_corto,
-        (
-            SELECT r.nombre
-            FROM seg.roles r
-            INNER JOIN seg.usuarios_roles ur ON r.id = ur.rol_id
-            WHERE ur.usuario_id = u.id AND r.is_active = 1
-            FOR JSON PATH
-        ) AS roles,
-        (
-            SELECT DISTINCT p.nombre_tecnico
-            FROM seg.permisos p
-            INNER JOIN seg.rol_permiso rp ON p.id = rp.permiso_id
-            INNER JOIN seg.usuarios_roles ur ON rp.rol_id = ur.rol_id
-            WHERE ur.usuario_id = u.id AND p.is_active = 1
-            FOR JSON PATH
-        ) AS permisos
-    FROM seg.usuarios u
-    INNER JOIN adm.empleados e ON u.empleado_id = e.id
-    WHERE u.correo_corp = @correo_corp
-    FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
 END
 GO
+
 
 -- Para inicio de sesion
 

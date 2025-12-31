@@ -29,7 +29,8 @@ async def login(payload: UserLoginSchema, db: Session = Depends(get_db)):
         data={
             "sub": str(user_data['usuario_id']),
             "nombre": user_data['nombre_corto'],
-            "permisos": user_data['permisos']
+            "permisos": user_data['permisos'],
+            "area": user_data['area_nombre'] # <--- Agregamos esto al JWT
         }
     )
 
@@ -38,6 +39,8 @@ async def login(payload: UserLoginSchema, db: Session = Depends(get_db)):
         "token_type": "bearer",
         "user": {
             "nombre": user_data['nombre_corto'],
+            "area": user_data['area_nombre'],  # <--- Enviamos el área
+            "cargo": user_data['cargo_nombre'],
             "debe_cambiar_password": user_data['debe_cambiar_password']
-        }
     }
+}

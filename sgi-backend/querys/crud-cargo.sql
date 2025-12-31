@@ -1,6 +1,7 @@
 USE SGI_GrupoCorban;
 GO
-
+select * from adm.empleados
+go
 -- =====================================================
 -- 1. SP: adm.sp_listar_cargos
 -- =====================================================

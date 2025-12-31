@@ -1,7 +1,7 @@
 'use server'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
-import { isRedirectError } from 'next/dist/client/components/redirect-error'; // Opcional pero recomendado
+import { isRedirectError } from 'next/dist/client/components/redirect-error';
 
 export interface ActionState {
   error: string | null;
@@ -12,7 +12,7 @@ export async function handleLoginAction(prevState: ActionState | null, formData:
   const correo = formData.get('correo') as string;
   const password = formData.get('password') as string;
 
-  let loginExitoso = false;
+  let targetPath = ''; 
 
   try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/login`, {
@@ -27,30 +27,51 @@ export async function handleLoginAction(prevState: ActionState | null, formData:
       return { error: data.detail || "Credenciales incorrectas" };
     }
 
+    // 1. Guardar el token en las cookies
     const cookieStore = await cookies();
     cookieStore.set('token', data.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24, // 1 día
+      maxAge: 60 * 60 * 24,
       path: '/',
-      sameSite: 'lax', // Recomendado para evitar CSRF
+      sameSite: 'lax',
     });
 
-    loginExitoso = true;
+    // 2. Lógica de Redirección Dinámica
+    // Normalizamos el nombre del área (minúsculas y sin espacios extra)
+    const area = data.user.area.toLowerCase().trim();
+
+    if (area.includes('comercial')) {
+      targetPath = '/comercial';
+    } 
+    else if (area.includes('administración')){
+      targetPath = '/administracion';
+    } 
+    else if (area.includes('sistemas')){
+      targetPath = '/sistemas'
+    }
+    else if (area.includes('operaciones')) {
+      targetPath = '/operaciones';
+    } 
+    else if (area.includes('facturación') || area.includes('facturacion')) {
+      targetPath = '/facturacion';
+    } 
+    else {
+      // Ruta por defecto si el área no coincide con las anteriores
+      targetPath = '/dashboard'; 
+    }
 
   } catch (err) {
-    // Si el error es una redirección de Next.js, lo dejamos pasar
     if (isRedirectError(err)) throw err;
-    
     return { error: "No se pudo conectar con el servidor de FastAPI" };
   }
 
-  // El redirect DEBE estar fuera del try-catch
-  if (loginExitoso) {
-    redirect('/comercial');
+  // 3. Ejecutar la redirección fuera del bloque try-catch
+  if (targetPath) {
+    redirect(targetPath);
   }
 
-  return { error: "Error inesperado" };
+  return { error: "Error inesperado al procesar el acceso" };
 }
 
 export async function handleLogoutAction() {

@@ -163,6 +163,13 @@ CREATE TABLE seg.roles (
 );
 GO
 
+insert into seg.roles (nombre, descripcion)
+values
+('Super Administrador', 'Manejo absoluto sobre el sistema'),
+('Auditor', 'Todos los permisos .ver'),
+('Auditor', 'Todos los permisos .ver'),
+
+
 -- Tabla: seg.permisos
 -- Descripción: Permisos granulares del sistema
 CREATE TABLE seg.permisos (
@@ -227,6 +234,8 @@ CREATE TABLE seg.usuarios (
         REFERENCES adm.empleados(id)
 );
 GO
+
+
 
 -- Tabla: seg.usuarios_roles
 -- Descripción: Relación N:M entre usuarios y roles
