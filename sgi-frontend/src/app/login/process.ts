@@ -8,22 +8,31 @@ export interface ActionState {
   success?: boolean;
 }
 
-export async function handleLoginAction(prevState: ActionState | null, formData: FormData): Promise<ActionState> {
+export async function handleLoginAction(prevState: any, formData: FormData) {
   const correo = formData.get('correo') as string;
   const password = formData.get('password') as string;
 
-  let targetPath = ''; 
+  let targetPath = '';
 
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/login`, {
+    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/login/`, {
       method: 'POST',
-      headers: { 'Content-type': 'application/json' },
-      body: JSON.stringify({ correo, password }),
+      headers: { 
+        // 2. Cambiamos el Content-Type
+        'Content-Type': 'application/json' 
+      },
+      body: JSON.stringify({ // <-- ENVIAR COMO STRING
+        correo: correo,
+        password: password
+      }),
     });
 
     const data = await res.json();
 
     if (!res.ok) {
+      if (Array.isArray(data.detail)) {
+        return { error: data.detail[0].msg };
+      }
       return { error: data.detail || "Credenciales incorrectas" };
     }
 
@@ -43,22 +52,22 @@ export async function handleLoginAction(prevState: ActionState | null, formData:
 
     if (area.includes('comercial')) {
       targetPath = '/comercial';
-    } 
-    else if (area.includes('administración')){
+    }
+    else if (area.includes('administración')) {
       targetPath = '/administracion';
-    } 
-    else if (area.includes('sistemas')){
+    }
+    else if (area.includes('sistemas')) {
       targetPath = '/sistemas'
     }
     else if (area.includes('operaciones')) {
       targetPath = '/operaciones';
-    } 
+    }
     else if (area.includes('facturación') || area.includes('facturacion')) {
       targetPath = '/facturacion';
-    } 
+    }
     else {
       // Ruta por defecto si el área no coincide con las anteriores
-      targetPath = '/dashboard'; 
+      targetPath = '/dashboard';
     }
 
   } catch (err) {

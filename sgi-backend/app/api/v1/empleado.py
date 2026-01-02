@@ -9,7 +9,7 @@ from app.schemas.empleado import (
 from app.services import empleado as empleado_service
 from app.core.security import get_current_user_id # Necesitaremos esta función
 
-router = APIRouter()
+router = APIRouter(prefix="/empleado", tags=["Empleados"])
 
 # 1. LISTAR EMPLEADOS (PAGINADO)
 @router.get("/", response_model=EmpleadoPaginationResponse)

@@ -48,7 +48,7 @@ export async function middleware(request: NextRequest) {
     }
 
     // El módulo de administración suele ser para Sistemas y Administración
-    if (pathname.startsWith('/administracion') && !userArea.includes('administracion')) {
+    if (pathname.startsWith('/administracion') && !userArea.includes('admin')) {
        return redirectToDashboard(userArea, request)
     }
 

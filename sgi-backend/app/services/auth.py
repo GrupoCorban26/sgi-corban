@@ -9,7 +9,7 @@ async def obtener_usuario_por_correo(db: AsyncSession, correo: str):
         result = await db.execute(query, {"correo": correo})
         row = result.fetchone()
         
-        if row is None or row[0] is None:
+        if not row or row is None or row[0] is None:
             return None
         
         user_dict = json.loads(row[0])

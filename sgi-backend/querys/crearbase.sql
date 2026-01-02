@@ -73,11 +73,20 @@ CREATE TABLE adm.cargos (
 );
 GO
 
+insert into adm.cargos(nombre, descripcion)
+values
+('Asistente', 'Asistente del área correspondiente, quien apoye directamente al jefe'),
+('Practicante', 'Practicantes pre profesionales'),
+('Ejecutivo', 'El ejecutivo comercial que se encargue de la gestion del area'),
+('Jefe', 'Jefe del area correspondiente'),
+('Pricing', 'Quien se encargue de los precios del area comercial')
+go
+
 -- Tabla: adm.areas
 -- Descripción: Áreas organizacionales de la empresa
 CREATE TABLE adm.areas (
     id INT PRIMARY KEY IDENTITY(1,1),
-    nombre NVARCHAR(100) NOT NULL,
+    nombre NVARCHAR(100) NOT NULL unique,
     descripcion NVARCHAR(300) NULL,
     parent_area_id INT NULL,
     responsable_id INT NULL,
@@ -91,6 +100,13 @@ CREATE TABLE adm.areas (
         REFERENCES adm.areas(id)
 );
 GO
+
+insert into adm.areas (nombre, descripcion, comisiona_ventas)
+values
+('Comercial', 'El area que se encarga de cerrar las ventas y atraer clientes', 1),
+('Administracion', 'El area que se encarga del correcto funcionamiento de la empresa', 0),
+('Sistemas', 'El area que se encarga del mantenimiento de los sistemas informaticos de la empresa', 0)
+go
 
 -- Tabla: rrhh.empleados
 -- Descripción: Registro de empleados de la empresa
@@ -147,6 +163,14 @@ ADD CONSTRAINT FK_areas_responsable FOREIGN KEY (responsable_id)
     REFERENCES adm.empleados(id);
 GO
 
+insert into adm.empleados (codigo_emplado, nombres, apellido_paterno, fecha_nacimiento, tipo_documento, nro_documento, celular, email_personal, direccion, distrito, provincia, fecha_ingreso cargo_id, area_id)
+values
+('ADM001', 'Maricielo', 'Criado', '1995-10-10', 'DNI', '74644421', '999999999', 'mari@gmail.com', 'Av. 199', 'Bocanegra', 'Callao', '2022-01-01', 4, 2),
+('SIS001', 'Branco', 'Arguedas', '1999-10-10', 'DNI', '74644489', '907740534', 'bm.arguedasv@gmail.com', 'Madreselvas 144', 'Comas', 'Lima', '2025-03-15', 1, 3),
+('COM001', 'Aranza', 'Rincon', '1994-02-05', 'DNI', '78766474', '999991299', 'aranza@gmail.com', 'Av. 124', 'Bocanegra', 'Callao', '2022-01-01', 4, 1),
+('COM002', 'Karina', 'Avalos', '1996-05-08', 'DNI', '74644121', '987654321', 'karina@gmail.com', 'Av. 875', 'Surco', 'Lima', '2022-01-01', 5, 1),
+go
+
 -- =====================================================
 -- 4. SCHEMA: SEG (Seguridad)
 -- =====================================================
@@ -167,8 +191,11 @@ insert into seg.roles (nombre, descripcion)
 values
 ('Super Administrador', 'Manejo absoluto sobre el sistema'),
 ('Auditor', 'Todos los permisos .ver'),
-('Auditor', 'Todos los permisos .ver'),
-
+('Gestor de RRHH', 'Administra la ficha personal de la organizacion'),
+('Aprobador', 'Quien puede autorizar si una tarea se cumplió correctamente'),
+('Operador Comercial', 'Crea y gestiona cotizaciones y prospectos'),
+('Soporte TI', 'Visualización de logs técnicos y mantenimiento de tablas maestras')
+go
 
 -- Tabla: seg.permisos
 -- Descripción: Permisos granulares del sistema
@@ -182,6 +209,15 @@ CREATE TABLE seg.permisos (
     created_at DATETIME2 DEFAULT GETDATE()
 );
 GO
+
+insert into seg.permisos(nombre_tecnico, nombre_display, modulo, descripcion)
+values
+('adm.area.crear', 'Crear area', 'adm', 'Permiso para crear un area organizacional'),
+('adm.area.editar', 'Editar area', 'adm', 'Permiso para editar un area organizacional'),
+('adm.area.desactivar', 'Desactivar area', 'adm', 'Permiso para desactivar un area organizacional'),
+('adm.area.listar', 'Listar area', 'adm', 'Permiso para listar las areas organizacional'),
+('adm.area.ver', 'Ver area', 'adm', 'Permoso para ver un area organizacional')
+go
 
 -- Tabla: seg.rol_permiso
 -- Descripción: Relación N:M entre roles y permisos
@@ -199,6 +235,15 @@ CREATE TABLE seg.rol_permiso (
         REFERENCES seg.permisos(id) ON DELETE CASCADE
 );
 GO
+
+insert into seg.rol_permiso(rol_id, permiso_id)
+values
+(3, 1),
+(3, 2),
+(3, 3),
+(3, 4),
+(3, 5),
+go
 
 -- Tabla: seg.usuarios
 -- Descripción: Usuarios del sistema (credenciales de acceso)
@@ -235,7 +280,13 @@ CREATE TABLE seg.usuarios (
 );
 GO
 
-
+insert into seg.usuarios(empleado_id, correo_corp, password_hash)
+values
+(1,'facturacion@grupocorban.pe', 'mari123'),
+(2,'basededatos@grupocorban.pe','branco123'),
+(3,'a.rincon@grupocorban.pe','aranza123'),
+(4, 'k.avalos@grupocorban.pe', 'karina123')
+go
 
 -- Tabla: seg.usuarios_roles
 -- Descripción: Relación N:M entre usuarios y roles
@@ -253,6 +304,11 @@ CREATE TABLE seg.usuarios_roles (
         REFERENCES seg.roles(id) ON DELETE CASCADE
 );
 GO
+
+insert into seg.usuarios_roles(usuario_id, rol_id)
+values
+(1, 3)
+go
 
 CREATE TABLE seg.sesiones (
     id UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
@@ -292,11 +348,21 @@ CREATE TABLE core.configuraciones (
     clave VARCHAR(100) UNIQUE NOT NULL,
     valor NVARCHAR(500) NOT NULL,
     tipo_dato VARCHAR(20) CHECK(tipo_dato IN ('string','int','decimal','boolean','json')),
+    categoria varchar(100),
     descripcion NVARCHAR(300) NULL,
     updated_at DATETIME2 DEFAULT GETDATE(),
     updated_by INT NULL
 );
 GO
+
+insert into core.configuraciones(clave, valor, tipo_dato, descripcion)
+values
+('auth_session_time', 60, 'int', 'sistemas', 'Tiempo que dura el token'),
+('com_igv_value', 18, 'decimal', 'comercial', 'Valor del igv en Perú'),
+('com_quote_prefix', 'COT-2026-', 'string','comercial','Prefijo para folios de ventas'),
+('app_theme_color_principal', '#013F5E', 'string', 'interfaz', 'Color azul de Grupo Corban'),
+('app_theme_color_secundario', '#EA7C63', 'string', 'interfaz', 'Color naranja de Grupo Corban')
+go
 
 -- Tabla: core.notificaciones
 -- Descripción: Notificaciones in-app para usuarios
@@ -349,6 +415,21 @@ CREATE TABLE core.incoterms(
 );
 GO
 
+insert into core.incoterms(nombre, nombre_largo, tipo)
+values
+('EXW', 'EX Works', 'cualquier transporte'),
+('FCA', 'Free Carrier', 'cualquier transporte'),
+('CPT', 'Carriage Paid To', 'cualquier transporte'),
+('CIP', 'Carriage and Insurance paid to', 'cualquier transporte'),
+('DPU', 'Delivered at Place Unloaded', 'cualquier transporte'),
+('DAP', 'Delivered at Place', 'cualquier transporte'),
+('DDP', 'Delivered Duty Paid', 'cualquier transporte'),
+('FAS', 'Free Alongside Ship', 'solo maritimo'),
+('FOB', 'Free on Board', 'solo maritimo'),
+('CFR', 'Cost and Freight', 'solo maritimo'),
+('CIF', 'Cost, Insurance and Freight', 'solo maritimo'),
+go
+
 CREATE TABLE core.tipo_contenedor(
     id int primary key identity(1,1),
     nombre varchar(50),
@@ -358,6 +439,13 @@ CREATE TABLE core.tipo_contenedor(
     updated_at DATETIME2 DEFAULT GETDATE()
 );
 GO
+
+insert into core.tipo_contenedor(nombre, descripcion)
+values
+('20''', 'Contenedor de 20'''),
+('40''', 'Contenedor de 40'''),
+('40'' HC', 'Contenedor de 40'' HC')
+go
 
 CREATE TABLE core.via(
     id int primary key identity(1,1),
@@ -369,9 +457,35 @@ CREATE TABLE core.via(
 );
 GO
 
+insert into core.via(nombre, descripcion)
+values
+('marítimo', 'Vía de transporte maritima'),
+('aereo', 'Via de transporte aérea')
+go
+
+CREATE TABLE core.tipo_mercaderia(
+    id int primary key identity(1,1),
+    nombre varchar(100) not null,
+    descripcion varchar(255) not null,
+    is_active bit default 1,
+    created_at DATETIME2 DEFAULT GETDATE(),
+    updated_at DATETIME2 DEFAULT GETDATE()
+);
+go
+
+insert into core.tipo_mercaderia(nombre, descripcion)
+values
+('Carga seca o general', 'Bienes no líquidos transportados en cajas, palets o contenedores.'),
+('Mercancías peligrosas', 'Sustancias que representen riesgos para la salud, la seguridad, el medio ambiente o la propiedad durante el transporte.'),
+('Carga refrigerada', 'Para mercancías sensibles a la temperatura.'),
+('Artículos usados, chatarra o material de deshecho', 'Bienes o materiales de segunda mano únicamente para fines de reciclaje o descarte.'),
+('Ganado, plantas o animales', 'Mascotas, ganado, plantas del hogar, etc.'),
+('Bienes personales o domésticos', 'Artículos pertenecientes a particulares o familias únicamente para fines de mudanza.'),
+('Artículos perecederos o frescos', 'Frutas y verduras frescas y otros artículos no enlatados.')
+go
+
 CREATE TABLE core.servicios (
     id INT PRIMARY KEY IDENTITY(1,1),
-    codigo_servicio VARCHAR(20) UNIQUE NOT NULL,
     nombre varchar(100) not null,
     descripcion varchar(255) not null,
     is_active BIT DEFAULT 1,
@@ -379,6 +493,14 @@ CREATE TABLE core.servicios (
     updated_at DATETIME2 DEFAULT GETDATE()
 );
 GO
+
+insert into core.servicios(nombre, descripcion)
+values
+('Carga', 'Servicio de traer un producto desde el exterior'),
+('Aduanas', 'Servicio de legalizar la carga al llegar al Perú'),
+('Transpote interno', 'Servicio de transporte interno'),
+('Integral', 'Servicio integral que agrupa los servicios de Carga, Aduanas y Transporte Interno')
+go
 
 -- =====================================================
 -- 6. SCHEMA: COMERCIAL
@@ -413,11 +535,12 @@ CREATE TABLE comercial.leads(
 
     CONSTRAINT FK_lotes_lead FOREIGN KEY (lote_id) 
         REFERENCES comercial.lotes_carga(id),
+    CONSTRAINT FK_usuarios_lead foreign key (usuario_asignado_id)
+        REFERENCES seg.usuarios(id),
 );
 
 CREATE TABLE comercial.clientes (
     id INT PRIMARY KEY IDENTITY(1,1),
-    codigo_cliente VARCHAR(20) UNIQUE NOT NULL,
     
     -- Identificación
     tipo_documento VARCHAR(20) NOT NULL CHECK(tipo_documento IN ('RUC','DNI','CE')),
@@ -468,163 +591,122 @@ CREATE TABLE comercial.clientes_contactos (
 );
 GO
 
-CREATE TABLE comercial.solicitudes_cotizacion(
+-- 1. SOLICITUDES INICIALES (El primer contacto)
+CREATE TABLE comercial.solicitudes_cotizacion (
     id INT PRIMARY KEY IDENTITY(1,1),
-    cliente_id int null,
-    lead_id int null,
-    comercial_id int not null,
-
+    cliente_id INT NOT NULL,
+    comercial_asignado_id INT NOT NULL, -- El comercial que recibe el requerimiento
+    descripcion_requerimiento NVARCHAR(MAX) NOT NULL,
+    fecha_solicitud DATETIME2 DEFAULT GETDATE(),
+    estado VARCHAR(30) DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'en_proceso', 'cotizado', 'anulado')),
+    
+    CONSTRAINT FK_solicitud_cliente FOREIGN KEY (cliente_id) REFERENCES comercial.clientes(id),
+    CONSTRAINT FK_solicitud_comercial FOREIGN KEY (comercial_asignado_id) REFERENCES adm.empleados(id)
 );
+GO
 
--- Tabla: comercial.servicios
--- Descripción: Catálogo de servicios que ofrece la empresa
-
-
--- Tabla: comercial.cotizaciones
--- Descripción: Cotizaciones comerciales
+-- 2. COTIZACIONES (Cabecera y Control de Flujo)
 CREATE TABLE comercial.cotizaciones (
     id INT PRIMARY KEY IDENTITY(1,1),
-    codigo VARCHAR(30) UNIQUE NOT NULL, -- COT-000001
+    codigo VARCHAR(30) UNIQUE NOT NULL, -- Ej: COT-2026-0001
     version INT DEFAULT 1,
-    cotizacion_padre_id INT NULL, -- Si es revisión de otra cotización
+    solicitud_id INT NULL,
     
-    -- Responsable
-    vendedor_id INT NOT NULL,
+    -- Actores del Proceso
+    comercial_id INT NOT NULL,      -- El que arma la estructura/formato
+    pricing_id INT NULL,            -- El que pone los costos/precios
+    aprobador_id INT NULL,          -- El Jefe Comercial que evalúa
+    asignado_a_id INT NOT NULL,     -- ¡CLAVE! ID del usuario que tiene la tarea pendiente ahora mismo
+    
     cliente_id INT NOT NULL,
-    contacto_cliente_id INT NULL,
-    
-    -- Estado
-    estado VARCHAR(30) DEFAULT 'borrador' CHECK(estado IN (
-        'borrador',
-        'pendiente_aprobacion',
-        'aprobada',
-        'rechazada',
+    contacto_id INT NULL,
+
+    -- Estado del Workflow (Ajustado a tu proceso)
+    estado VARCHAR(40) DEFAULT 'borrador' CHECK (estado IN (
+        'borrador',                 -- Comercial llenando datos iniciales
+        'en_pricing',               -- Esperando que Pricing ponga precios
+        'revision_comercial',       -- Pricing terminó, Comercial arma el PDF/Formato
+        'pendiente_aprobacion',     -- En manos del Jefe Comercial
+        'rechazado_pricing',        -- Jefe rechazó por precios (vuelve a Pricing)
+        'rechazado_comercial',      -- Jefe rechazó por formato (vuelve a Comercial)
+        'aprobada',                 -- Lista para enviar al cliente
         'enviada_cliente',
-        'ganada',
-        'perdida',
-        'vencida'
+        'ganada', 'perdida', 'vencida'
     )),
-    
-    -- Datos de operación
-    tipo_servicio int not null,
-    via_transporte int not null,
-    incoterm int not null,
-    tipo_contenedor int not null,
-    
-    -- Ruta
+
+    -- Datos de Operación y Carga
+    tipo_servicio_id INT NOT NULL,
+    via_transporte_id INT NOT NULL,
+    incoterm_id INT NOT NULL,
+    contenedor_id INT NULL, -- Ej: 40' HC
     origen NVARCHAR(150) NOT NULL,
     destino NVARCHAR(150) NOT NULL,
-    
-    -- Carga
     descripcion_carga NVARCHAR(500) NULL,
-    peso_total DECIMAL(18,2) NULL,
-    volumen_total DECIMAL(18,2) NULL,
-    cantidad_bultos INT NULL,
-    tipo_carga VARCHAR(50) NULL,
     
     -- Financiero
-    moneda VARCHAR(3) DEFAULT 'USD' CHECK(moneda IN ('USD','PEN','EUR')),
-    tipo_cambio DECIMAL(10,4) NULL,
-    subtotal DECIMAL(18,2) NOT NULL DEFAULT 0,
+    moneda VARCHAR(3) DEFAULT 'USD',
+    subtotal DECIMAL(18,2) DEFAULT 0,
     igv DECIMAL(18,2) DEFAULT 0,
-    total DECIMAL(18,2) NOT NULL DEFAULT 0,
+    total DECIMAL(18,2) DEFAULT 0,
     
-    -- Validez
+    -- Fechas y Validez
+    fecha_emision DATETIME2 DEFAULT GETDATE(),
     fecha_validez DATE NOT NULL,
-    tiempo_transito_dias INT NULL,
-    
-    -- Observaciones
-    observaciones NVARCHAR(1000) NULL,
-    terminos_condiciones NVARCHAR(2000) NULL,
-    
-    -- Aprobación
-    aprobado_por_id INT NULL,
-    fecha_aprobacion DATETIME2 NULL,
-    motivo_rechazo NVARCHAR(500) NULL,
-    
-    -- Resultado con cliente
-    resultado_cliente VARCHAR(20) NULL CHECK(resultado_cliente IN ('ganada','perdida','pendiente')),
-    motivo_perdida NVARCHAR(500) NULL,
     
     -- Auditoría
     created_at DATETIME2 DEFAULT GETDATE(),
     updated_at DATETIME2 DEFAULT GETDATE(),
     created_by INT NULL,
     updated_by INT NULL,
-    
-    -- Foreign Keys
-    CONSTRAINT FK_cotizaciones_vendedor FOREIGN KEY (vendedor_id) 
-        REFERENCES adm.empleados(id),
-    CONSTRAINT FK_cotizaciones_cliente FOREIGN KEY (cliente_id) 
-        REFERENCES comercial.clientes(id),
-    CONSTRAINT FK_cotizaciones_contacto FOREIGN KEY (contacto_cliente_id) 
-        REFERENCES comercial.clientes_contactos(id),
-    CONSTRAINT FK_cotizaciones_aprobador FOREIGN KEY (aprobado_por_id) 
-        REFERENCES seg.usuarios(id),
-    CONSTRAINT FK_cotizaciones_padre FOREIGN KEY (cotizacion_padre_id) 
-        REFERENCES comercial.cotizaciones(id)
+
+    CONSTRAINT FK_cotiz_comercial FOREIGN KEY (comercial_id) REFERENCES adm.empleados(id),
+    CONSTRAINT FK_cotiz_pricing FOREIGN KEY (pricing_id) REFERENCES seg.usuarios(id),
+    CONSTRAINT FK_cotiz_aprobador FOREIGN KEY (aprobador_id) REFERENCES seg.usuarios(id),
+    CONSTRAINT FK_cotiz_asignado FOREIGN KEY (asignado_a_id) REFERENCES seg.usuarios(id),
+    CONSTRAINT FK_cotiz_solicitud FOREIGN KEY (solicitud_id) REFERENCES comercial.solicitudes_cotizacion(id)
 );
 GO
 
--- Tabla: comercial.cotizaciones_items
--- Descripción: Líneas de detalle de cada cotización
+-- 3. ITEMS DE COTIZACIÓN (Detalle de Costos y Precios)
 CREATE TABLE comercial.cotizaciones_items (
     id INT PRIMARY KEY IDENTITY(1,1),
     cotizacion_id INT NOT NULL,
-    servicio_id INT NOT NULL,
+    concepto_id INT NOT NULL, -- Ej: Flete Marítimo, THC, Gastos Locales
+    descripcion_detallada NVARCHAR(300) NULL,
     
-    -- Detalle
-    descripcion_item NVARCHAR(300) NULL,
-    cantidad DECIMAL(18,2) NOT NULL DEFAULT 1,
-    unidad_medida VARCHAR(20) NULL,
-    
-    -- Costos
+    -- Pricing llena esto:
     costo_unitario DECIMAL(18,2) NOT NULL DEFAULT 0,
-    costo_total AS (cantidad * costo_unitario) PERSISTED,
     
-    -- Precios
-    precio_unitario DECIMAL(18,2) NOT NULL,
-    precio_total AS (cantidad * precio_unitario) PERSISTED,
-    margen_porcentaje AS (
-        CASE 
-            WHEN costo_unitario > 0 
-            THEN ((precio_unitario - costo_unitario) / costo_unitario) * 100 
-            ELSE 0 
-        END
-    ) PERSISTED,
+    -- Comercial/Pricing definen esto:
+    precio_unitario DECIMAL(18,2) NOT NULL DEFAULT 0,
+    cantidad DECIMAL(18,2) DEFAULT 1,
     
-    -- Otros
-    observacion NVARCHAR(500) NULL,
-    orden INT DEFAULT 1,
-    
-    created_at DATETIME2 DEFAULT GETDATE(),
-    
-    -- Foreign Keys
-    CONSTRAINT FK_items_cotizacion FOREIGN KEY (cotizacion_id) 
-        REFERENCES comercial.cotizaciones(id) ON DELETE CASCADE,
-    CONSTRAINT FK_items_servicio FOREIGN KEY (servicio_id) 
-        REFERENCES comercial.servicios(id)
+    -- Cálculos Automáticos
+    subtotal_item AS (cantidad * precio_unitario) PERSISTED,
+    margen_valor AS ((precio_unitario - costo_unitario) * cantidad) PERSISTED,
+
+    CONSTRAINT FK_items_cotizacion FOREIGN KEY (cotizacion_id) REFERENCES comercial.cotizaciones(id) ON DELETE CASCADE
 );
 GO
 
--- Tabla: comercial.cotizacion_seguimiento
--- Descripción: Historial de cambios de estado de cotizaciones
+-- 4. SEGUIMIENTO Y LOG DE RECHAZOS (La historia del "Ida y Vuelta")
 CREATE TABLE comercial.cotizacion_seguimiento (
     id INT PRIMARY KEY IDENTITY(1,1),
     cotizacion_id INT NOT NULL,
-    estado_anterior VARCHAR(30) NULL,
-    estado_actual VARCHAR(30) NOT NULL,
-    usuario_id INT NOT NULL,
-    comentario NVARCHAR(1000) NULL,
-    tipo_cambio VARCHAR(50) DEFAULT 'cambio_estado',
-    documento_url NVARCHAR(500) NULL,
-    fecha_cambio DATETIME2 DEFAULT GETDATE(),
+    usuario_id INT NOT NULL,       -- Quién hizo el movimiento
+    estado_anterior VARCHAR(40),
+    estado_nuevo VARCHAR(40),
     
-    -- Foreign Keys
-    CONSTRAINT FK_seguimiento_cotizacion FOREIGN KEY (cotizacion_id) 
-        REFERENCES comercial.cotizaciones(id) ON DELETE CASCADE,
-    CONSTRAINT FK_seguimiento_usuario FOREIGN KEY (usuario_id) 
-        REFERENCES seg.usuarios(id)
+    -- El motivo del rechazo o comentario de aprobación
+    comentario NVARCHAR(MAX) NULL, 
+    
+    -- Categoría de rechazo para saber a quién se le devolvió
+    tipo_accion VARCHAR(30) CHECK (tipo_accion IN ('envio', 'aprobacion', 'rechazo_formato', 'rechazo_precio', 'comentario')),
+    
+    fecha_movimiento DATETIME2 DEFAULT GETDATE(),
+
+    CONSTRAINT FK_seg_cotizacion FOREIGN KEY (cotizacion_id) REFERENCES comercial.cotizaciones(id) ON DELETE CASCADE,
+    CONSTRAINT FK_seg_usuario FOREIGN KEY (usuario_id) REFERENCES seg.usuarios(id)
 );
 GO
 

@@ -71,46 +71,81 @@ GO
 -- =====================================================
 
 CREATE OR ALTER PROCEDURE adm.sp_crear_area
-    @id INT = NULL,
     @nombre NVARCHAR(100),
     @descripcion NVARCHAR(300) = NULL,
     @parent_area_id INT = NULL,
     @responsable_id INT = NULL,
     @comisiona_ventas BIT = 0,
-    @is_active BIT = 1
+    @is_active BIT = 1,
+    @usuario_id INT  -- <--- Nuevo parámetro de auditoría
 AS
 BEGIN
     SET NOCOUNT ON;
-    BEGIN TRY
-        IF @id IS NULL OR @id = 0
-        BEGIN
-            -- INSERTAR
-            INSERT INTO adm.areas (nombre, descripcion, parent_area_id, responsable_id, comisiona_ventas, is_active)
-            VALUES (@nombre, @descripcion, @parent_area_id, @responsable_id, @comisiona_ventas, @is_active);
-            
-            SELECT @id = SCOPE_IDENTITY();
-            PRINT '✓ Área creada correctamente';
-        END
-        ELSE
-        BEGIN
-            -- ACTUALIZAR
-            UPDATE adm.areas
-            SET nombre = @nombre,
-                descripcion = @descripcion,
-                parent_area_id = @parent_area_id,
-                responsable_id = @responsable_id,
-                comisiona_ventas = @comisiona_ventas,
-                is_active = @is_active,
-                updated_at = GETDATE()
-            WHERE id = @id;
-            
-            PRINT '✓ Área actualizada correctamente';
-        END
+    DECLARE @new_id INT;
 
-        -- Devolvemos el registro afectado en formato JSON
+    BEGIN TRY
+        INSERT INTO adm.areas (
+            nombre, descripcion, parent_area_id, responsable_id, 
+            comisiona_ventas, is_active, usuario_creacion_id, created_at
+        )
+        VALUES (
+            @nombre, @descripcion, @parent_area_id, @responsable_id, 
+            @comisiona_ventas, @is_active, @usuario_id, GETDATE()
+        );
+
+        SET @new_id = SCOPE_IDENTITY();
+
+        -- Devolvemos JSON para que Python lo lea directo
         SELECT 
             success = 1,
-            message = 'Operación exitosa',
+            message = 'Área creada correctamente',
+            id = @new_id
+        FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
+
+    END TRY
+    BEGIN CATCH
+        SELECT 
+            success = 0,
+            message = ERROR_MESSAGE(),
+            id = CAST(NULL AS INT)
+        FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
+    END CATCH
+END
+
+
+-- =====================================================
+-- SP: adm.sp_editar_area
+-- Descripción: Edita una area
+-- =====================================================
+
+CREATE OR ALTER PROCEDURE adm.sp_editar_area
+    @id INT,
+    @nombre NVARCHAR(100),
+    @descripcion NVARCHAR(300) = NULL,
+    @parent_area_id INT = NULL,
+    @responsable_id INT = NULL,
+    @comisiona_ventas BIT = 0,
+    @is_active BIT = 1,
+    @usuario_id INT -- <--- Auditoría de modificación
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    BEGIN TRY
+        UPDATE adm.areas
+        SET nombre = @nombre,
+            descripcion = @descripcion,
+            parent_area_id = @parent_area_id,
+            responsable_id = @responsable_id,
+            comisiona_ventas = @comisiona_ventas,
+            is_active = @is_active,
+            usuario_modificacion_id = @usuario_id, -- Quién editó
+            updated_at = GETDATE()
+        WHERE id = @id;
+
+        SELECT 
+            success = 1,
+            message = 'Área actualizada correctamente',
             id = @id
         FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
 
@@ -123,7 +158,6 @@ BEGIN
         FOR JSON PATH, WITHOUT_ARRAY_WRAPPER;
     END CATCH
 END
-GO
 
 -- =====================================================
 -- SP: adm.sp_borrar_area
@@ -274,3 +308,6 @@ go
 insert into seg.usuarios_roles(usuario_id, rol_id, asignado_por)
 values
 ()
+
+
+EXEC sp_helptext 'adm.sp_listar_areas';

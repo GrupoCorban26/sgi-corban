@@ -19,7 +19,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 30
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 # Herramienta para extraer el token de la cabecera (Bearer Token)
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/login")
 
 # --- FUNCIONES DE "EMISIÓN" (Para el Login) ---
 

@@ -8,10 +8,10 @@ export const MENU_ROLES = {
   ],
   administrador: [
     { label: 'Inicio', href: '/administracion/' },
+    { label: 'Organización', href: '/administracion/organizacion' },
     { label: 'Inventario', href: '/administracion/inventario' },
-    { label: 'Empleados', href: '/administracion/empleados' },
-    { label: 'Areas', href: '/administracion/areas' },
-    { label: 'Cargos', href: '/administracion/cargos' },
+    { label: 'Asistencias', href: '/administracion/asistencias' },
+    { label: 'Rendimiento', href: '/administracion/rendimiento' },
   ],
   jefa_comercial: [
     { label: 'Inicio', href: '/dashboard', icon: 'HomeIcon' },

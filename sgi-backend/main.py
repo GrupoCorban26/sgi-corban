@@ -24,10 +24,10 @@ app.add_middleware(
 
 # 2. "Conectas" el router a la aplicación principal
 # El prefix ayuda a que la URL sea /api/auth/login
-app.include_router(auth_router, prefix="/api", tags=["Seguridad"])
+app.include_router(auth_router, prefix="/api/v1")
 
-app.include_router(empleado_router, prefix="/api", tags=["Empleado"])
-app.include_router(areas_router, prefix="/api", tags=["Areas"])
+app.include_router(empleado_router, prefix="/api/v1")
+app.include_router(areas_router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():
