@@ -6,7 +6,7 @@ export async function middleware(request: NextRequest) {
   const token = request.cookies.get('token')?.value // nos quedamos con el valor del token
   const { pathname } = request.nextUrl // nos quedamos con el path: grupocorban.pe/path/path2... -> pathname = path/path2...
 
-  let payload: any = null; 
+  let payload: any = null;
 
   // 1. Verificación de Integridad del Token
   if (token) {
@@ -25,6 +25,10 @@ export async function middleware(request: NextRequest) {
   const privateModules = ['/comercial', '/administracion', '/operaciones', '/facturacion']
   const isTargetingModule = privateModules.some(prefix => pathname.startsWith(prefix))
 
+  if ((isTargetingModule || pathname === '/') && !payload) {
+    return NextResponse.redirect(new URL('/login', request.url))
+  }
+
   if (isTargetingModule && !payload) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
@@ -32,7 +36,7 @@ export async function middleware(request: NextRequest) {
   // 3. VALIDACIÓN DE SEGURIDAD: ¿Coincide su área con la URL?
   if (payload && isTargetingModule) {
     const userArea = (payload.area as string || '').toLowerCase().trim()
-    
+
     // Definimos qué áreas tienen prohibido qué rutas
     // Un usuario de Comercial no puede entrar a nada que no empiece con /comercial
     if (pathname.startsWith('/comercial') && !userArea.includes('comercial')) {
@@ -49,11 +53,11 @@ export async function middleware(request: NextRequest) {
 
     // El módulo de administración suele ser para Sistemas y Administración
     if (pathname.startsWith('/administracion') && !userArea.includes('admin')) {
-       return redirectToDashboard(userArea, request)
+      return redirectToDashboard(userArea, request)
     }
 
-    if (pathname.startsWith('/sistemas') && !userArea.includes('sistemas'))  {
-       return redirectToDashboard(userArea, request)
+    if (pathname.startsWith('/sistemas') && !userArea.includes('sistemas')) {
+      return redirectToDashboard(userArea, request)
     }
   }
 
@@ -73,7 +77,7 @@ function redirectToDashboard(area: string, request: NextRequest) {
   else if (area.includes('sistemas')) target = '/sistemas'
   else if (area.includes('operaciones')) target = '/operaciones'
   else if (area.includes('facturacion')) target = '/facturacion'
-  
+
   if (request.nextUrl.pathname === target) return NextResponse.next()
   return NextResponse.redirect(new URL(target, request.url))
 }

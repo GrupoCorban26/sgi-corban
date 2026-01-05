@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.database.db_connection import get_db
-from app.schemas.empleado import (
+from app.schemas.organizacion.empleado import (
     EmpleadoCreate, EmpleadoUpdate, EmpleadoResponse, EmpleadoPaginationResponse
 )
 from app.services import empleado as empleado_service

@@ -1,6 +1,3 @@
-exec seg.sp_obtener_usuario_login @correo_corp = 'basededatos@grupocorban.pe'
-go
-
 CREATE OR ALTER PROCEDURE seg.sp_obtener_usuario_login
     @correo_corp NVARCHAR(100)
 AS
@@ -89,6 +86,6 @@ GO
 ALTER ROLE [db_datareader] ADD MEMBER UsuarioGeneral;
 ALTER ROLE [db_datawriter] ADD MEMBER UsuarioGeneral;
 GO
-
+GRANT CONNECT TO UsuarioGeneral;
 GRANT EXECUTE TO UsuarioGeneral; 
 GO
