@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional
+from typing import List, Optional
 
 from app.database.db_connection import get_db # Ajustado a la ruta común
 from app.services.organizacion.departamentos import DepartamentoService
@@ -8,7 +8,8 @@ from app.schemas.organizacion.departamentos import (
     DepartamentoCreate, 
     DepartamentoUpdate, 
     DepartamentoPaginationResponse,
-    OperationResult
+    OperationResult,
+    DepartamentoDropDown
 )
 
 router = APIRouter(prefix="/departamentos", tags=["Organización - Departamentos"])
@@ -77,3 +78,10 @@ async def desactivar_departamento(
             status_code=status.HTTP_400_BAD_REQUEST, 
             detail=str(e)
         )
+
+@router.get("/dropdown", response_model=List[DepartamentoDropDown])
+async def get_departamentos_dropdown(
+    db: AsyncSession = Depends(get_db)
+):
+    service = DepartamentoService(db)
+    return await service.get_departamentos_dropdown()

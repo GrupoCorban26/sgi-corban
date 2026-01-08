@@ -1,10 +1,20 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios'; // O tu instancia configurada de axios
-import { Departamento, PaginationResponse, OperationResult } from '@/types/organizacion/departamento';
+import axios from 'axios';
+import {
+  Departamento,
+  DepartamentoPaginationResponse,
+  OperationResult,
+  EmpleadoOption,
+  DepartamentoOption
+} from '@/types/organizacion/departamento';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 const DEPTOS_URL = `${API_BASE_URL}/departamentos`;
+const EMPLEADOS_URL = `${API_BASE_URL}/empleado`; // Singular - matches backend route
 
+// ============================================
+// HOOK PRINCIPAL DE DEPARTAMENTOS
+// ============================================
 export const useDepartamentos = (busqueda = '', page = 1, pageSize = 15) => {
   const queryClient = useQueryClient();
 
@@ -12,7 +22,7 @@ export const useDepartamentos = (busqueda = '', page = 1, pageSize = 15) => {
   const listQuery = useQuery({
     queryKey: ['departamentos', busqueda, page, pageSize],
     queryFn: async () => {
-      const { data } = await axios.get<PaginationResponse>(`${DEPTOS_URL}/`, {
+      const { data } = await axios.get<DepartamentoPaginationResponse>(`${DEPTOS_URL}/`, {
         params: { busqueda, page, page_size: pageSize },
       });
       return data;
@@ -32,8 +42,8 @@ export const useDepartamentos = (busqueda = '', page = 1, pageSize = 15) => {
 
   // 3. Actualizar Departamento
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: number; data: Partial<Departamento> }) => {
-      const response = await axios.put<OperationResult>(`${DEPTOS_URL}/${id}`, data);
+    mutationFn: async ({ id, data: deptoData }: { id: number; data: Partial<Departamento> }) => {
+      const response = await axios.put<OperationResult>(`${DEPTOS_URL}/${id}`, deptoData);
       return response.data;
     },
     onSuccess: () => {
@@ -53,9 +63,56 @@ export const useDepartamentos = (busqueda = '', page = 1, pageSize = 15) => {
   });
 
   return {
+    // Query de listado
     listQuery,
+    departamentos: listQuery.data?.data || [],
+    totalPages: listQuery.data?.total_pages || 1,
+    totalRegistros: listQuery.data?.total || 0,
+    isLoading: listQuery.isLoading,
+    isError: listQuery.isError,
+    error: listQuery.error,
+    refetch: listQuery.refetch,
+    isFetching: listQuery.isFetching,
+    // Mutaciones
     createMutation,
     updateMutation,
     deleteMutation,
   };
+};
+
+// ============================================
+// HOOK PARA CARGAR EMPLEADOS (DROPDOWN)
+// ============================================
+export const useEmpleadosParaSelect = () => {
+  return useQuery({
+    queryKey: ['empleados-select'],
+    queryFn: async () => {
+      // Traemos todos los empleados activos para el dropdown
+      const { data } = await axios.get(`${EMPLEADOS_URL}/`, {
+        params: { page: 1, page_size: 100, activo: true },
+      });
+      // Mapeamos a formato simple para el select
+      const empleados: EmpleadoOption[] = data.data.map((emp: any) => ({
+        id: emp.id,
+        nombre_completo: `${emp.nombres} ${emp.apellido_paterno}`.trim(),
+      }));
+      return empleados;
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutos de caché
+  });
+};
+
+// ============================================
+// HOOK PARA CARGAR DEPARTAMENTOS (DROPDOWN)
+// ============================================
+
+export const useDepartamentosParaSelect = () => {
+  return useQuery({
+    queryKey: ['departamentos-select'],
+    queryFn: async () => {
+      const { data } = await axios.get<DepartamentoOption[]>(`${DEPTOS_URL}/dropdown`);
+      return data;
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutos de caché
+  });
 };

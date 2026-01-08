@@ -4,7 +4,8 @@ from app.schemas.organizacion.departamentos import (
     DepartamentoCreate, 
     DepartamentoUpdate, 
     OperationResult,
-    DepartamentoPaginationResponse
+    DepartamentoPaginationResponse,
+    DepartamentoDropDown
 )
 
 class DepartamentoService:
@@ -26,20 +27,13 @@ class DepartamentoService:
         data = result.mappings().all()
         
         # 2. Obtener el total (Para la paginación del frontend)
-        query_total = text("SELECT COUNT(*) FROM adm.departamentos WHERE is_active = 1")
-        if busqueda:
-            query_total = text("SELECT COUNT(*) FROM adm.departamentos WHERE nombre LIKE :b AND is_active = 1")
-            result_total = await self.db.execute(query_total, {"b": f"%{busqueda}%"})
-        else:
-            result_total = await self.db.execute(query_total)
-            
-        total_records = result_total.scalar() or 0
-        
+        total_records = data[0]["total_registros"] if data else 0
+
         return {
             "total": total_records,
             "page": page,
             "registro_por_pagina": page_size,
-            "total_pages": (total_records + page_size - 1) // page_size,
+            "total_pages": (total_records + page_size - 1) // page_size if total_records > 0 else 1,
             "data": data
         }
 
@@ -88,3 +82,9 @@ class DepartamentoService:
         await self.db.execute(query, params)
         await self.db.commit()
         return {"success": True, "message": "Estado del departamento actualizado"}
+
+    async def get_departamentos_dropdown(self):
+        query = text("EXEC adm.usp_dropdown_departamentos")
+        result = await self.db.execute(query)
+        data = result.mappings().all()
+        return data

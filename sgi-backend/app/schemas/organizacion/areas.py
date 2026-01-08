@@ -3,7 +3,7 @@ from typing import Optional, List
 from datetime import datetime
 
 # --- ESQUEMA BASE ---
-class AreaSchema(BaseModel):
+class AreaBase(BaseModel):
     # strip_whitespace elimina espacios al inicio y final automáticamente
     nombre: str = Field(
         ..., 
@@ -17,7 +17,11 @@ class AreaSchema(BaseModel):
         max_length=300, 
         examples=["Encargada de las ventas y pricing"]
     )
-    parent_area_id: Optional[int] = Field(
+    departamento_id: Optional[int] = Field(
+        None, 
+        description="ID del área superior (para jerarquías)"
+    )
+    area_parent_id: Optional[int] = Field(
         None, 
         description="ID del área superior (para jerarquías)"
     )
@@ -25,25 +29,27 @@ class AreaSchema(BaseModel):
         None, 
         description="ID del empleado a cargo"
     )
-    comisiona_ventas: bool = Field(
-        False, 
-        description="Indica si los empleados de esta área reciben comisiones"
-    )
-    is_active: bool = True
 
 # --- ESQUEMA PARA GUARDAR (POST/PUT) ---
-class AreaCreate(BaseModel):
-    nombre: str
-    descripcion: Optional[str] = None
+class AreaCreate(AreaBase):
+    pass
 
 # --- ESQUEMA PARA EDITAR
-class AreaUpdate(AreaCreate):
-    area_id: int
-
+class AreaUpdate(BaseModel):
+    nombre: Optional[str] = Field(None, min_length=3, max_length=100)
+    descripcion: Optional[str] = Field(None, max_length=500)
+    departamento_id: Optional[int] = None
+    area_padre_name: Optional[int] = None
+    responsable_id: Optional[int] = None
+    is_active: Optional[bool] = None
 
 # --- ESQUEMA PARA RESPUESTA (LECTURA) ---
-class AreaResponse(AreaSchema):
+class AreaResponse(AreaBase):
     id: int
+    is_active: bool
+    responsable_name: Optional[str] = "Sin responsable"
+    departamento_name: Optional[str] = "Sin departamento"
+    area_padre_name: Optional[str] = "Sin area padre"
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     
@@ -65,3 +71,8 @@ class OperationResult(BaseModel):
     success: int # 1: Ok, 0: Error
     message: str
     id: Optional[int] = None
+
+class AreasDropDown(BaseModel):
+    id: int
+    nombre: str
+    model_config = ConfigDict(from_attributes=True)

@@ -49,3 +49,8 @@ class OperationResult(BaseModel):
     success: bool # Cambiado a bool para que FastAPI lo envíe como true/false JSON
     message: str
     id: Optional[int] = None
+
+class DepartamentoDropDown(BaseModel):
+    id: int
+    nombre: str
+    model_config = ConfigDict(from_attributes=True)

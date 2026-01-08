@@ -17,9 +17,9 @@ BEGIN
                d.created_at
         FROM adm.departamentos d
         LEFT JOIN adm.empleados e ON d.responsable_id = e.id
-        WHERE (@busqueda IS NULL OR d.nombre LIKE '%' + @busqueda + '%')
+        WHERE (@busqueda IS NULL OR d.nombre LIKE '%' + @busqueda + '%') and is_active = 1
     )
-    SELECT *, (SELECT COUNT(*) FROM Resultado) AS TotalRegistros 
+    SELECT *, (SELECT COUNT(*) FROM Resultado) AS total_registros 
     FROM Resultado
     ORDER BY id
     OFFSET (@page - 1) * @registro_por_pagina ROWS 
@@ -75,7 +75,7 @@ END;
 GO
 
 /* 3. DESACTIVAR DEPARTAMENTO (SOFT DELETE) */
-CREATE PROCEDURE adm.usp_desactivar_departamento
+CREATE or ALTER PROCEDURE adm.usp_desactivar_departamento
     @Id bigint,
     @Estado BIT -- Usamos BIT en lugar de bool
 AS
@@ -146,3 +146,16 @@ BEGIN
 END;
 GO
 
+/* 5. MOSTRAR SOLO ID Y NOMBRE */
+
+CREATE OR ALTER PROCEDURE adm.usp_dropdown_departamentos
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT id, nombre
+    FROM adm.departamentos
+    WHERE is_active = 1
+    ORDER BY nombre ASC;
+END
+GO
