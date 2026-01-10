@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from app.database.db_connection import get_db
 from app.services.organizacion.empleados import EmpleadoService
-from app.schemas.organizacion.empleado import (
+from app.schemas.organizacion.empleados import (
     EmpleadoCreate, 
     EmpleadoUpdate, 
     EmpleadoPaginationResponse,
@@ -78,7 +78,7 @@ async def desactivar_empleado(
     empleado_id: int,
     db: AsyncSession = Depends(get_db)
 ):
-    """Desactiva un empleado (soft delete)"""
+    """Desactiva un empleado (soft delete) - asigna fecha_cese automáticamente"""
     service = EmpleadoService(db)
     result = await service.delete(empleado_id)
     if result.get("success") != 1:
@@ -87,3 +87,19 @@ async def desactivar_empleado(
             detail=result.get("message", "Error al desactivar empleado")
         )
     return result
+
+@router.patch("/{empleado_id}/reactivar", response_model=OperationResult)
+async def reactivar_empleado(
+    empleado_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Reactiva un empleado desactivado - limpia fecha_cese"""
+    service = EmpleadoService(db)
+    result = await service.reactivate(empleado_id)
+    if result.get("success") != 1:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result.get("message", "Error al reactivar empleado")
+        )
+    return result
+

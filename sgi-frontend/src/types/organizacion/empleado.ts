@@ -13,11 +13,11 @@ export interface Empleado {
     distrito_id?: number | null;
     distrito?: string | null;
     provincia?: string | null;
-    departamento?: string | null; // Departamento geográfico
+    departamento?: string | null; // Departamento geográfico (ubigeo)
     direccion?: string | null;
     fecha_ingreso?: string | null;
     fecha_cese?: string | null;
-    activo: boolean;
+    is_active: boolean;
     cargo_id?: number | null;
     cargo_nombre?: string | null;
     area_id?: number | null;
@@ -44,9 +44,6 @@ export interface EmpleadoOperationResult {
 
 export interface EmpleadoOption {
     id: number;
-    nombres: string;
-    apellido_paterno: string;
-    apellido_materno?: string | null;
     nombre_completo: string;
 }
 
@@ -62,8 +59,6 @@ export interface EmpleadoCreate {
     distrito_id: number;
     direccion?: string | null;
     fecha_ingreso: string;
-    fecha_cese?: string | null;
-    activo?: boolean;
     cargo_id: number;
     area_id: number;
     departamento_id: number;
@@ -82,8 +77,6 @@ export interface EmpleadoUpdate {
     distrito_id?: number;
     direccion?: string | null;
     fecha_ingreso?: string;
-    fecha_cese?: string | null;
-    activo?: boolean;
     cargo_id?: number;
     area_id?: number;
     departamento_id?: number;

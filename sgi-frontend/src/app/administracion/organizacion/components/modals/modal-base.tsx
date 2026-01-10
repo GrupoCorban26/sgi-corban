@@ -1,7 +1,24 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, createContext, useContext } from 'react';
 import { X } from 'lucide-react';
+
+// Contexto para el modal
+interface ModalContextValue {
+    handleClose: () => void;
+    isClosing: boolean;
+    disableClose: boolean;
+}
+
+const ModalContext = createContext<ModalContextValue | null>(null);
+
+const useModalContext = () => {
+    const context = useContext(ModalContext);
+    if (!context) {
+        throw new Error('useModalContext must be used within ModalBase');
+    }
+    return context;
+};
 
 // ============================================
 // ESTILOS CSS PARA ANIMACIONES
@@ -126,7 +143,7 @@ export function ModalBase({
     if (!shouldRender) return null;
 
     return (
-        <>
+        <ModalContext.Provider value={{ handleClose, isClosing, disableClose }}>
             <style>{modalStyles}</style>
             <div className="fixed inset-0 z-50 overflow-hidden">
                 {/* Overlay */}
@@ -145,7 +162,7 @@ export function ModalBase({
                     {children}
                 </div>
             </div>
-        </>
+        </ModalContext.Provider>
     );
 }
 
@@ -155,11 +172,18 @@ export function ModalBase({
 interface ModalHeaderProps {
     icon: React.ReactNode;
     title: string;
-    onClose: () => void;
-    disableClose?: boolean;
+    onClose?: () => void; // Opcional, se obtiene del contexto si está disponible
+    disableClose?: boolean; // Opcional, se obtiene del contexto si está disponible
 }
 
-export function ModalHeader({ icon, title, onClose, disableClose = false }: ModalHeaderProps) {
+export function ModalHeader({ icon, title, onClose, disableClose }: ModalHeaderProps) {
+    // Obtener del contexto si está disponible
+    const context = useContext(ModalContext);
+
+    // Usar contexto si existe, sino usar props
+    const closeHandler = context?.handleClose ?? onClose;
+    const isDisabled = context?.disableClose ?? disableClose ?? false;
+
     return (
         <header className="flex items-center justify-between p-5 border-b bg-white shrink-0">
             <div className="flex items-center gap-3">
@@ -170,8 +194,8 @@ export function ModalHeader({ icon, title, onClose, disableClose = false }: Moda
             </div>
             <button
                 type="button"
-                onClick={onClose}
-                disabled={disableClose}
+                onClick={closeHandler}
+                disabled={isDisabled}
                 className="cursor-pointer text-gray-400 hover:text-gray-600 p-1.5 rounded-lg hover:bg-gray-100 transition-all disabled:opacity-50"
                 aria-label="Cerrar modal"
             >

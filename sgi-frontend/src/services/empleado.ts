@@ -1,37 +1,18 @@
 import Cookies from 'js-cookie';
-
-// Definimos la estructura de lo que devuelve el API (Igual que en Pydantic)
-export interface Empleado {
-  id: number;
-  codigo_empleado: string;
-  nombres: string;
-  apellido_paterno: string;
-  apellido_materno?: string;
-  nro_documento: string;
-  celular?: string;
-  email_personal?: string;
-  fecha_ingreso: string;
-  activo: boolean;
-  cargo_nombre?: string;
-  area_nombre?: string;
-  jefe_nombre_completo?: string;
-}
-
-export interface EmpleadoPagination {
-  total: number;
-  page: number;
-  page_size: number;
-  total_pages: number;
-  data: Empleado[];
-}
+import {
+  Empleado,
+  EmpleadoPaginationResponse,
+  EmpleadoOperationResult,
+  EmpleadoCreate,
+  EmpleadoUpdate,
+  EmpleadoOption
+} from '@/types/organizacion/empleado';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
 // Función auxiliar para obtener los headers con el Token
 const getAuthHeaders = () => {
-  // Buscamos la cookie 'token' que guardamos en el login
-  const token = Cookies.get('token'); 
-  
+  const token = Cookies.get('token');
   return {
     'Content-Type': 'application/json',
     'Authorization': `Bearer ${token}`
@@ -39,13 +20,20 @@ const getAuthHeaders = () => {
 };
 
 export const empleadoService = {
-  
+
   // 1. LISTAR CON PAGINACIÓN Y FILTROS
-  async listar(page = 1, pageSize = 20, busqueda = '', activo?: boolean) {
+  async listar(
+    page = 1,
+    pageSize = 15,
+    busqueda = '',
+    departamentoId?: number,
+    areaId?: number
+  ): Promise<EmpleadoPaginationResponse> {
     let url = `${API_URL}/empleados?page=${page}&page_size=${pageSize}`;
-    
+
     if (busqueda) url += `&busqueda=${encodeURIComponent(busqueda)}`;
-    if (activo !== undefined) url += `&activo=${activo}`;
+    if (departamentoId) url += `&departamento_id=${departamentoId}`;
+    if (areaId) url += `&area_id=${areaId}`;
 
     const res = await fetch(url, {
       method: 'GET',
@@ -53,21 +41,21 @@ export const empleadoService = {
     });
 
     if (!res.ok) throw new Error('Error al cargar empleados');
-    return (await res.json()) as EmpleadoPagination;
+    return await res.json();
   },
 
-  // 2. OBTENER UNO
-  async obtenerPorId(id: number) {
-    const res = await fetch(`${API_URL}/empleados/${id}`, {
+  // 2. OBTENER DROPDOWN
+  async obtenerDropdown(): Promise<EmpleadoOption[]> {
+    const res = await fetch(`${API_URL}/empleados/dropdown`, {
       method: 'GET',
       headers: getAuthHeaders(),
     });
-    if (!res.ok) throw new Error('Empleado no encontrado');
-    return (await res.json()) as Empleado;
+    if (!res.ok) throw new Error('Error al cargar lista de empleados');
+    return await res.json();
   },
 
   // 3. CREAR
-  async crear(datos: Partial<Empleado>) {
+  async crear(datos: EmpleadoCreate): Promise<EmpleadoOperationResult> {
     const res = await fetch(`${API_URL}/empleados/`, {
       method: 'POST',
       headers: getAuthHeaders(),
@@ -80,24 +68,43 @@ export const empleadoService = {
     return await res.json();
   },
 
-  // 4. ACTUALIZAR (PATCH)
-  async actualizar(id: number, datos: Partial<Empleado>) {
+  // 4. ACTUALIZAR (PUT)
+  async actualizar(id: number, datos: EmpleadoUpdate): Promise<EmpleadoOperationResult> {
     const res = await fetch(`${API_URL}/empleados/${id}`, {
-      method: 'PATCH',
+      method: 'PUT',
       headers: getAuthHeaders(),
       body: JSON.stringify(datos),
     });
-    if (!res.ok) throw new Error('Error al actualizar empleado');
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.detail || 'Error al actualizar empleado');
+    }
     return await res.json();
   },
 
-  // 5. DESACTIVAR (DELETE)
-  async desactivar(id: number) {
+  // 5. DESACTIVAR (DELETE - asigna fecha_cese automáticamente)
+  async desactivar(id: number): Promise<EmpleadoOperationResult> {
     const res = await fetch(`${API_URL}/empleados/${id}`, {
       method: 'DELETE',
       headers: getAuthHeaders(),
     });
-    if (!res.ok) throw new Error('No se pudo desactivar el empleado');
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.detail || 'No se pudo desactivar el empleado');
+    }
+    return await res.json();
+  },
+
+  // 6. REACTIVAR (limpia fecha_cese)
+  async reactivar(id: number): Promise<EmpleadoOperationResult> {
+    const res = await fetch(`${API_URL}/empleados/${id}/reactivar`, {
+      method: 'PATCH',
+      headers: getAuthHeaders(),
+    });
+    if (!res.ok) {
+      const error = await res.json();
+      throw new Error(error.detail || 'No se pudo reactivar el empleado');
+    }
     return await res.json();
   }
 };

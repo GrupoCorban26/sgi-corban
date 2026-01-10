@@ -1,7 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import {
-    Empleado,
     EmpleadoPaginationResponse,
     EmpleadoOperationResult,
     EmpleadoOption,
@@ -46,6 +45,7 @@ export const useEmpleados = (
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['empleados'] });
+            queryClient.invalidateQueries({ queryKey: ['empleados-select'] });
         },
     });
 
@@ -57,10 +57,11 @@ export const useEmpleados = (
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['empleados'] });
+            queryClient.invalidateQueries({ queryKey: ['empleados-select'] });
         },
     });
 
-    // 4. Desactivar Empleado (Soft delete)
+    // 4. Desactivar Empleado (Soft delete - asigna fecha_cese automáticamente)
     const deleteMutation = useMutation({
         mutationFn: async (id: number) => {
             const { data } = await axios.delete<EmpleadoOperationResult>(`${EMPLEADOS_URL}/${id}`);
@@ -68,6 +69,19 @@ export const useEmpleados = (
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['empleados'] });
+            queryClient.invalidateQueries({ queryKey: ['empleados-select'] });
+        },
+    });
+
+    // 5. Reactivar Empleado (limpia fecha_cese)
+    const reactivateMutation = useMutation({
+        mutationFn: async (id: number) => {
+            const { data } = await axios.patch<EmpleadoOperationResult>(`${EMPLEADOS_URL}/${id}/reactivar`);
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['empleados'] });
+            queryClient.invalidateQueries({ queryKey: ['empleados-select'] });
         },
     });
 
@@ -84,6 +98,7 @@ export const useEmpleados = (
         createMutation,
         updateMutation,
         deleteMutation,
+        reactivateMutation,
     };
 };
 

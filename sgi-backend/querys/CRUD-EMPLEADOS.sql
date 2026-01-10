@@ -27,9 +27,9 @@ BEGIN
             e.celular,
             e.email_personal,
             e.distrito_id,
-            dist.distrito,
-            p.provincia,
-            dept.departamento,
+            dist.nombre AS distrito,
+            p.nombre AS provincia,
+            dept.nombre AS departamento,
             e.direccion,
             e.fecha_ingreso,
             e.fecha_cese,
@@ -67,63 +67,74 @@ END
 GO
 
 /* =====================================================
-   2. CREAR EMPLEADOS (CON PAGINACION Y BUSQUEDA)
+   2. CREAR EMPLEADOS
+   - fecha_cese es NULL por defecto (se asigna al desactivar)
+   - is_active es 1 por defecto
    ===================================================== */
 CREATE OR ALTER PROCEDURE adm.usp_crear_empleados
-    @nombre NVARCHAR(100),
+    @nombres NVARCHAR(100),
     @apellido_paterno NVARCHAR(100),
-    @apellido_materno NVARCHAR(100),
-    @fecha_nacimiento DATE,
-    @tipo_documento NVARCHAR(20),
+    @apellido_materno NVARCHAR(100) = NULL,
+    @fecha_nacimiento DATE = NULL,
+    @tipo_documento NVARCHAR(20) = 'DNI',
     @nro_documento NVARCHAR(20),
-    @celular NVARCHAR(20),
-    @email_personal NVARCHAR(100),
+    @celular NVARCHAR(20) = NULL,
+    @email_personal NVARCHAR(100) = NULL,
     @distrito_id INT,
-    @direccion NVARCHAR(200),
+    @direccion NVARCHAR(200) = NULL,
     @fecha_ingreso DATE,
-    @fecha_cese DATE,
-    @activo BIT,
     @cargo_id INT,
     @area_id INT,
     @departamento_id INT,
-    @jefe_id INT
+    @jefe_id INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
 
+    -- Validaciones
     IF NOT EXISTS (SELECT 1 FROM adm.departamentos WHERE id = @departamento_id AND is_active = 1)
     BEGIN
-        RAISERROR('El departamento especificado no existe o est� inactivo.', 16, 1);
+        RAISERROR('El departamento especificado no existe o está inactivo.', 16, 1);
         RETURN;
     END
 
     IF NOT EXISTS (SELECT 1 FROM adm.cargos WHERE id = @cargo_id AND is_active = 1)
     BEGIN
-        RAISERROR('El cargo especificado no existe o est� inactivo.', 16, 1);
+        RAISERROR('El cargo especificado no existe o está inactivo.', 16, 1);
         RETURN;
     END
 
     IF NOT EXISTS (SELECT 1 FROM adm.areas WHERE id = @area_id AND is_active = 1)
     BEGIN
-        RAISERROR('El area especificada no existe o est� inactiva.', 16, 1);
+        RAISERROR('El área especificada no existe o está inactiva.', 16, 1);
         RETURN;
     END
 
-    IF NOT EXISTS (SELECT 1 FROM adm.empleados WHERE id = @jefe_id AND is_active = 1)
+    IF @jefe_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM adm.empleados WHERE id = @jefe_id AND is_active = 1)
     BEGIN
-        RAISERROR('El jefe especificado no existe o est� inactivo.', 16, 1);
+        RAISERROR('El jefe especificado no existe o está inactivo.', 16, 1);
         RETURN;
     END
 
     IF EXISTS (SELECT 1 FROM adm.empleados WHERE nro_documento = @nro_documento AND is_active = 1)
     BEGIN
-        RAISERROR('Ya existe un empleado con el nro de documento especificado.', 16, 1);
+        RAISERROR('Ya existe un empleado con el número de documento especificado.', 16, 1);
         RETURN;
     END
 
     BEGIN TRY
-        INSERT INTO adm.empleados (nombres, apellido_paterno, apellido_materno, fecha_nacimiento, tipo_documento, nro_documento, celular, email_personal, distrito_id, direccion, fecha_ingreso, fecha_cese, is_active, cargo_id, area_id, departamento_id, jefe_id)
-        VALUES (@nombre, @apellido_paterno, @apellido_materno, @fecha_nacimiento, @tipo_documento, @nro_documento, @celular, @email_personal, @distrito_id, @direccion, @fecha_ingreso, @fecha_cese, @activo, @cargo_id, @area_id, @departamento_id, @jefe_id);
+        INSERT INTO adm.empleados (
+            nombres, apellido_paterno, apellido_materno, fecha_nacimiento, 
+            tipo_documento, nro_documento, celular, email_personal, 
+            distrito_id, direccion, fecha_ingreso, fecha_cese, is_active, 
+            cargo_id, area_id, departamento_id, jefe_id
+        )
+        VALUES (
+            @nombres, @apellido_paterno, @apellido_materno, @fecha_nacimiento, 
+            @tipo_documento, @nro_documento, @celular, @email_personal, 
+            @distrito_id, @direccion, @fecha_ingreso, NULL, 1, 
+            @cargo_id, @area_id, @departamento_id, @jefe_id
+        );
 
         SELECT 1 AS success, SCOPE_IDENTITY() AS id, 'Empleado creado exitosamente' AS message;
     END TRY
@@ -139,60 +150,67 @@ GO
 
 CREATE OR ALTER PROCEDURE adm.usp_editar_empleados
     @id INT,
-    @nombre NVARCHAR(100),
+    @nombres NVARCHAR(100),
     @apellido_paterno NVARCHAR(100),
-    @apellido_materno NVARCHAR(100),
-    @fecha_nacimiento DATE,
-    @tipo_documento NVARCHAR(20),
+    @apellido_materno NVARCHAR(100) = NULL,
+    @fecha_nacimiento DATE = NULL,
+    @tipo_documento NVARCHAR(20) = 'DNI',
     @nro_documento NVARCHAR(20),
-    @celular NVARCHAR(20),
-    @email_personal NVARCHAR(100),
+    @celular NVARCHAR(20) = NULL,
+    @email_personal NVARCHAR(100) = NULL,
     @distrito_id INT,
-    @direccion NVARCHAR(200),
+    @direccion NVARCHAR(200) = NULL,
     @fecha_ingreso DATE,
-    @fecha_cese DATE,
-    @activo BIT,
     @cargo_id INT,
     @area_id INT,
     @departamento_id INT,
-    @jefe_id INT
+    @jefe_id INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
 
+    -- Verificar que el empleado existe
+    IF NOT EXISTS (SELECT 1 FROM adm.empleados WHERE id = @id)
+    BEGIN
+        RAISERROR('El empleado especificado no existe.', 16, 1);
+        RETURN;
+    END
+
+    -- Validaciones
     IF NOT EXISTS (SELECT 1 FROM adm.departamentos WHERE id = @departamento_id AND is_active = 1)
     BEGIN
-        RAISERROR('El departamento especificado no existe o est� inactivo.', 16, 1);
+        RAISERROR('El departamento especificado no existe o está inactivo.', 16, 1);
         RETURN;
     END
 
     IF NOT EXISTS (SELECT 1 FROM adm.cargos WHERE id = @cargo_id AND is_active = 1)
     BEGIN
-        RAISERROR('El cargo especificado no existe o est� inactivo.', 16, 1);
+        RAISERROR('El cargo especificado no existe o está inactivo.', 16, 1);
         RETURN;
     END
 
     IF NOT EXISTS (SELECT 1 FROM adm.areas WHERE id = @area_id AND is_active = 1)
     BEGIN
-        RAISERROR('El area especificada no existe o est� inactiva.', 16, 1);
+        RAISERROR('El área especificada no existe o está inactiva.', 16, 1);
         RETURN;
     END
 
-    IF NOT EXISTS (SELECT 1 FROM adm.empleados WHERE id = @jefe_id AND is_active = 1)
+    IF @jefe_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM adm.empleados WHERE id = @jefe_id AND is_active = 1)
     BEGIN
-        RAISERROR('El jefe especificado no existe o est� inactivo.', 16, 1);
+        RAISERROR('El jefe especificado no existe o está inactivo.', 16, 1);
         RETURN;
     END
 
-    IF EXISTS (SELECT 1 FROM adm.empleados WHERE nro_documento = @nro_documento AND is_active = 1)
+    -- Verificar duplicado de documento (excluyendo el empleado actual)
+    IF EXISTS (SELECT 1 FROM adm.empleados WHERE nro_documento = @nro_documento AND id != @id AND is_active = 1)
     BEGIN
-        RAISERROR('Ya existe un empleado con el nro de documento especificado.', 16, 1);
+        RAISERROR('Ya existe otro empleado con el número de documento especificado.', 16, 1);
         RETURN;
     END
 
     BEGIN TRY
         UPDATE adm.empleados
-        SET nombres = @nombre,
+        SET nombres = @nombres,
             apellido_paterno = @apellido_paterno,
             apellido_materno = @apellido_materno,
             fecha_nacimiento = @fecha_nacimiento,
@@ -203,8 +221,6 @@ BEGIN
             distrito_id = @distrito_id,
             direccion = @direccion,
             fecha_ingreso = @fecha_ingreso,
-            fecha_cese = @fecha_cese,
-            is_active = @activo,
             cargo_id = @cargo_id,
             area_id = @area_id,
             departamento_id = @departamento_id,
@@ -212,7 +228,7 @@ BEGIN
             updated_at = GETDATE()
         WHERE id = @id;
 
-        SELECT 1 AS success, @id AS id, 'Empleado editado exitosamente' AS message;
+        SELECT 1 AS success, @id AS id, 'Empleado actualizado exitosamente' AS message;
     END TRY
     BEGIN CATCH
         THROW;
@@ -221,12 +237,13 @@ END
 GO
 
 /* =====================================================
-   3. DESACTIVAR EMPLEADOS
+   4. DESACTIVAR EMPLEADOS (SOFT DELETE)
+   - Establece fecha_cese = fecha actual
+   - Establece is_active = 0
    ===================================================== */
 
 CREATE OR ALTER PROCEDURE adm.usp_desactivar_empleados
-    @id INT,
-    @estado BIT = 0
+    @id INT
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -237,8 +254,15 @@ BEGIN
         RETURN;
     END
 
+    -- Verificar si el empleado ya está desactivado
+    IF NOT EXISTS (SELECT 1 FROM adm.empleados WHERE id = @id AND is_active = 1)
+    BEGIN
+        RAISERROR('El empleado ya se encuentra desactivado.', 16, 1);
+        RETURN;
+    END
+
     -- Verificar si el empleado es jefe de otros empleados activos
-    IF @estado = 0 AND EXISTS (SELECT 1 FROM adm.empleados WHERE jefe_id = @id AND is_active = 1)
+    IF EXISTS (SELECT 1 FROM adm.empleados WHERE jefe_id = @id AND is_active = 1)
     BEGIN
         RAISERROR('No se puede desactivar un empleado que es jefe de otros empleados activos.', 16, 1);
         RETURN;
@@ -246,7 +270,8 @@ BEGIN
 
     BEGIN TRY
         UPDATE adm.empleados
-        SET is_active = @estado,
+        SET is_active = 0,
+            fecha_cese = CAST(GETDATE() AS DATE),
             updated_at = GETDATE()
         WHERE id = @id;
 
@@ -259,7 +284,46 @@ END
 GO
 
 /* =====================================================
-   4. Listar ID Y NOMBRE de Areas para DropDown
+   5. REACTIVAR EMPLEADO
+   - Establece fecha_cese = NULL
+   - Establece is_active = 1
+   ===================================================== */
+
+CREATE OR ALTER PROCEDURE adm.usp_reactivar_empleado
+    @id INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF NOT EXISTS (SELECT 1 FROM adm.empleados WHERE id = @id)
+    BEGIN
+        RAISERROR('El empleado especificado no existe.', 16, 1);
+        RETURN;
+    END
+
+    IF EXISTS (SELECT 1 FROM adm.empleados WHERE id = @id AND is_active = 1)
+    BEGIN
+        RAISERROR('El empleado ya se encuentra activo.', 16, 1);
+        RETURN;
+    END
+
+    BEGIN TRY
+        UPDATE adm.empleados
+        SET is_active = 1,
+            fecha_cese = NULL,
+            updated_at = GETDATE()
+        WHERE id = @id;
+
+        SELECT 1 AS success, @id AS id, 'Empleado reactivado exitosamente' AS message;
+    END TRY
+    BEGIN CATCH
+        THROW;
+    END CATCH
+END
+GO
+
+/* =====================================================
+   6. LISTAR EMPLEADOS PARA DROPDOWN
    ===================================================== */
 CREATE OR ALTER PROCEDURE adm.usp_listar_empleados_dropdown
 AS
@@ -268,18 +332,7 @@ BEGIN
 
     SELECT 
         id, 
-        -- Creamos una sola columna 'nombre_completo' para el frontend
-        CONCAT(
-            nombres, 
-            ' ', 
-            apellido_paterno, 
-            CASE 
-                WHEN apellido_materno IS NOT NULL AND apellido_materno <> '' 
-                -- Solo ponemos la inicial y el punto si existe el apellido
-                THEN ' ' + LEFT(apellido_materno, 1) + '.' 
-                ELSE '' 
-            END
-        ) AS nombre_completo
+        CONCAT(nombres, ' ', apellido_paterno, ' ', ISNULL(apellido_materno, '')) AS nombre_completo
     FROM adm.empleados
     WHERE is_active = 1
     ORDER BY nombres ASC;

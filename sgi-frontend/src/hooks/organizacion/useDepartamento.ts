@@ -10,7 +10,7 @@ import {
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
 const DEPTOS_URL = `${API_BASE_URL}/departamentos`;
-const EMPLEADOS_URL = `${API_BASE_URL}/empleado`; // Singular - matches backend route
+const EMPLEADOS_URL = `${API_BASE_URL}/empleados`; // Plural - correcto
 
 // ============================================
 // HOOK PRINCIPAL DE DEPARTAMENTOS
@@ -87,16 +87,9 @@ export const useEmpleadosParaSelect = () => {
   return useQuery({
     queryKey: ['empleados-select'],
     queryFn: async () => {
-      // Traemos todos los empleados activos para el dropdown
-      const { data } = await axios.get(`${EMPLEADOS_URL}/`, {
-        params: { page: 1, page_size: 100, activo: true },
-      });
-      // Mapeamos a formato simple para el select
-      const empleados: EmpleadoOption[] = data.data.map((emp: any) => ({
-        id: emp.id,
-        nombre_completo: `${emp.nombres} ${emp.apellido_paterno}`.trim(),
-      }));
-      return empleados;
+      // Usamos el endpoint dropdown que devuelve formato simple
+      const { data } = await axios.get<EmpleadoOption[]>(`${EMPLEADOS_URL}/dropdown`);
+      return data;
     },
     staleTime: 1000 * 60 * 5, // 5 minutos de caché
   });

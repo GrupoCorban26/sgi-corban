@@ -1,5 +1,5 @@
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from datetime import date, datetime
+from datetime import date
 from typing import Optional, List
 
 # ============================================
@@ -7,6 +7,7 @@ from typing import Optional, List
 # ============================================
 
 class EmpleadoBase(BaseModel):
+    """Campos base para empleados"""
     nombres: str = Field(..., max_length=100)
     apellido_paterno: str = Field(..., max_length=75)
     apellido_materno: Optional[str] = Field(None, max_length=75)
@@ -23,8 +24,11 @@ class EmpleadoBase(BaseModel):
     departamento_id: int
     jefe_id: Optional[int] = None
 
+
 class EmpleadoCreate(EmpleadoBase):
-    is_active: bool = True
+    """Schema para crear empleado - fecha_cese es NULL por defecto"""
+    pass  # Hereda todos los campos de EmpleadoBase
+
 
 class EmpleadoUpdate(BaseModel):
     """Schema para actualizar empleado - todos los campos opcionales"""
@@ -39,12 +43,11 @@ class EmpleadoUpdate(BaseModel):
     distrito_id: Optional[int] = None
     direccion: Optional[str] = Field(None, max_length=200)
     fecha_ingreso: Optional[date] = None
-    fecha_cese: Optional[date] = None
-    is_active: Optional[bool] = None
     cargo_id: Optional[int] = None
     area_id: Optional[int] = None
     departamento_id: Optional[int] = None
     jefe_id: Optional[int] = None
+
 
 class EmpleadoResponse(BaseModel):
     """Schema de respuesta con datos completos"""
@@ -76,6 +79,7 @@ class EmpleadoResponse(BaseModel):
     
     model_config = ConfigDict(from_attributes=True)
 
+
 class EmpleadoPaginationResponse(BaseModel):
     """Respuesta paginada de empleados"""
     total: int
@@ -84,11 +88,13 @@ class EmpleadoPaginationResponse(BaseModel):
     total_pages: int
     data: List[EmpleadoResponse]
 
+
 class OperationResult(BaseModel):
     """Respuesta genérica para operaciones CRUD"""
     success: int
     message: str
     id: Optional[int] = None
+
 
 class EmpleadoDropdown(BaseModel):
     """Schema para dropdown de empleados"""

@@ -1,27 +1,34 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
-from app.schemas.organizacion.empleado import EmpleadoCreate, EmpleadoUpdate
+from app.schemas.organizacion.empleados import EmpleadoCreate, EmpleadoUpdate
 
 class EmpleadoService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_all(self, busqueda: str = None, departamento_id: int = None, area_id: int = None, page: int = 1, page_size: int = 15) -> dict:
+    async def get_all(
+        self, 
+        busqueda: str = None, 
+        departamento_id: int = None, 
+        area_id: int = None, 
+        page: int = 1, 
+        page_size: int = 15
+    ) -> dict:
         """Obtiene todos los empleados con paginación y filtros"""
         query = text("""
             EXEC adm.usp_listar_empleados
-                @busqueda=:b,
-                @departamento_id=:d,
-                @area_id=:a,
-                @page=:p,
-                @registro_por_pagina=:r
+                @busqueda=:busqueda,
+                @departamento_id=:departamento_id,
+                @area_id=:area_id,
+                @page=:page,
+                @registro_por_pagina=:page_size
         """)
         result = await self.db.execute(query, {
-            "b": busqueda, 
-            "d": departamento_id, 
-            "a": area_id, 
-            "p": page, 
-            "r": page_size
+            "busqueda": busqueda, 
+            "departamento_id": departamento_id, 
+            "area_id": area_id, 
+            "page": page, 
+            "page_size": page_size
         })
         data = result.mappings().all()
 
@@ -39,7 +46,7 @@ class EmpleadoService:
         """Crea un nuevo empleado"""
         query = text("""
             EXEC adm.usp_crear_empleados
-                @nombre=:nombres,
+                @nombres=:nombres,
                 @apellido_paterno=:apellido_paterno,
                 @apellido_materno=:apellido_materno,
                 @fecha_nacimiento=:fecha_nacimiento,
@@ -50,8 +57,6 @@ class EmpleadoService:
                 @distrito_id=:distrito_id,
                 @direccion=:direccion,
                 @fecha_ingreso=:fecha_ingreso,
-                @fecha_cese=:fecha_cese,
-                @activo=:activo,
                 @cargo_id=:cargo_id,
                 @area_id=:area_id,
                 @departamento_id=:departamento_id,
@@ -69,8 +74,6 @@ class EmpleadoService:
             "distrito_id": empleado.distrito_id,
             "direccion": empleado.direccion,
             "fecha_ingreso": empleado.fecha_ingreso,
-            "fecha_cese": empleado.fecha_cese,
-            "activo": empleado.activo,
             "cargo_id": empleado.cargo_id,
             "area_id": empleado.area_id,
             "departamento_id": empleado.departamento_id,
@@ -85,7 +88,7 @@ class EmpleadoService:
         query = text("""
             EXEC adm.usp_editar_empleados
                 @id=:id,
-                @nombre=:nombres,
+                @nombres=:nombres,
                 @apellido_paterno=:apellido_paterno,
                 @apellido_materno=:apellido_materno,
                 @fecha_nacimiento=:fecha_nacimiento,
@@ -96,8 +99,6 @@ class EmpleadoService:
                 @distrito_id=:distrito_id,
                 @direccion=:direccion,
                 @fecha_ingreso=:fecha_ingreso,
-                @fecha_cese=:fecha_cese,
-                @activo=:activo,
                 @cargo_id=:cargo_id,
                 @area_id=:area_id,
                 @departamento_id=:departamento_id,
@@ -116,8 +117,6 @@ class EmpleadoService:
             "distrito_id": empleado.distrito_id,
             "direccion": empleado.direccion,
             "fecha_ingreso": empleado.fecha_ingreso,
-            "fecha_cese": empleado.fecha_cese,
-            "activo": empleado.activo,
             "cargo_id": empleado.cargo_id,
             "area_id": empleado.area_id,
             "departamento_id": empleado.departamento_id,
@@ -128,20 +127,24 @@ class EmpleadoService:
         return dict(row) if row else {"success": 0, "message": "Error al actualizar empleado"}
 
     async def delete(self, id: int) -> dict:
-        """Desactiva un empleado (soft delete)"""
-        query = text("EXEC adm.usp_desactivar_empleados @id=:id, @estado=0")
+        """Desactiva un empleado (soft delete) - asigna fecha_cese automáticamente"""
+        query = text("EXEC adm.usp_desactivar_empleados @id=:id")
         result = await self.db.execute(query, {"id": id})
         await self.db.commit()
         row = result.mappings().first()
         return dict(row) if row else {"success": 0, "message": "Error al desactivar empleado"}
+
+    async def reactivate(self, id: int) -> dict:
+        """Reactiva un empleado - limpia fecha_cese"""
+        query = text("EXEC adm.usp_reactivar_empleado @id=:id")
+        result = await self.db.execute(query, {"id": id})
+        await self.db.commit()
+        row = result.mappings().first()
+        return dict(row) if row else {"success": 0, "message": "Error al reactivar empleado"}
 
     async def get_dropdown(self) -> list:
         """Obtiene lista simple de empleados para dropdown"""
         query = text("EXEC adm.usp_listar_empleados_dropdown")
         result = await self.db.execute(query)
         data = result.mappings().all()
-        
-        return {
-            "success": 1,
-            "data": data
-        }
+        return [dict(row) for row in data]
