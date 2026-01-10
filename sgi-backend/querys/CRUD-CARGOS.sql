@@ -171,7 +171,7 @@ BEGIN
     END
 
     -- 2. Si se va a desactivar, validar que no tenga empleados activos
-    IF @estado = 0 AND EXISTS (SELECT 1 FROM adm.empleados WHERE cargo_id = @id AND activo = 1)
+    IF @estado = 0 AND EXISTS (SELECT 1 FROM adm.empleados WHERE cargo_id = @id AND is_active = 1)
     BEGIN
         RAISERROR('No se puede desactivar un cargo que tiene empleados activos asignados.', 16, 1);
         RETURN;

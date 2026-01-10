@@ -140,11 +140,8 @@ class EmpleadoService:
         query = text("EXEC adm.usp_listar_empleados_dropdown")
         result = await self.db.execute(query)
         data = result.mappings().all()
-        # Agregar nombre_completo
-        return [
-            {
-                **dict(row),
-                "nombre_completo": f"{row['nombres']} {row['apellido_paterno']} {row.get('apellido_materno', '') or ''}".strip()
-            }
-            for row in data
-        ]
+        
+        return {
+            "success": 1,
+            "data": data
+        }

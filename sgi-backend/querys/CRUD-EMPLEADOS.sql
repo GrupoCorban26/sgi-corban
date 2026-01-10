@@ -266,7 +266,20 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    SELECT id, nombres, apellido_paterno, apellido_materno
+    SELECT 
+        id, 
+        -- Creamos una sola columna 'nombre_completo' para el frontend
+        CONCAT(
+            nombres, 
+            ' ', 
+            apellido_paterno, 
+            CASE 
+                WHEN apellido_materno IS NOT NULL AND apellido_materno <> '' 
+                -- Solo ponemos la inicial y el punto si existe el apellido
+                THEN ' ' + LEFT(apellido_materno, 1) + '.' 
+                ELSE '' 
+            END
+        ) AS nombre_completo
     FROM adm.empleados
     WHERE is_active = 1
     ORDER BY nombres ASC;

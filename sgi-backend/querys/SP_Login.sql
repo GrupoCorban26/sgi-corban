@@ -1,3 +1,6 @@
+USE SGI_GrupoCorban
+GO
+
 CREATE OR ALTER PROCEDURE seg.sp_obtener_usuario_login
     @correo_corp NVARCHAR(100)
 AS
@@ -11,7 +14,7 @@ BEGIN
             e.id AS empleado_id,
             u.password_hash,
             u.is_bloqueado,
-            u.debe_cambiar_password,
+            u.debe_cambiar_pass,
             CONCAT(e.nombres, ' ', e.apellido_paterno) AS nombre_corto,
             -- Datos para la redirección dinámica
             a.nombre AS area_nombre,

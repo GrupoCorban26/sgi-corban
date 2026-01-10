@@ -1,23 +1,31 @@
 USE SGI_GrupoCorban
 GO
 
-/* 1. LISTAR DEPARTAMENTOS (CON JOIN AL RESPONSABLE) */
+/* =====================================================
+   1. LISTAR DEPARTAMENTOS (CON PAGINACION Y BUSQUEDA)
+   ===================================================== */
 CREATE OR ALTER PROCEDURE adm.usp_listar_departamentos
     @busqueda NVARCHAR(100) = NULL,
-    @page INT=1,
-    @registro_por_pagina INT=15
-    -- Eliminamos @total_de_filas de aquí porque lo calcularemos dentro
+    @page INT = 1,
+    @registro_por_pagina INT = 15
 AS
 BEGIN
     SET NOCOUNT ON;
 
     WITH Resultado AS (
-        SELECT d.id, d.nombre, d.descripcion,
-               ISNULL(e.nombres + ' ' + e.apellido_paterno, 'Sin asignar') AS responsable_name,
-               d.created_at
+        SELECT 
+            d.id, 
+            d.nombre, 
+            d.descripcion, 
+            d.responsable_id,
+            ISNULL(e.nombres + ' ' + e.apellido_paterno, 'Sin asignar') AS responsable_nombre,
+            d.is_active, 
+            d.created_at,
+            d.updated_at
         FROM adm.departamentos d
-        LEFT JOIN adm.empleados e ON d.responsable_id = e.id
-        WHERE (@busqueda IS NULL OR d.nombre LIKE '%' + @busqueda + '%') and is_active = 1
+        LEFT JOIN adm.empleados e ON e.id = d.responsable_id
+        WHERE d.is_active = 1 
+          AND (@busqueda IS NULL OR d.nombre LIKE '%' + @busqueda + '%')
     )
     SELECT *, (SELECT COUNT(*) FROM Resultado) AS total_registros 
     FROM Resultado
@@ -27,127 +35,143 @@ BEGIN
 END
 GO
 
-/* 2. EDITAR DEPARTAMENTO (CON VALIDACIÓN DE DUPLICADO) */
-CREATE or ALTER PROCEDURE adm.usp_editar_departamento
-    @Id bigint,
-    @Nombre NVARCHAR(100),
-    @Descripcion NVARCHAR(500) = NULL,
-    @Responsable_id int = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET XACT_ABORT ON;
-
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        -- Validar que el ID exista
-        IF NOT EXISTS (SELECT 1 FROM adm.departamentos WHERE id = @Id)
-        BEGIN
-            RAISERROR('El departamento no existe.', 16, 1);
-            ROLLBACK TRANSACTION;
-            RETURN;
-        END
-
-        -- Validar que el nuevo nombre no lo tenga OTRO departamento
-        IF EXISTS (SELECT 1 FROM adm.departamentos WHERE nombre = @Nombre AND id <> @Id AND is_active = 1)
-        BEGIN
-            RAISERROR('Ya existe otro departamento con ese nombre.', 16, 1);
-            ROLLBACK TRANSACTION;
-            RETURN;
-        END
-
-        UPDATE adm.departamentos
-        SET 
-            nombre = ISNULL(LTRIM(RTRIM(@Nombre)), nombre),
-            descripcion = ISNULL(@Descripcion, descripcion),
-            responsable_id = ISNULL(@Responsable_id, responsable_id),
-            updated_at = GETDATE()
-        WHERE id = @Id;
-
-        COMMIT TRANSACTION;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        THROW; -- Retorna el error original al backend
-    END CATCH
-END;
-GO
-
-/* 3. DESACTIVAR DEPARTAMENTO (SOFT DELETE) */
-CREATE or ALTER PROCEDURE adm.usp_desactivar_departamento
-    @Id bigint,
-    @Estado BIT -- Usamos BIT en lugar de bool
+/* =====================================================
+   2. CREAR DEPARTAMENTO
+   ===================================================== */
+CREATE OR ALTER PROCEDURE adm.usp_crear_departamento
+    @nombre NVARCHAR(100),
+    @descripcion NVARCHAR(300) = NULL,
+    @responsable_id INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
     
-    -- Verificamos si tiene Áreas activas antes de desactivar (Opcional pero recomendado)
-    IF @Estado = 0 AND EXISTS (SELECT 1 FROM adm.areas WHERE departamento_id = @Id AND is_active = 1)
+    -- 1. Validar nombre unico (entre departamentos activos)
+    IF EXISTS (SELECT 1 FROM adm.departamentos WHERE nombre = @nombre AND is_active = 1)
     BEGIN
-        RAISERROR('No se puede desactivar un departamento que tiene áreas activas.', 16, 1);
+        DECLARE @msg_dup NVARCHAR(200) = 'Ya existe un departamento activo con el nombre "' + @nombre + '".';
+        RAISERROR(@msg_dup, 16, 1);
         RETURN;
     END
 
-    UPDATE adm.departamentos
-    SET is_active = @Estado, updated_at = GETDATE()
-    WHERE id = @Id;
-END;
+    -- 2. Validar que el responsable exista (si se especifica)
+    IF @responsable_id IS NOT NULL 
+       AND NOT EXISTS (SELECT 1 FROM adm.empleados WHERE id = @responsable_id AND is_active = 1)
+    BEGIN
+        RAISERROR('El empleado responsable especificado no existe o esta inactivo.', 16, 1);
+        RETURN;
+    END
+
+    -- 3. Insertar
+    BEGIN TRY
+        INSERT INTO adm.departamentos (nombre, descripcion, responsable_id)
+        VALUES (LTRIM(RTRIM(@nombre)), @descripcion, @responsable_id);
+
+        SELECT 1 AS success, SCOPE_IDENTITY() AS id, 'Departamento creado exitosamente' AS message;
+    END TRY
+    BEGIN CATCH
+        THROW;
+    END CATCH
+END
 GO
 
-CREATE OR ALTER PROCEDURE adm.usp_crear_departamento
-    @Nombre NVARCHAR(100),
-    @Descripcion NVARCHAR(500) = NULL,
-    @Responsable_id INT = NULL
+/* =====================================================
+   3. EDITAR DEPARTAMENTO
+   ===================================================== */
+CREATE OR ALTER PROCEDURE adm.usp_editar_departamento
+    @id INT,
+    @nombre NVARCHAR(100),
+    @descripcion NVARCHAR(300) = NULL,
+    @responsable_id INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
-    SET XACT_ABORT ON;
 
+    -- 1. Validar que el departamento exista
+    IF NOT EXISTS (SELECT 1 FROM adm.departamentos WHERE id = @id)
+    BEGIN
+        RAISERROR('El departamento especificado no existe.', 16, 1);
+        RETURN;
+    END
+
+    -- 2. Validar que el nombre no este duplicado en OTRO departamento activo
+    IF EXISTS (SELECT 1 FROM adm.departamentos WHERE nombre = @nombre AND id <> @id AND is_active = 1)
+    BEGIN
+        DECLARE @msg_dup NVARCHAR(200) = 'Ya existe otro departamento con el nombre "' + @nombre + '".';
+        RAISERROR(@msg_dup, 16, 1);
+        RETURN;
+    END
+
+    -- 3. Validar que el responsable exista (si se especifica)
+    IF @responsable_id IS NOT NULL 
+       AND NOT EXISTS (SELECT 1 FROM adm.empleados WHERE id = @responsable_id AND is_active = 1)
+    BEGIN
+        RAISERROR('El empleado responsable especificado no existe o esta inactivo.', 16, 1);
+        RETURN;
+    END
+
+    -- 4. Actualizar
     BEGIN TRY
-        BEGIN TRANSACTION;
+        UPDATE adm.departamentos
+        SET nombre = LTRIM(RTRIM(@nombre)),
+            descripcion = @descripcion,
+            responsable_id = @responsable_id,
+            updated_at = GETDATE()
+        WHERE id = @id;
 
-        -- 1. Validar que el nombre no esté duplicado
-        -- LTRIM y RTRIM eliminan espacios accidentales al inicio o final
-        IF EXISTS (SELECT 1 FROM adm.departamentos WHERE nombre = LTRIM(RTRIM(@Nombre)) AND is_active = 1)
-        BEGIN
-            RAISERROR('Ya existe un departamento activo con este nombre.', 16, 1);
-            ROLLBACK TRANSACTION;
-            RETURN;
-        END
-
-        -- 2. Insertar el nuevo registro
-        INSERT INTO adm.departamentos (
-            nombre, 
-            descripcion, 
-            responsable_id, 
-            is_active, 
-            created_at, 
-            updated_at
-        )
-        VALUES (
-            LTRIM(RTRIM(@Nombre)), 
-            @Descripcion, 
-            @Responsable_id, 
-            1,          -- Por defecto activo
-            GETDATE(), 
-            GETDATE()
-        );
-
-        -- 3. Retornar el ID del nuevo departamento (útil para el Frontend)
-        SELECT SCOPE_IDENTITY() AS id;
-
-        COMMIT TRANSACTION;
+        SELECT 1 AS success, @id AS id, 'Departamento actualizado correctamente' AS message;
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        THROW; 
+        THROW;
     END CATCH
-END;
+END
 GO
 
-/* 5. MOSTRAR SOLO ID Y NOMBRE */
+/* =====================================================
+   4. DESACTIVAR DEPARTAMENTO (SOFT DELETE)
+   ===================================================== */
+CREATE OR ALTER PROCEDURE adm.usp_desactivar_departamento
+    @id INT,
+    @estado BIT = 0  -- 0 = desactivar, 1 = reactivar
+AS
+BEGIN
+    SET NOCOUNT ON;
 
+    -- 1. Validar que el departamento exista
+    IF NOT EXISTS (SELECT 1 FROM adm.departamentos WHERE id = @id)
+    BEGIN
+        RAISERROR('El departamento especificado no existe.', 16, 1);
+        RETURN;
+    END
+
+    -- 2. Si se va a desactivar, validar que no tenga areas activas
+    IF @estado = 0 AND EXISTS (SELECT 1 FROM adm.areas WHERE departamento_id = @id AND is_active = 1)
+    BEGIN
+        RAISERROR('No se puede desactivar un departamento que tiene areas activas.', 16, 1);
+        RETURN;
+    END
+
+    -- 3. Si se va a desactivar, validar que no tenga empleados activos asignados directamente
+    IF @estado = 0 AND EXISTS (SELECT 1 FROM adm.empleados WHERE departamento_id = @id AND is_active = 1)
+    BEGIN
+        RAISERROR('No se puede desactivar un departamento que tiene empleados activos asignados.', 16, 1);
+        RETURN;
+    END
+
+    -- 4. Actualizar estado
+    UPDATE adm.departamentos
+    SET is_active = @estado,
+        updated_at = GETDATE()
+    WHERE id = @id;
+
+    DECLARE @accion NVARCHAR(20) = CASE WHEN @estado = 1 THEN 'reactivado' ELSE 'desactivado' END;
+    SELECT 1 AS success, @id AS id, 'Departamento ' + @accion + ' correctamente' AS message;
+END
+GO
+
+/* =====================================================
+   5. DROPDOWN DE DEPARTAMENTOS
+   ===================================================== */
 CREATE OR ALTER PROCEDURE adm.usp_dropdown_departamentos
 AS
 BEGIN

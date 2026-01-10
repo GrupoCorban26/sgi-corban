@@ -24,9 +24,7 @@ class EmpleadoBase(BaseModel):
     jefe_id: Optional[int] = None
 
 class EmpleadoCreate(EmpleadoBase):
-    """Schema para crear empleado"""
-    fecha_cese: Optional[date] = None
-    activo: bool = True
+    is_active: bool = True
 
 class EmpleadoUpdate(BaseModel):
     """Schema para actualizar empleado - todos los campos opcionales"""
@@ -42,7 +40,7 @@ class EmpleadoUpdate(BaseModel):
     direccion: Optional[str] = Field(None, max_length=200)
     fecha_ingreso: Optional[date] = None
     fecha_cese: Optional[date] = None
-    activo: Optional[bool] = None
+    is_active: Optional[bool] = None
     cargo_id: Optional[int] = None
     area_id: Optional[int] = None
     departamento_id: Optional[int] = None
@@ -66,7 +64,7 @@ class EmpleadoResponse(BaseModel):
     direccion: Optional[str] = None
     fecha_ingreso: Optional[date] = None
     fecha_cese: Optional[date] = None
-    activo: bool = True
+    is_active: bool = True
     cargo_id: Optional[int] = None
     cargo_nombre: Optional[str] = None
     area_id: Optional[int] = None
@@ -95,9 +93,6 @@ class OperationResult(BaseModel):
 class EmpleadoDropdown(BaseModel):
     """Schema para dropdown de empleados"""
     id: int
-    nombres: str
-    apellido_paterno: str
-    apellido_materno: Optional[str] = None
-    nombre_completo: Optional[str] = None
+    nombre_completo: str
     
     model_config = ConfigDict(from_attributes=True)

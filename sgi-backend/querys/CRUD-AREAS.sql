@@ -1,7 +1,7 @@
 USE SGI_GrupoCorban
 GO
 /* =====================================================
-   1. LISTAR �REAS (CON PAGINACI�N Y B�SQUEDA)
+   1. LISTAR AREAS (CON PAGINACION Y BUSQUEDA)
    ===================================================== */
 CREATE OR ALTER PROCEDURE adm.usp_listar_areas
     @busqueda NVARCHAR(100) = NULL,
@@ -19,7 +19,7 @@ BEGIN
             a.descripcion, 
             a.departamento_id,
             d.nombre AS departamento_name, 
-            a.area_parent_id, 
+            a.area_padre_id, 
             ap.nombre AS area_padre_name,
             a.responsable_id,
             ISNULL(e.nombres + ' ' + e.apellido_paterno, 'Sin asignar') AS responsable_name,
@@ -29,7 +29,7 @@ BEGIN
         FROM adm.areas a
         INNER JOIN adm.departamentos d ON d.id = a.departamento_id
         LEFT JOIN adm.empleados e ON e.id = a.responsable_id
-        LEFT JOIN adm.areas ap ON ap.id = a.area_parent_id
+        LEFT JOIN adm.areas ap ON ap.id = a.area_padre_id
         WHERE a.is_active = 1 
           AND (@busqueda IS NULL 
                OR a.nombre LIKE '%' + @busqueda + '%' 
@@ -45,7 +45,7 @@ END
 GO
 
 /* =====================================================
-   2. CREAR �REA
+   2. CREAR AREA
    ===================================================== */
 CREATE OR ALTER PROCEDURE adm.usp_crear_areas
     @nombre NVARCHAR(100),
@@ -64,11 +64,11 @@ BEGIN
         RETURN;
     END
 
-    -- 2. Validar que el �rea padre exista (si se especific�)
+    -- 2. Validar que el area padre exista (si se especifica)
     IF @area_parent_id IS NOT NULL 
        AND NOT EXISTS (SELECT 1 FROM adm.areas WHERE id = @area_parent_id AND is_active = 1)
     BEGIN
-        RAISERROR('El �rea padre especificada no existe o est� inactiva.', 16, 1);
+        RAISERROR('El area padre especificada no existe o est� inactiva.', 16, 1);
         RETURN;
     END
 
@@ -82,7 +82,7 @@ BEGIN
 
     -- 4. Insertar
     BEGIN TRY
-        INSERT INTO adm.areas (nombre, descripcion, departamento_id, area_parent_id, responsable_id )
+        INSERT INTO adm.areas (nombre, descripcion, departamento_id, area_padre_id, responsable_id )
         VALUES (@nombre, @descripcion, @departamento_id, @area_parent_id, @responsable_id);
 
         SELECT 1 AS success, SCOPE_IDENTITY() AS id, '�rea creada exitosamente' AS message;
@@ -142,7 +142,7 @@ BEGIN
         SET nombre = @nombre,
             descripcion = @descripcion,
             departamento_id = @departamento_id,
-            area_parent_id = @area_parent_id,
+            area_padre_id = @area_parent_id,
             responsable_id = @responsable_id,
             updated_at = GETDATE()
         WHERE id = @id;
@@ -173,7 +173,7 @@ BEGIN
     END
 
     -- 2. Si se va a desactivar, validar que no tenga sub-�reas activas
-    IF @estado = 0 AND EXISTS (SELECT 1 FROM adm.areas WHERE area_parent_id = @id AND is_active = 1)
+    IF @estado = 0 AND EXISTS (SELECT 1 FROM adm.areas WHERE area_padre_id = @id AND is_active = 1)
     BEGIN
         RAISERROR('No se puede desactivar un �rea que tiene sub-�reas activas.', 16, 1);
         RETURN;

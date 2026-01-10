@@ -39,7 +39,7 @@ class AreaUpdate(BaseModel):
     nombre: Optional[str] = Field(None, min_length=3, max_length=100)
     descripcion: Optional[str] = Field(None, max_length=500)
     departamento_id: Optional[int] = None
-    area_padre_name: Optional[int] = None
+    area_parent_id: Optional[int] = None
     responsable_id: Optional[int] = None
     is_active: Optional[bool] = None
 

@@ -18,10 +18,10 @@ router = APIRouter(prefix="/empleados", tags=["Organización - Empleados"])
 @router.get("/", response_model=EmpleadoPaginationResponse)
 async def listar_empleados(
     busqueda: Optional[str] = Query(None, description="Buscar por nombre o apellido"),
-    departamento_id: Optional[int] = Query(None, description="Filtrar por departamento organizacional"),
-    area_id: Optional[int] = Query(None, description="Filtrar por área"),
     page: int = Query(1, ge=1), 
     page_size: int = Query(15, ge=1, le=100), 
+    departamento_id: Optional[int] = Query(None, description="Filtrar por departamento organizacional"),
+    area_id: Optional[int] = Query(None, description="Filtrar por área"),
     db: AsyncSession = Depends(get_db)
 ):
     """Lista todos los empleados con paginación y filtros"""

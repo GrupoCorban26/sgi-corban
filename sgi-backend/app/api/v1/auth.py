@@ -52,6 +52,6 @@ async def login(
             "nombre": user_data['nombre_corto'],
             "area": user_data['area_nombre'],
             "cargo": user_data['cargo_nombre'],
-            "debe_cambiar_password": user_data['debe_cambiar_password']
+            "debe_cambiar_password": user_data['debe_cambiar_pass']
         }
     }
