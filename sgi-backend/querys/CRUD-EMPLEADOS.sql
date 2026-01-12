@@ -1,3 +1,4 @@
+
 USE SGI_GrupoCorban
 GO
 
@@ -5,6 +6,8 @@ GO
    1. LISTAR EMPLEADOS (CON PAGINACION Y BUSQUEDA)
    ===================================================== */
 
+select * from adm.empleados
+go
 CREATE OR ALTER PROCEDURE adm.usp_listar_empleados
     @busqueda NVARCHAR(100) = NULL,
     @page INT = 1,
