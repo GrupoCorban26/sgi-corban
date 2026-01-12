@@ -13,7 +13,7 @@ interface ActionButtonsProps {
     createTitle?: string;
     editTitle?: string;
     deleteTitle?: string;
-    createColor?: string;
+    createColor?: 'blue' | 'purple' | 'indigo';
     visible?: boolean;
 }
 
@@ -38,7 +38,7 @@ export function ActionButtons({
             {onCreate && (
                 <button
                     onClick={(e) => { e.stopPropagation(); onCreate(); }}
-                    className={`p-1.5 text-slate-400 ${colorClasses[createColor]} rounded-lg transition-all`}
+                    className={`p-1.5 text-slate-400 ${colorClasses[createColor]} rounded-lg transition-all cursor-pointer`}
                     title={createTitle}
                 >
                     <Plus size={15} />
@@ -47,7 +47,7 @@ export function ActionButtons({
             {onEdit && (
                 <button
                     onClick={(e) => { e.stopPropagation(); onEdit(); }}
-                    className="p-1.5 hover:bg-white hover:shadow-md text-slate-400 hover:text-blue-600 rounded-lg transition-all"
+                    className="p-1.5 hover:bg-white hover:shadow-md text-slate-400 hover:text-blue-600 rounded-lg transition-all cursor-pointer"
                     title={editTitle}
                 >
                     <Pencil size={15} />
@@ -56,7 +56,7 @@ export function ActionButtons({
             {onDelete && (
                 <button
                     onClick={(e) => { e.stopPropagation(); onDelete(); }}
-                    className="p-1.5 hover:bg-white hover:shadow-md text-slate-400 hover:text-red-600 rounded-lg transition-all"
+                    className="p-1.5 hover:bg-white hover:shadow-md text-slate-400 hover:text-red-600 rounded-lg transition-all cursor-pointer"
                     title={deleteTitle}
                 >
                     <Trash2 size={15} />

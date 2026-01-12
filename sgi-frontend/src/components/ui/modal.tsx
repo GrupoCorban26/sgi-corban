@@ -12,7 +12,7 @@ interface ModalContextValue {
 
 const ModalContext = createContext<ModalContextValue | null>(null);
 
-const useModalContext = () => {
+export const useModalContext = () => {
     const context = useContext(ModalContext);
     if (!context) {
         throw new Error('useModalContext must be used within ModalBase');
@@ -20,67 +20,7 @@ const useModalContext = () => {
     return context;
 };
 
-// ============================================
-// ESTILOS CSS PARA ANIMACIONES
-// ============================================
-const modalStyles = `
-  @keyframes modalScaleIn {
-    0% {
-      opacity: 0;
-      transform: scale(0.9) translate(-50%, -50%);
-    }
-    100% {
-      opacity: 1;
-      transform: scale(1) translate(-50%, -50%);
-    }
-  }
-
-  @keyframes modalScaleOut {
-    0% {
-      opacity: 1;
-      transform: scale(1) translate(-50%, -50%);
-    }
-    100% {
-      opacity: 0;
-      transform: scale(0.9) translate(-50%, -50%);
-    }
-  }
-
-  @keyframes overlayFadeIn {
-    0% { opacity: 0; }
-    100% { opacity: 1; }
-  }
-
-  @keyframes overlayFadeOut {
-    0% { opacity: 1; }
-    100% { opacity: 0; }
-  }
-
-  .modal-animate-in {
-    animation: modalScaleIn 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform-origin: center center;
-  }
-
-  .modal-animate-out {
-    animation: modalScaleOut 0.2s cubic-bezier(0.36, 0, 0.66, -0.56) forwards;
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform-origin: center center;
-  }
-
-  .overlay-animate-in {
-    animation: overlayFadeIn 0.2s ease-out forwards;
-  }
-
-  .overlay-animate-out {
-    animation: overlayFadeOut 0.2s ease-out forwards;
-  }
-`;
-
+// Duración de la animación de cierre (debe coincidir con CSS)
 const CLOSE_ANIMATION_DURATION = 200;
 
 // ============================================
@@ -144,7 +84,6 @@ export function ModalBase({
 
     return (
         <ModalContext.Provider value={{ handleClose, isClosing, disableClose }}>
-            <style>{modalStyles}</style>
             <div className="fixed inset-0 z-50 overflow-hidden">
                 {/* Overlay */}
                 <div

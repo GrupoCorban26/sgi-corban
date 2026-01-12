@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { X, Save, User, IdCard, MapPin, Briefcase, Calendar, Phone, Mail, Building2, Users } from 'lucide-react';
+import { Save, User, IdCard, MapPin, Briefcase, Calendar, Phone, Mail, Building2, Users, Loader2, AlertCircle } from 'lucide-react';
 import { useEmpleados, useEmpleadosParaSelect } from '@/hooks/organizacion/useEmpleado';
-import { useDepartamentos, useDepartamentosParaSelect } from '@/hooks/organizacion/useDepartamento';
-import { useAreasParaSelect, useAreasByDepartamento } from '@/hooks/organizacion/useArea';
-import { useCargosParaSelect, useCargosByArea } from '@/hooks/organizacion/useCargo';
+import { useDepartamentosParaSelect } from '@/hooks/organizacion/useDepartamento';
+import { useAreasByDepartamento } from '@/hooks/organizacion/useArea';
+import { useCargosByArea } from '@/hooks/organizacion/useCargo';
 import { useDepartamentosGeo, useProvincias, useDistritos } from '@/hooks/core/useUbigeo';
 import { Empleado, EmpleadoCreate, EmpleadoUpdate } from '@/types/organizacion/empleado';
+import { ModalBase, ModalHeader, ModalFooter, useModalContext } from '@/components/ui/modal';
 import { toast } from 'sonner';
 
 interface ModalProps {
@@ -36,6 +37,20 @@ interface FormState {
   jefe_id: number | null;
 }
 
+interface FormErrors {
+  nombres?: string;
+  apellido_paterno?: string;
+  nro_documento?: string;
+  departamento_geo_id?: string;
+  provincia_id?: string;
+  distrito_id?: string;
+  fecha_ingreso?: string;
+  departamento_id?: string;
+  area_id?: string;
+  cargo_id?: string;
+  email_personal?: string;
+}
+
 const initialFormState: FormState = {
   nombres: '',
   apellido_paterno: '',
@@ -56,10 +71,109 @@ const initialFormState: FormState = {
   jefe_id: null,
 };
 
-export default function ModalGestionarEmpleado({ isOpen, onClose, empleadoData }: ModalProps) {
+// ============================================
+// COMPONENTE DE INPUT CON ERROR
+// ============================================
+interface InputFieldProps {
+  label: string;
+  name: string;
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  error?: string;
+  required?: boolean;
+  disabled?: boolean;
+  type?: string;
+  placeholder?: string;
+  maxLength?: number;
+  icon?: React.ReactNode;
+}
+
+function InputField({ label, name, value, onChange, error, required, disabled, type = 'text', placeholder, maxLength, icon }: InputFieldProps) {
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-semibold text-gray-600 flex items-center gap-1">
+        {icon}
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onChange={onChange}
+        className={`w-full px-3 py-2 rounded-lg border outline-none focus:ring-2 text-sm transition-colors ${error
+            ? 'border-red-300 focus:ring-red-500 bg-red-50'
+            : 'border-gray-200 focus:ring-blue-500 focus:border-transparent'
+          }`}
+        placeholder={placeholder}
+        disabled={disabled}
+        maxLength={maxLength}
+      />
+      {error && (
+        <p className="text-xs text-red-500 flex items-center gap-1">
+          <AlertCircle size={12} />
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// COMPONENTE DE SELECT CON ERROR
+// ============================================
+interface SelectFieldProps {
+  label: string;
+  name: string;
+  value: string | number | null;
+  onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
+  options: { id: number; nombre?: string; nombre_completo?: string }[];
+  error?: string;
+  required?: boolean;
+  disabled?: boolean;
+  placeholder?: string;
+}
+
+function SelectField({ label, name, value, onChange, options, error, required, disabled, placeholder = 'Seleccionar...' }: SelectFieldProps) {
+  return (
+    <div className="space-y-1">
+      <label className="text-xs font-semibold text-gray-600">
+        {label} {required && <span className="text-red-500">*</span>}
+      </label>
+      <select
+        name={name}
+        value={value || ''}
+        onChange={onChange}
+        disabled={disabled}
+        className={`w-full px-3 py-2 rounded-lg border bg-white outline-none focus:ring-2 text-sm transition-colors ${error
+            ? 'border-red-300 focus:ring-red-500 bg-red-50'
+            : 'border-gray-200 focus:ring-blue-500'
+          } ${disabled ? 'bg-gray-50 text-gray-400' : ''}`}
+      >
+        <option value="">{placeholder}</option>
+        {options?.map(opt => (
+          <option key={opt.id} value={opt.id}>{opt.nombre || opt.nombre_completo}</option>
+        ))}
+      </select>
+      {error && (
+        <p className="text-xs text-red-500 flex items-center gap-1">
+          <AlertCircle size={12} />
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ============================================
+// COMPONENTE INTERNO DEL FORMULARIO
+// ============================================
+function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Empleado | null; isOpen: boolean }) {
+  const { handleClose } = useModalContext();
   const isEdit = !!empleadoData;
   const [formData, setFormData] = useState<FormState>(initialFormState);
+  const [errors, setErrors] = useState<FormErrors>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [touched, setTouched] = useState<Set<string>>(new Set());
 
   // Hooks de empleados
   const { createMutation, updateMutation } = useEmpleados();
@@ -75,6 +189,75 @@ export default function ModalGestionarEmpleado({ isOpen, onClose, empleadoData }
   const { data: provincias } = useProvincias(formData.departamento_geo_id);
   const { data: distritos } = useDistritos(formData.provincia_id);
 
+  const isLoading = isSubmitting || createMutation.isPending || updateMutation.isPending;
+
+  // Validar un solo campo
+  const validateField = (name: string, value: string | number | null): string | undefined => {
+    switch (name) {
+      case 'nombres':
+        if (!value || (typeof value === 'string' && !value.trim())) return 'El nombre es obligatorio';
+        break;
+      case 'apellido_paterno':
+        if (!value || (typeof value === 'string' && !value.trim())) return 'El apellido paterno es obligatorio';
+        break;
+      case 'nro_documento':
+        if (!value || (typeof value === 'string' && !value.trim())) return 'El número de documento es obligatorio';
+        if (formData.tipo_documento === 'DNI' && typeof value === 'string' && value.length !== 8) return 'El DNI debe tener 8 dígitos';
+        break;
+      case 'email_personal':
+        if (value && typeof value === 'string' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Email inválido';
+        break;
+      case 'departamento_geo_id':
+        if (!value) return 'Seleccione un departamento';
+        break;
+      case 'provincia_id':
+        if (!value && formData.departamento_geo_id) return 'Seleccione una provincia';
+        break;
+      case 'distrito_id':
+        if (!value && formData.provincia_id) return 'Seleccione un distrito';
+        break;
+      case 'fecha_ingreso':
+        if (!value) return 'La fecha de ingreso es obligatoria';
+        break;
+      case 'departamento_id':
+        if (!value) return 'Seleccione un departamento organizacional';
+        break;
+      case 'area_id':
+        if (!value && formData.departamento_id) return 'Seleccione un área';
+        break;
+      case 'cargo_id':
+        if (!value && formData.area_id) return 'Seleccione un cargo';
+        break;
+    }
+    return undefined;
+  };
+
+  // Validar todo el formulario
+  const validateForm = (): boolean => {
+    const newErrors: FormErrors = {};
+
+    // Campos obligatorios
+    const requiredFields = [
+      'nombres', 'apellido_paterno', 'nro_documento',
+      'departamento_geo_id', 'provincia_id', 'distrito_id',
+      'fecha_ingreso', 'departamento_id', 'area_id', 'cargo_id'
+    ];
+
+    requiredFields.forEach(field => {
+      const error = validateField(field, formData[field as keyof FormState]);
+      if (error) newErrors[field as keyof FormErrors] = error;
+    });
+
+    // Validar email si tiene valor
+    if (formData.email_personal) {
+      const emailError = validateField('email_personal', formData.email_personal);
+      if (emailError) newErrors.email_personal = emailError;
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   // Cargar datos al editar
   useEffect(() => {
     if (isEdit && empleadoData) {
@@ -87,7 +270,7 @@ export default function ModalGestionarEmpleado({ isOpen, onClose, empleadoData }
         nro_documento: empleadoData.nro_documento || '',
         celular: empleadoData.celular || '',
         email_personal: empleadoData.email_personal || '',
-        departamento_geo_id: null, // Se debe cargar desde el distrito
+        departamento_geo_id: null,
         provincia_id: null,
         distrito_id: empleadoData.distrito_id || null,
         direccion: empleadoData.direccion || '',
@@ -97,8 +280,12 @@ export default function ModalGestionarEmpleado({ isOpen, onClose, empleadoData }
         cargo_id: empleadoData.cargo_id || null,
         jefe_id: empleadoData.jefe_id || null,
       });
+      setErrors({});
+      setTouched(new Set());
     } else {
       setFormData(initialFormState);
+      setErrors({});
+      setTouched(new Set());
     }
   }, [isEdit, empleadoData, isOpen]);
 
@@ -129,30 +316,58 @@ export default function ModalGestionarEmpleado({ isOpen, onClose, empleadoData }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value === '' ? null : (
-        ['departamento_geo_id', 'provincia_id', 'distrito_id', 'departamento_id', 'area_id', 'cargo_id', 'jefe_id'].includes(name)
-          ? parseInt(value)
-          : value
-      )
-    }));
+    const newValue = value === '' ? null : (
+      ['departamento_geo_id', 'provincia_id', 'distrito_id', 'departamento_id', 'area_id', 'cargo_id', 'jefe_id'].includes(name)
+        ? parseInt(value)
+        : value
+    );
+
+    setFormData(prev => ({ ...prev, [name]: newValue }));
+    setTouched(prev => new Set(prev).add(name));
+
+    // Validar el campo al cambiar si ya fue tocado
+    if (touched.has(name)) {
+      const error = validateField(name, newValue);
+      setErrors(prev => {
+        const newErrors = { ...prev };
+        if (error) {
+          newErrors[name as keyof FormErrors] = error;
+        } else {
+          delete newErrors[name as keyof FormErrors];
+        }
+        return newErrors;
+      });
+    }
+  };
+
+  const handleBlur = (e: React.FocusEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setTouched(prev => new Set(prev).add(name));
+
+    const newValue = value === '' ? null : (
+      ['departamento_geo_id', 'provincia_id', 'distrito_id', 'departamento_id', 'area_id', 'cargo_id', 'jefe_id'].includes(name)
+        ? parseInt(value)
+        : value
+    );
+
+    const error = validateField(name, newValue);
+    setErrors(prev => {
+      const newErrors = { ...prev };
+      if (error) {
+        newErrors[name as keyof FormErrors] = error;
+      } else {
+        delete newErrors[name as keyof FormErrors];
+      }
+      return newErrors;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // Validaciones básicas
-    if (!formData.nombres || !formData.apellido_paterno || !formData.nro_documento) {
-      toast.error('Por favor complete los campos obligatorios');
-      return;
-    }
-    if (!formData.distrito_id || !formData.fecha_ingreso) {
-      toast.error('Debe seleccionar distrito y fecha de ingreso');
-      return;
-    }
-    if (!formData.departamento_id || !formData.area_id || !formData.cargo_id) {
-      toast.error('Debe seleccionar departamento, área y cargo');
+    // Validar todo antes de enviar
+    if (!validateForm()) {
+      toast.error('Por favor corrija los errores en el formulario');
       return;
     }
 
@@ -200,317 +415,272 @@ export default function ModalGestionarEmpleado({ isOpen, onClose, empleadoData }
         await createMutation.mutateAsync(createData);
         toast.success('Empleado registrado correctamente');
       }
-      onClose();
-    } catch (error: any) {
-      toast.error(error.message || 'Error al guardar empleado');
+      handleClose();
+    } catch (error: unknown) {
+      toast.error((error as Error).message || 'Error al guardar empleado');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (!isOpen) return null;
+  const hasErrors = Object.keys(errors).length > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+    <>
+      <ModalHeader
+        icon={isEdit ? <Briefcase size={20} className="text-amber-600" /> : <User size={20} className="text-blue-600" />}
+        title={isEdit ? 'Editar Colaborador' : 'Registrar Nuevo Colaborador'}
+      />
 
-      <div className="relative bg-white w-full max-w-4xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+      <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1">
 
-        {/* Header */}
-        <div className={`flex items-center justify-between p-5 border-b ${isEdit ? 'bg-amber-50' : 'bg-slate-50'}`}>
-          <div className="flex items-center gap-3">
-            <div className={`p-2.5 rounded-xl text-white shadow-lg ${isEdit ? 'bg-amber-600' : 'bg-blue-600'}`}>
-              {isEdit ? <Briefcase size={22} /> : <User size={22} />}
-            </div>
+        {/* Banner de errores */}
+        {hasErrors && (
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4 flex items-start gap-3">
+            <AlertCircle size={20} className="text-red-500 flex-shrink-0 mt-0.5" />
             <div>
-              <h2 className="text-lg font-bold text-slate-800">
-                {isEdit ? 'Editar Colaborador' : 'Registrar Nuevo Colaborador'}
-              </h2>
-              <p className="text-xs text-slate-500">
-                {isEdit ? `Modificando: ${empleadoData?.nombres} ${empleadoData?.apellido_paterno}` : 'Complete los datos del colaborador'}
-              </p>
+              <p className="text-sm font-semibold text-red-700">Por favor corrija los siguientes errores:</p>
+              <ul className="text-xs text-red-600 mt-1 list-disc list-inside">
+                {Object.values(errors).map((err, i) => (
+                  <li key={i}>{err}</li>
+                ))}
+              </ul>
             </div>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 p-2 hover:bg-white rounded-full transition-all">
-            <X size={22} />
-          </button>
-        </div>
+        )}
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1">
-
-          {/* SECCIÓN 1: DATOS PERSONALES */}
-          <section className="space-y-4">
-            <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-              <IdCard size={16} className="text-blue-600" />
-              <h3 className="font-semibold text-slate-700 uppercase text-xs tracking-wider">Datos Personales</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Nombres *</label>
-                <input
-                  type="text"
-                  name="nombres"
-                  value={formData.nombres}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  placeholder="Ingrese nombres"
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Apellido Paterno *</label>
-                <input
-                  type="text"
-                  name="apellido_paterno"
-                  value={formData.apellido_paterno}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Apellido Materno</label>
-                <input
-                  type="text"
-                  name="apellido_materno"
-                  value={formData.apellido_materno}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Tipo Documento</label>
-                <select
-                  name="tipo_documento"
-                  value={formData.tipo_documento}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                >
-                  <option value="DNI">DNI</option>
-                  <option value="CE">Carné de Extranjería</option>
-                  <option value="PASAPORTE">Pasaporte</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Nro. Documento *</label>
-                <input
-                  type="text"
-                  name="nro_documento"
-                  value={formData.nro_documento}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                  maxLength={20}
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Fecha Nacimiento</label>
-                <input
-                  type="date"
-                  name="fecha_nacimiento"
-                  value={formData.fecha_nacimiento}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                />
-              </div>
-            </div>
-          </section>
-
-          {/* SECCIÓN 2: CONTACTO */}
-          <section className="space-y-4">
-            <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-              <Phone size={16} className="text-emerald-600" />
-              <h3 className="font-semibold text-slate-700 uppercase text-xs tracking-wider">Contacto y Ubicación</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600 flex items-center gap-1"><Phone size={12} /> Celular</label>
-                <input
-                  type="tel"
-                  name="celular"
-                  value={formData.celular}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  placeholder="999 999 999"
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600 flex items-center gap-1"><Mail size={12} /> Email Personal</label>
-                <input
-                  type="email"
-                  name="email_personal"
-                  value={formData.email_personal}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  placeholder="correo@ejemplo.com"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Departamento *</label>
-                <select
-                  name="departamento_geo_id"
-                  value={formData.departamento_geo_id || ''}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                >
-                  <option value="">Seleccionar...</option>
-                  {departamentosGeo?.map(d => (
-                    <option key={d.id} value={d.id}>{d.nombre}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Provincia *</label>
-                <select
-                  name="provincia_id"
-                  value={formData.provincia_id || ''}
-                  onChange={handleChange}
-                  disabled={!formData.departamento_geo_id}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-slate-50 disabled:text-slate-400"
-                >
-                  <option value="">Seleccionar...</option>
-                  {provincias?.map(p => (
-                    <option key={p.id} value={p.id}>{p.nombre}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Distrito *</label>
-                <select
-                  name="distrito_id"
-                  value={formData.distrito_id || ''}
-                  onChange={handleChange}
-                  disabled={!formData.provincia_id}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-slate-50 disabled:text-slate-400"
-                >
-                  <option value="">Seleccionar...</option>
-                  {distritos?.map(d => (
-                    <option key={d.id} value={d.id}>{d.nombre}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
+        {/* SECCIÓN 1: DATOS PERSONALES */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+            <IdCard size={16} className="text-blue-600" />
+            <h3 className="font-semibold text-gray-700 uppercase text-xs tracking-wider">Datos Personales</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <InputField
+              label="Nombres"
+              name="nombres"
+              value={formData.nombres}
+              onChange={handleChange}
+              error={touched.has('nombres') ? errors.nombres : undefined}
+              required
+              disabled={isLoading}
+              placeholder="Ingrese nombres"
+            />
+            <InputField
+              label="Apellido Paterno"
+              name="apellido_paterno"
+              value={formData.apellido_paterno}
+              onChange={handleChange}
+              error={touched.has('apellido_paterno') ? errors.apellido_paterno : undefined}
+              required
+              disabled={isLoading}
+            />
+            <InputField
+              label="Apellido Materno"
+              name="apellido_materno"
+              value={formData.apellido_materno}
+              onChange={handleChange}
+              disabled={isLoading}
+            />
             <div className="space-y-1">
-              <label className="text-xs font-semibold text-slate-600 flex items-center gap-1"><MapPin size={12} /> Dirección</label>
-              <input
-                type="text"
-                name="direccion"
-                value={formData.direccion}
+              <label className="text-xs font-semibold text-gray-600">Tipo Documento</label>
+              <select
+                name="tipo_documento"
+                value={formData.tipo_documento}
                 onChange={handleChange}
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                placeholder="Av. / Jr. / Calle..."
-              />
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                disabled={isLoading}
+              >
+                <option value="DNI">DNI</option>
+                <option value="CE">Carné de Extranjería</option>
+                <option value="PASAPORTE">Pasaporte</option>
+              </select>
             </div>
-          </section>
+            <InputField
+              label="Nro. Documento"
+              name="nro_documento"
+              value={formData.nro_documento}
+              onChange={handleChange}
+              error={touched.has('nro_documento') ? errors.nro_documento : undefined}
+              required
+              disabled={isLoading}
+              maxLength={20}
+            />
+            <InputField
+              label="Fecha Nacimiento"
+              name="fecha_nacimiento"
+              type="date"
+              value={formData.fecha_nacimiento}
+              onChange={handleChange}
+              disabled={isLoading}
+            />
+          </div>
+        </section>
 
-          {/* SECCIÓN 3: INFORMACIÓN LABORAL */}
-          <section className="space-y-4">
-            <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-              <Building2 size={16} className="text-indigo-600" />
-              <h3 className="font-semibold text-slate-700 uppercase text-xs tracking-wider">Información Laboral</h3>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600 flex items-center gap-1"><Calendar size={12} /> Fecha Ingreso *</label>
-                <input
-                  type="date"
-                  name="fecha_ingreso"
-                  value={formData.fecha_ingreso}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  required
-                />
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600 flex items-center gap-1"><Users size={12} /> Jefe Directo</label>
-                <select
-                  name="jefe_id"
-                  value={formData.jefe_id || ''}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                >
-                  <option value="">Sin jefe asignado</option>
-                  {empleadosDropdown?.map(emp => (
-                    <option key={emp.id} value={emp.id}>{emp.nombre_completo}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Departamento Org. *</label>
-                <select
-                  name="departamento_id"
-                  value={formData.departamento_id || ''}
-                  onChange={handleChange}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                  required
-                >
-                  <option value="">Seleccionar...</option>
-                  {departamentosOrg?.map(d => (
-                    <option key={d.id} value={d.id}>{d.nombre}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Área *</label>
-                <select
-                  name="area_id"
-                  value={formData.area_id || ''}
-                  onChange={handleChange}
-                  disabled={!formData.departamento_id}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-slate-50 disabled:text-slate-400"
-                  required
-                >
-                  <option value="">Seleccionar...</option>
-                  {areasDelDepto?.map(a => (
-                    <option key={a.id} value={a.id}>{a.nombre}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-slate-600">Cargo *</label>
-                <select
-                  name="cargo_id"
-                  value={formData.cargo_id || ''}
-                  onChange={handleChange}
-                  disabled={!formData.area_id}
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm disabled:bg-slate-50 disabled:text-slate-400"
-                  required
-                >
-                  <option value="">Seleccionar...</option>
-                  {cargosDelArea?.map(c => (
-                    <option key={c.id} value={c.id}>{c.nombre}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          </section>
-        </form>
+        {/* SECCIÓN 2: CONTACTO */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+            <Phone size={16} className="text-emerald-600" />
+            <h3 className="font-semibold text-gray-700 uppercase text-xs tracking-wider">Contacto y Ubicación</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <InputField
+              label="Celular"
+              name="celular"
+              type="tel"
+              value={formData.celular}
+              onChange={handleChange}
+              disabled={isLoading}
+              placeholder="999 999 999"
+              icon={<Phone size={12} />}
+            />
+            <InputField
+              label="Email Personal"
+              name="email_personal"
+              type="email"
+              value={formData.email_personal}
+              onChange={handleChange}
+              error={touched.has('email_personal') ? errors.email_personal : undefined}
+              disabled={isLoading}
+              placeholder="correo@ejemplo.com"
+              icon={<Mail size={12} />}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <SelectField
+              label="Departamento"
+              name="departamento_geo_id"
+              value={formData.departamento_geo_id}
+              onChange={handleChange}
+              options={departamentosGeo || []}
+              error={touched.has('departamento_geo_id') ? errors.departamento_geo_id : undefined}
+              required
+              disabled={isLoading}
+            />
+            <SelectField
+              label="Provincia"
+              name="provincia_id"
+              value={formData.provincia_id}
+              onChange={handleChange}
+              options={provincias || []}
+              error={touched.has('provincia_id') ? errors.provincia_id : undefined}
+              required
+              disabled={!formData.departamento_geo_id || isLoading}
+            />
+            <SelectField
+              label="Distrito"
+              name="distrito_id"
+              value={formData.distrito_id}
+              onChange={handleChange}
+              options={distritos || []}
+              error={touched.has('distrito_id') ? errors.distrito_id : undefined}
+              required
+              disabled={!formData.provincia_id || isLoading}
+            />
+          </div>
+          <InputField
+            label="Dirección"
+            name="direccion"
+            value={formData.direccion}
+            onChange={handleChange}
+            disabled={isLoading}
+            placeholder="Av. / Jr. / Calle..."
+            icon={<MapPin size={12} />}
+          />
+        </section>
 
-        {/* Footer */}
-        <div className="p-5 border-t bg-slate-50 flex items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="px-5 py-2 rounded-lg border border-slate-300 text-slate-700 font-medium hover:bg-white transition-all text-sm"
-          >
-            Cancelar
-          </button>
-          <button
-            type="submit"
-            onClick={handleSubmit}
-            disabled={isSubmitting}
-            className={`px-6 py-2 text-white rounded-lg font-semibold shadow-lg flex items-center gap-2 transition-all text-sm disabled:opacity-50 ${isEdit ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'}`}
-          >
-            <Save size={16} />
-            {isSubmitting ? 'Guardando...' : (isEdit ? 'Guardar Cambios' : 'Registrar')}
-          </button>
-        </div>
-      </div>
-    </div>
+        {/* SECCIÓN 3: INFORMACIÓN LABORAL */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
+            <Building2 size={16} className="text-indigo-600" />
+            <h3 className="font-semibold text-gray-700 uppercase text-xs tracking-wider">Información Laboral</h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <InputField
+              label="Fecha Ingreso"
+              name="fecha_ingreso"
+              type="date"
+              value={formData.fecha_ingreso}
+              onChange={handleChange}
+              error={touched.has('fecha_ingreso') ? errors.fecha_ingreso : undefined}
+              required
+              disabled={isLoading}
+              icon={<Calendar size={12} />}
+            />
+            <SelectField
+              label="Jefe Directo"
+              name="jefe_id"
+              value={formData.jefe_id}
+              onChange={handleChange}
+              options={empleadosDropdown || []}
+              disabled={isLoading}
+              placeholder="Sin jefe asignado"
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <SelectField
+              label="Departamento Org."
+              name="departamento_id"
+              value={formData.departamento_id}
+              onChange={handleChange}
+              options={departamentosOrg || []}
+              error={touched.has('departamento_id') ? errors.departamento_id : undefined}
+              required
+              disabled={isLoading}
+            />
+            <SelectField
+              label="Área"
+              name="area_id"
+              value={formData.area_id}
+              onChange={handleChange}
+              options={areasDelDepto || []}
+              error={touched.has('area_id') ? errors.area_id : undefined}
+              required
+              disabled={!formData.departamento_id || isLoading}
+            />
+            <SelectField
+              label="Cargo"
+              name="cargo_id"
+              value={formData.cargo_id}
+              onChange={handleChange}
+              options={cargosDelArea || []}
+              error={touched.has('cargo_id') ? errors.cargo_id : undefined}
+              required
+              disabled={!formData.area_id || isLoading}
+            />
+          </div>
+        </section>
+      </form>
+
+      <ModalFooter>
+        <button
+          type="button"
+          onClick={handleClose}
+          disabled={isLoading}
+          className="cursor-pointer flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-700 font-semibold hover:bg-white hover:border-gray-400 disabled:opacity-50"
+        >
+          Cancelar
+        </button>
+        <button
+          type="submit"
+          onClick={handleSubmit}
+          disabled={isLoading}
+          className={`cursor-pointer flex-1 px-4 py-2.5 text-white rounded-xl text-sm font-semibold shadow-lg flex items-center justify-center gap-2 disabled:opacity-50 ${isEdit ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-200' : 'bg-blue-600 hover:bg-blue-700 shadow-blue-200'}`}
+        >
+          {isLoading ? <><Loader2 size={16} className="animate-spin" /> Guardando...</> : <><Save size={16} /> {isEdit ? 'Guardar Cambios' : 'Registrar'}</>}
+        </button>
+      </ModalFooter>
+    </>
+  );
+}
+
+// ============================================
+// COMPONENTE PRINCIPAL
+// ============================================
+export default function ModalGestionarEmpleado({ isOpen, onClose, empleadoData }: ModalProps) {
+  return (
+    <ModalBase isOpen={isOpen} onClose={onClose} maxWidth="max-w-4xl">
+      <ModalEmpleadoContent empleadoData={empleadoData} isOpen={isOpen} />
+    </ModalBase>
   );
 }

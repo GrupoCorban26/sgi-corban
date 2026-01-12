@@ -5,7 +5,7 @@ import { GitBranch, User, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAreasByDepartamento } from '@/hooks/organizacion/useArea';
 import { Area } from '@/types/organizacion/area';
 import { Cargo } from '@/types/organizacion/cargo';
-import { ActionButtons, LoadingRow, EmptyRow, ErrorRow } from '../ui/table-helpers';
+import { ActionButtons, LoadingRow, EmptyRow, ErrorRow } from '@/components/ui/TableHelpers';
 import { CargosExpandidos } from './cargos-expandidos';
 
 // ============================================

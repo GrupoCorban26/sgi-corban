@@ -4,7 +4,7 @@ import React from 'react';
 import { Briefcase } from 'lucide-react';
 import { useCargosByArea } from '@/hooks/organizacion/useCargo';
 import { Cargo } from '@/types/organizacion/cargo';
-import { ActionButtons, LoadingRow, EmptyRow, ErrorRow } from '../ui/table-helpers';
+import { ActionButtons, LoadingRow, EmptyRow, ErrorRow } from '@/components/ui/TableHelpers';
 
 // ============================================
 // TIPOS

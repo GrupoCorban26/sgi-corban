@@ -483,9 +483,6 @@ BEGIN
         nombre_comercial NVARCHAR(255),
         direccion_fiscal NVARCHAR(255),
         distrito_id INT,
-        telefono VARCHAR(20),
-        email NVARCHAR(100),
-        sitio_web NVARCHAR(200),
         area_encargada_id INT,
         comercial_encargado_id INT,
         ultimo_contacto DATETIME2,
@@ -520,6 +517,78 @@ BEGIN
         created_at DATETIME2 NOT NULL DEFAULT GETDATE()
     );
     PRINT '✓ Tabla comercial.cliente_contactos creada';
+END
+GO
+
+-- -----------------------------------------------------
+-- 4.4 IMPORTADORES
+-- -----------------------------------------------------
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'registro_importaciones' AND schema_id = SCHEMA_ID('comercial'))
+BEGIN
+    CREATE TABLE comercial.registro_importaciones(
+        id INT,
+        dia char(2),
+        mes char(2),
+        anio char(2),
+        dua char(6),
+        serie char(4),
+        aduana varchar(30),
+        tipo_documento varchar(40),
+        ruc char(11),
+        razon_social varchar(100),
+        direccion varchar(100),
+        telefono varchar(60),
+        fax varchar(10),
+        departamento varchar(40),
+        provincia varchar(30),
+        distrito varchar(50),
+        via_transporte varchar(20),
+        banco varchar(80),
+        pais_origen varchar(80),
+        pais_adquisicion varchar(80),
+        puerto_embarque varchar(80),
+        buque varchar(40),
+        empresa_transporte varchar(100),
+        agente_aduanas varchar(100),
+        agente_carga_destino varchar(120),
+        almacen varchar(120),
+        partida_arancelaria_cod char(10),
+        partida_arancelaria_descripcion varchar(255),
+        mercancia varchar(150),
+        descripcion_mercancia_1 varchar(150),
+        descripcion_mercancia_2 varchar(150),
+        descripcion_mercancia_3 varchar(150),
+        descripcion_mercancia_4 varchar(150),
+        probable_embarcador varchar(100),
+        producto varchar(50),
+        marca varchar(40),
+        modelo varchar(50),
+        caracteristica varchar(120),
+        manifiesto varchar(20),
+        bill_landing varchar(40),
+        fob decimal(10,2),
+        flete decimal(10,2),
+        seguro decimal(12,2),
+        cif decimal(10,2),
+        fob_unit decimal(10,2),
+        cif_unit decimal(10,2),
+        advalorem decimal(12,2),
+        igv decimal(10,2),
+        ipm_max decimal(10,2),
+        peso_bruto decimal(12,2),
+        peso_neto decimal(12,2),
+        anio_fabricacion char(4),
+        unidad_comercial varchar(40),
+        estado_mercancia varchar(30),
+        incoterm char(8),
+        bill_landing_master varchar(40),
+        forma_pago varchar(30),
+        canal varchar(10),
+        unidad_medida varchar(10),
+        tipo_bulto varchar(60)
+    );
+    PRINT '✓ Tabla comercial.registro_importaciones creada';
 END
 GO
 

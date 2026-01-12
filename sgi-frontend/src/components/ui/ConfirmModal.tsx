@@ -1,9 +1,10 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, X } from 'lucide-react';
+import { AlertTriangle, Loader2 } from 'lucide-react';
+import { ModalBase, ModalFooter } from '@/components/ui/modal';
 
-interface ModalConfirmarProps {
+interface ConfirmModalProps {
     isOpen: boolean;
     onClose: () => void;
     onConfirm: () => void;
@@ -15,7 +16,7 @@ interface ModalConfirmarProps {
     variant?: 'danger' | 'warning';
 }
 
-export default function ModalConfirmar({
+export function ConfirmModal({
     isOpen,
     onClose,
     onConfirm,
@@ -25,9 +26,7 @@ export default function ModalConfirmar({
     cancelText = 'Cancelar',
     isLoading = false,
     variant = 'danger',
-}: ModalConfirmarProps) {
-    if (!isOpen) return null;
-
+}: ConfirmModalProps) {
     const variantStyles = {
         danger: {
             icon: 'bg-red-50 text-red-600',
@@ -42,23 +41,8 @@ export default function ModalConfirmar({
     const styles = variantStyles[variant];
 
     return (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-            {/* Overlay */}
-            <div
-                className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm animate-in fade-in duration-200"
-                onClick={onClose}
-            />
-
-            {/* Modal */}
-            <div className="relative bg-white w-full max-w-sm rounded-2xl shadow-2xl animate-in zoom-in-95 duration-200 p-6">
-                {/* Close button */}
-                <button
-                    onClick={onClose}
-                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
-                >
-                    <X size={20} />
-                </button>
-
+        <ModalBase isOpen={isOpen} onClose={onClose} maxWidth="max-w-sm">
+            <div className="p-6">
                 {/* Icon */}
                 <div className={`w-12 h-12 rounded-xl ${styles.icon} flex items-center justify-center mx-auto mb-4`}>
                     <AlertTriangle size={24} />
@@ -69,7 +53,7 @@ export default function ModalConfirmar({
                 <p className="text-sm text-gray-500 text-center mb-6">{message}</p>
 
                 {/* Actions */}
-                <div className="flex gap-3">
+                <ModalFooter>
                     <button
                         onClick={onClose}
                         disabled={isLoading}
@@ -80,12 +64,15 @@ export default function ModalConfirmar({
                     <button
                         onClick={onConfirm}
                         disabled={isLoading}
-                        className={`flex-1 px-4 py-2.5 ${styles.button} text-white rounded-xl text-sm font-semibold shadow-md transition-all disabled:opacity-50`}
+                        className={`flex-1 px-4 py-2.5 ${styles.button} text-white rounded-xl text-sm font-semibold shadow-md transition-all disabled:opacity-50 flex items-center justify-center gap-2`}
                     >
-                        {isLoading ? 'Procesando...' : confirmText}
+                        {isLoading ? <><Loader2 size={16} className="animate-spin" /> Procesando...</> : confirmText}
                     </button>
-                </div>
+                </ModalFooter>
             </div>
-        </div>
+        </ModalBase>
     );
 }
+
+// Default export for backwards compatibility
+export default ConfirmModal;

@@ -4,14 +4,16 @@ import React, { useState } from 'react';
 import { Users, Plus, LayoutGrid } from 'lucide-react';
 import { toast } from 'sonner';
 
+// Componentes compartidos
+import { TabButton } from '@/components/ui/TabButton';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+
 // Componentes organizados por carpeta
-import { TabButton } from './components/ui/tab-button';
 import { EstructuraTab } from './components/estructura/estructura-tab';
 import { ColaboradoresTab } from './components/colaboradores/colaboradores-tab';
 import { AuditoriaPanel } from './components/auditoria/auditoria-panel';
 import ModalEntidad from './components/modals/modal-entidad';
 import ModalGestionarEmpleado from './components/modals/modal-empleado';
-import ModalConfirmar from './components/modals/modal-confirmar';
 
 // Hooks y tipos
 import { useDepartamentos } from '@/hooks/organizacion/useDepartamento';
@@ -20,11 +22,12 @@ import { useCargos } from '@/hooks/organizacion/useCargo';
 import { Departamento } from '@/types/organizacion/departamento';
 import { Area } from '@/types/organizacion/area';
 import { Cargo } from '@/types/organizacion/cargo';
+import { Empleado } from '@/types/organizacion/empleado';
 
 export default function OrganizacionPage() {
   const [activeTab, setActiveTab] = useState('estructura');
   const [showHistory, setShowHistory] = useState(false);
-  const [selectedEntity, setSelectedEntity] = useState(null);
+  const [selectedEntity, setSelectedEntity] = useState<Empleado | null>(null);
 
   // Modal Entidades
   const [isEntityModalOpen, setIsEntityModalOpen] = useState(false);
@@ -35,7 +38,7 @@ export default function OrganizacionPage() {
 
   // Modal Empleados
   const [isEmpModalOpen, setIsEmpModalOpen] = useState(false);
-  const [selectedEmpleado, setSelectedEmpleado] = useState(null);
+  const [selectedEmpleado, setSelectedEmpleado] = useState<Empleado | null>(null);
 
   // Modal Confirmación
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
@@ -142,8 +145,8 @@ export default function OrganizacionPage() {
         )}
         {activeTab === 'colaboradores' && (
           <ColaboradoresTab
-            onOpenHistory={(e) => { setSelectedEntity(e as null); setShowHistory(true); }}
-            onEdit={(e) => { setSelectedEmpleado(e as null); setIsEmpModalOpen(true); }}
+            onOpenHistory={(e) => { setSelectedEntity(e); setShowHistory(true); }}
+            onEdit={(e) => { setSelectedEmpleado(e); setIsEmpModalOpen(true); }}
             onNew={() => { setSelectedEmpleado(null); setIsEmpModalOpen(true); }}
           />
         )}
@@ -161,7 +164,7 @@ export default function OrganizacionPage() {
 
       <ModalGestionarEmpleado isOpen={isEmpModalOpen} onClose={() => setIsEmpModalOpen(false)} empleadoData={selectedEmpleado} />
 
-      <ModalConfirmar
+      <ConfirmModal
         isOpen={isConfirmModalOpen}
         onClose={() => { setIsConfirmModalOpen(false); setEntityToDelete(null); }}
         onConfirm={handleConfirmDelete}

@@ -24,6 +24,11 @@ export const MENU_ROLES = {
     { label: 'Tarifario', href: '/tarifas', icon: 'PriceIcon' },
     { label: 'Cotizaciones', href: '/cotizaciones', icon: 'FileIcon' },
   ],
+  sistemas: [
+    { label: 'Inicio', href: '/sistemas', icon: 'HomeIcon' },
+    { label: 'Base', href: '/sistemas/base', icon: 'PriceIcon' },
+    { label: 'Usuarios', href: '/sistemas/usuarios', icon: 'FileIcon' },
+  ],
 } as const;
 
 export type Role = keyof typeof MENU_ROLES;
