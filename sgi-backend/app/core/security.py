@@ -26,6 +26,10 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/login")
 def verificar_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
+def hashear_password(password: str) -> str:
+    """Genera el hash de una contraseña para almacenarla en la BD"""
+    return pwd_context.hash(password)
+
 def crear_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))

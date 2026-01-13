@@ -412,7 +412,6 @@ BEGIN
     PRINT '✓ Tabla core.via creada';
 END
 GO
-
 -- -----------------------------------------------------
 -- 3.9 TIPO DE MERCADERÍA
 -- -----------------------------------------------------
@@ -507,93 +506,62 @@ IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'cliente_contactos' AND sch
 BEGIN
     CREATE TABLE comercial.cliente_contactos(
         id INT IDENTITY(1,1),
-        cliente_id INT NOT NULL,
-        nombre NVARCHAR(100) NOT NULL,
+        ruc CHAR(11) NOT NULL,
         cargo NVARCHAR(100),
-        telefono VARCHAR(20),
+        telefono VARCHAR(20) not null,
         email NVARCHAR(100),
-        es_principal BIT NOT NULL DEFAULT 0,
+        origen VARCHAR(30),
+        is_client BIT NOT NULL DEFAULT 0,
         is_active BIT NOT NULL DEFAULT 1,
-        created_at DATETIME2 NOT NULL DEFAULT GETDATE()
+        -- Campos de asignación para leads
+        asignado_a INT,                          -- Usuario comercial asignado
+        fecha_asignacion DATETIME2,              -- Cuándo fue asignado
+        lote_asignacion INT,                     -- Número de lote
+        estado VARCHAR(30) DEFAULT 'DISPONIBLE', -- DISPONIBLE, EN_GESTION, CONTESTADO, NO_CONTESTO, NO_EXISTE, etc.
+        --
+        created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+        updated_at DATETIME2
     );
     PRINT '✓ Tabla comercial.cliente_contactos creada';
 END
 GO
 
 -- -----------------------------------------------------
--- 4.4 IMPORTADORES
+-- 4.4 IMPORTADORES AGRUPADOS
 -- -----------------------------------------------------
 
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'registro_importaciones' AND schema_id = SCHEMA_ID('comercial'))
 BEGIN
     CREATE TABLE comercial.registro_importaciones(
-        id INT,
-        dia char(2),
-        mes char(2),
-        anio char(2),
-        dua char(6),
-        serie char(4),
-        aduana varchar(30),
-        tipo_documento varchar(40),
+        id INT IDENTITY(1,1),  -- CORREGIDO: Ahora tiene IDENTITY
         ruc char(11),
-        razon_social varchar(100),
-        direccion varchar(100),
-        telefono varchar(60),
-        fax varchar(10),
-        departamento varchar(40),
-        provincia varchar(30),
-        distrito varchar(50),
-        via_transporte varchar(20),
-        banco varchar(80),
-        pais_origen varchar(80),
-        pais_adquisicion varchar(80),
-        puerto_embarque varchar(80),
-        buque varchar(40),
-        empresa_transporte varchar(100),
-        agente_aduanas varchar(100),
-        agente_carga_destino varchar(120),
-        almacen varchar(120),
-        partida_arancelaria_cod char(10),
-        partida_arancelaria_descripcion varchar(255),
-        mercancia varchar(150),
-        descripcion_mercancia_1 varchar(150),
-        descripcion_mercancia_2 varchar(150),
-        descripcion_mercancia_3 varchar(150),
-        descripcion_mercancia_4 varchar(150),
-        probable_embarcador varchar(100),
-        producto varchar(50),
-        marca varchar(40),
-        modelo varchar(50),
-        caracteristica varchar(120),
-        manifiesto varchar(20),
-        bill_landing varchar(40),
-        fob decimal(10,2),
-        flete decimal(10,2),
-        seguro decimal(12,2),
-        cif decimal(10,2),
-        fob_unit decimal(10,2),
-        cif_unit decimal(10,2),
-        advalorem decimal(12,2),
-        igv decimal(10,2),
-        ipm_max decimal(10,2),
-        peso_bruto decimal(12,2),
-        peso_neto decimal(12,2),
-        anio_fabricacion char(4),
-        unidad_comercial varchar(40),
-        estado_mercancia varchar(30),
-        incoterm char(8),
-        bill_landing_master varchar(40),
-        forma_pago varchar(30),
-        canal varchar(10),
-        unidad_medida varchar(10),
-        tipo_bulto varchar(60)
+        anio char(4),
+        razon_social varchar(150),
+        aduanas varchar(255),
+        via_transporte varchar(150),
+        paises_origen varchar(2000),
+        puertos_embarque varchar(max),
+        embarcadores varchar(max),
+        agente_aduanas varchar(max),
+        partida_arancelaria_cod varchar(max),
+        partida_arancelaria_descripcion varchar(max),
+        fob_min decimal(12,2),
+        fob_max decimal(12,2),
+        fob_prom decimal(12,2),
+        fob_anual decimal(12,2),
+        total_operaciones int,
+        cantidad_agentes int,
+        cantidad_paises int,
+        cantidad_partidas int,
+        primera_importacion date,
+        ultima_importacion date
     );
     PRINT '✓ Tabla comercial.registro_importaciones creada';
 END
 GO
 
 -- -----------------------------------------------------
--- 4.4 COTIZACIONES
+-- 4.5 COTIZACIONES
 -- -----------------------------------------------------
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'cotizaciones' AND schema_id = SCHEMA_ID('comercial'))
 BEGIN
@@ -637,7 +605,7 @@ END
 GO
 
 -- -----------------------------------------------------
--- 4.5 DETALLE DE COTIZACIONES
+-- 4.6 DETALLE DE COTIZACIONES
 -- -----------------------------------------------------
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'cotizacion_detalle' AND schema_id = SCHEMA_ID('comercial'))
 BEGIN
@@ -657,7 +625,7 @@ END
 GO
 
 -- -----------------------------------------------------
--- 4.6 HISTORIAL DE COTIZACIONES
+-- 4.7 HISTORIAL DE COTIZACIONES
 -- -----------------------------------------------------
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'cotizacion_historial' AND schema_id = SCHEMA_ID('comercial'))
 BEGIN
@@ -676,7 +644,7 @@ END
 GO
 
 -- -----------------------------------------------------
--- 4.7 ARCHIVOS DE LEADS
+-- 4.8 ARCHIVOS DE LEADS
 -- -----------------------------------------------------
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'archivos_leads' AND schema_id = SCHEMA_ID('comercial'))
 BEGIN
@@ -696,7 +664,7 @@ END
 GO
 
 -- -----------------------------------------------------
--- 4.8 LEADS
+-- 4.9 LEADS
 -- -----------------------------------------------------
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'leads' AND schema_id = SCHEMA_ID('comercial'))
 BEGIN
@@ -720,7 +688,7 @@ END
 GO
 
 -- -----------------------------------------------------
--- 4.9 FEEDBACK DE LEADS
+-- 4.10 FEEDBACK DE LEADS
 -- -----------------------------------------------------
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'lead_feedback' AND schema_id = SCHEMA_ID('comercial'))
 BEGIN
@@ -740,7 +708,7 @@ END
 GO
 
 -- -----------------------------------------------------
--- 4.10 LOTES DE LEADS
+-- 4.11 LOTES DE LEADS
 -- -----------------------------------------------------
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'lotes_leads' AND schema_id = SCHEMA_ID('comercial'))
 BEGIN
@@ -759,7 +727,7 @@ END
 GO
 
 -- -----------------------------------------------------
--- 4.11 ÓRDENES DE SERVICIO
+-- 4.12 ÓRDENES DE SERVICIO
 -- -----------------------------------------------------
 IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'ordenes' AND schema_id = SCHEMA_ID('comercial'))
 BEGIN

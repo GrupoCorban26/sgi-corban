@@ -1,6 +1,7 @@
 export const MENU_ROLES = {
   comercial: [
     { label: 'Inicio', href: '/comercial/' },
+    { label: 'Prospección', href: '/comercial/prospeccion', icon: 'UserPlusIcon' },
     { label: 'Base', href: '/comercial/base' },
     { label: 'Cotizaciones', href: '/comercial/cotizaciones' },
     { label: 'Ordenes', href: '/comercial/ordenes' },
@@ -26,6 +27,8 @@ export const MENU_ROLES = {
   ],
   sistemas: [
     { label: 'Inicio', href: '/sistemas', icon: 'HomeIcon' },
+    { label: 'Transacciones', href: '/sistemas/transacciones', icon: 'FileIcon' },
+    { label: 'Contactos', href: '/sistemas/contactos', icon: 'UserGroupIcon' },
     { label: 'Base', href: '/sistemas/base', icon: 'PriceIcon' },
     { label: 'Usuarios', href: '/sistemas/usuarios', icon: 'FileIcon' },
   ],

@@ -101,8 +101,8 @@ function InputField({ label, name, value, onChange, error, required, disabled, t
         value={value}
         onChange={onChange}
         className={`w-full px-3 py-2 rounded-lg border outline-none focus:ring-2 text-sm transition-colors ${error
-            ? 'border-red-300 focus:ring-red-500 bg-red-50'
-            : 'border-gray-200 focus:ring-blue-500 focus:border-transparent'
+          ? 'border-red-300 focus:ring-red-500 bg-red-50'
+          : 'border-gray-200 focus:ring-blue-500 focus:border-transparent'
           }`}
         placeholder={placeholder}
         disabled={disabled}
@@ -145,8 +145,8 @@ function SelectField({ label, name, value, onChange, options, error, required, d
         onChange={onChange}
         disabled={disabled}
         className={`w-full px-3 py-2 rounded-lg border bg-white outline-none focus:ring-2 text-sm transition-colors ${error
-            ? 'border-red-300 focus:ring-red-500 bg-red-50'
-            : 'border-gray-200 focus:ring-blue-500'
+          ? 'border-red-300 focus:ring-red-500 bg-red-50'
+          : 'border-gray-200 focus:ring-blue-500'
           } ${disabled ? 'bg-gray-50 text-gray-400' : ''}`}
       >
         <option value="">{placeholder}</option>
@@ -218,6 +218,7 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
         break;
       case 'fecha_ingreso':
         if (!value) return 'La fecha de ingreso es obligatoria';
+        if (typeof value === 'string' && new Date(value) > new Date()) return 'La fecha no puede ser futura';
         break;
       case 'departamento_id':
         if (!value) return 'Seleccione un departamento organizacional';
@@ -595,28 +596,6 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
             <Building2 size={16} className="text-indigo-600" />
             <h3 className="font-semibold text-gray-700 uppercase text-xs tracking-wider">Información Laboral</h3>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <InputField
-              label="Fecha Ingreso"
-              name="fecha_ingreso"
-              type="date"
-              value={formData.fecha_ingreso}
-              onChange={handleChange}
-              error={touched.has('fecha_ingreso') ? errors.fecha_ingreso : undefined}
-              required
-              disabled={isLoading}
-              icon={<Calendar size={12} />}
-            />
-            <SelectField
-              label="Jefe Directo"
-              name="jefe_id"
-              value={formData.jefe_id}
-              onChange={handleChange}
-              options={empleadosDropdown || []}
-              disabled={isLoading}
-              placeholder="Sin jefe asignado"
-            />
-          </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <SelectField
               label="Departamento Org."
@@ -647,6 +626,32 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
               error={touched.has('cargo_id') ? errors.cargo_id : undefined}
               required
               disabled={!formData.area_id || isLoading}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <InputField
+              label="Fecha Ingreso"
+              name="fecha_ingreso"
+              type="date"
+              value={formData.fecha_ingreso}
+              onChange={handleChange}
+              error={touched.has('fecha_ingreso') ? errors.fecha_ingreso : undefined}
+              required
+              disabled={isLoading}
+              icon={<Calendar size={12} />}
+            />
+            <SelectField
+              label="Jefe Directo"
+              name="jefe_id"
+              value={formData.jefe_id}
+              onChange={handleChange}
+              options={(empleadosDropdown || []).filter(emp => {
+                // Filtrar empleados de la misma área o del mismo departamento
+                // Solo mostrar jefes potenciales después de seleccionar área
+                return formData.area_id ? true : false;
+              })}
+              disabled={!formData.area_id || isLoading}
+              placeholder={formData.area_id ? 'Sin jefe asignado' : 'Seleccione área primero'}
             />
           </div>
         </section>

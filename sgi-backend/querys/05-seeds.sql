@@ -2557,15 +2557,59 @@ ELSE
 GO
 
 -- =====================================================
--- 16. ASIGNACIÓN DE ROL ADMIN AL USUARIO
+-- 16. EMPLEADO SISTEMAS
+-- =====================================================
+
+PRINT '>> Insertando Empleado Admin...';
+IF NOT EXISTS (SELECT 1 FROM adm.empleados WHERE nombres = 'Branco')
+BEGIN
+    INSERT INTO adm.empleados (nombres, apellido_paterno, apellido_materno, fecha_nacimiento, tipo_documento, nro_documento, celular, email_personal, direccion, distrito_id, fecha_ingreso, is_active, cargo_id, area_id, departamento_id)
+    VALUES 
+        ('Branco', 'Arguedas', 'Villavicencio', '1999-10-10', 'DNI', '74644489', '907740534', 'bm.arguedasv@gmail.pe', 'Lima', 1293, '2025-03-15', 1, 1, 1, 1);
+    PRINT '✓ Empleado Admin insertado';
+END
+ELSE
+    PRINT '⚠ Empleado Admin ya existe';
+GO
+
+-- =====================================================
+-- 17. USUARIO SISTEMAS
+-- =====================================================
+
+PRINT '>> Insertando Usuario Admin...';
+IF NOT EXISTS (SELECT 1 FROM seg.usuarios WHERE correo_corp = 'sistemas@grupocorban.pe')
+BEGIN
+    INSERT INTO seg.usuarios (empleado_id, correo_corp, password_hash)
+    VALUES 
+    -- Password: admin1234 (generado con bcrypt)
+        (2, 'sistemas@grupocorban.pe', '$2b$12$1/tg1PP/TI39uVknPx4htOsIFcLxk6.o79QhzzHDZf0Bfl6WSgwri');
+    PRINT '✓ Usuario Admin insertado';
+END
+ELSE
+    PRINT '⚠ Usuario Admin ya existe';
+GO
+
+-- =====================================================
+-- 17. ASIGNACIÓN DE ROL ADMIN AL USUARIO
 -- =====================================================
 
 PRINT '>> Asignando rol ADMIN al usuario...';
-IF NOT EXISTS (SELECT 1 FROM seg.usuarios_roles WHERE usuario_id = 1 AND rol_id = 1)
+IF NOT EXISTS (SELECT 1 FROM seg.usuarios_roles WHERE usuario_id = 2 AND rol_id = 8)
 BEGIN
     INSERT INTO seg.usuarios_roles (usuario_id, rol_id)
     VALUES (1, 1); -- usuario_id=1 (Admin), rol_id=1 (ADMIN)
-    PRINT '✓ Rol ADMIN asignado al usuario';
+    PRINT '✓ Rol SISTEMAS asignado al usuario';
+END
+ELSE
+    PRINT '⚠ Rol ya asignado';
+GO
+
+PRINT '>> Asignando rol Sistemas al usuario...';
+IF NOT EXISTS (SELECT 1 FROM seg.usuarios_roles WHERE usuario_id = 2 AND rol_id = 8)
+BEGIN
+    INSERT INTO seg.usuarios_roles (usuario_id, rol_id)
+    VALUES (2, 8); -- usuario_id=1 (Sistemas), rol_id=1 (ADMIN)
+    PRINT '✓ Rol Sistemas asignado al usuario';
 END
 ELSE
     PRINT '⚠ Rol ya asignado';

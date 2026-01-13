@@ -5,7 +5,7 @@ import {
   UserPlus,
   History,
   Edit2,
-  MoreVertical,
+  Power,
   Search,
   Filter,
   Loader2,
@@ -21,9 +21,10 @@ interface ColaboradoresTabProps {
   onOpenHistory: (entity: Empleado) => void;
   onEdit: (empleado: Empleado) => void;
   onNew: () => void;
+  onToggleStatus: (empleado: Empleado) => void;
 }
 
-export function ColaboradoresTab({ onOpenHistory, onEdit, onNew }: ColaboradoresTabProps) {
+export function ColaboradoresTab({ onOpenHistory, onEdit, onNew, onToggleStatus }: ColaboradoresTabProps) {
   const [busqueda, setBusqueda] = useState('');
   const [page, setPage] = useState(1);
   const pageSize = 15;
@@ -149,8 +150,16 @@ export function ColaboradoresTab({ onOpenHistory, onEdit, onNew }: Colaboradores
                         <History size={16} />
                       </button>
 
-                      <button className="p-2 hover:bg-gray-100 text-gray-400 rounded-lg transition-colors cursor-pointer">
-                        <MoreVertical size={16} />
+                      {/* BOTÓN DESACTIVAR/ACTIVAR */}
+                      <button
+                        onClick={() => onToggleStatus(emp)}
+                        className={`p-2 rounded-lg transition-colors cursor-pointer ${emp.is_active
+                            ? 'hover:bg-amber-100 text-amber-600'
+                            : 'hover:bg-green-100 text-green-600'
+                          }`}
+                        title={emp.is_active ? 'Desactivar colaborador' : 'Reactivar colaborador'}
+                      >
+                        <Power size={16} />
                       </button>
                     </div>
                   </td>

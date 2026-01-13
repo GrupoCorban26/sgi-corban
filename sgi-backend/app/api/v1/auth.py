@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+import logging
 # 1. Quitamos OAuth2PasswordRequestForm e importamos tu esquema
 from app.schemas.auth import UserLoginSchema 
 from sqlalchemy.ext.asyncio import AsyncSession # Asegúrate de usar AsyncSession si tu service es async
@@ -17,6 +18,9 @@ async def login(
     # 3. Accedemos a los datos mediante 'payload.correo' (ya no es .username)
     user_data = await obtener_usuario_por_correo(db, payload.correo)
     
+    # DEBUG: Ver qué roles devuelve el SP
+    logging.info(f"[LOGIN DEBUG] Roles del usuario: {user_data.get('roles', []) if user_data else 'No user data'}")
+    
     if not user_data:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, 
@@ -34,12 +38,13 @@ async def login(
     if user_data['is_bloqueado']:
         raise HTTPException(status_code=403, detail="Cuenta bloqueada")
 
-    # 4. Generar Token
+    # 4. Generar Token (incluir roles para el menú del frontend)
     access_token = security.crear_access_token(
         data={
             "sub": str(user_data['usuario_id']),
             "nombre": user_data['nombre_corto'],
             "permisos": user_data['permisos'],
+            "roles": user_data.get('roles', []),
             "area": user_data['area_nombre']
         }
     )
@@ -52,6 +57,7 @@ async def login(
             "nombre": user_data['nombre_corto'],
             "area": user_data['area_nombre'],
             "cargo": user_data['cargo_nombre'],
+            "roles": user_data.get('roles', []),
             "debe_cambiar_password": user_data['debe_cambiar_pass']
         }
     }
