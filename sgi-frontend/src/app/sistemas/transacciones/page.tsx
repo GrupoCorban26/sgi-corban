@@ -16,6 +16,8 @@ export default function TransaccionesPage() {
         setPage,
         search,
         setSearch,
+        sinTelefono,
+        setSinTelefono,
         pageSize,
         uploadFile
     } = useImportaciones();
@@ -86,15 +88,26 @@ export default function TransaccionesPage() {
 
             <div className="bg-white rounded-lg shadow border border-gray-200">
                 <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-                    <div className="relative w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                        <input
-                            type="text"
-                            placeholder="Buscar por RUC o Razón Social..."
-                            value={search}
-                            onChange={(e) => setSearch(e.target.value)}
-                            className="pl-9 pr-4 py-2 border rounded-lg text-sm w-full focus:ring-2 focus:ring-blue-500 outline-none"
-                        />
+                    <div className="flex items-center gap-4">
+                        <div className="relative w-64">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                            <input
+                                type="text"
+                                placeholder="Buscar por RUC o Razón Social..."
+                                value={search}
+                                onChange={(e) => setSearch(e.target.value)}
+                                className="pl-9 pr-4 py-2 border rounded-lg text-sm w-full focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                        </div>
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={sinTelefono}
+                                onChange={(e) => { setSinTelefono(e.target.checked); setPage(1); }}
+                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            />
+                            <span className="text-sm text-gray-600">Solo sin teléfono</span>
+                        </label>
                     </div>
                     <div className="flex items-center gap-3">
                         {loading && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}

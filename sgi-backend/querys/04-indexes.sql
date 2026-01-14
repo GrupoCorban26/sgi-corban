@@ -112,6 +112,15 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_clientes_activo')
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_cliente_contactos_ruc')
     CREATE NONCLUSTERED INDEX IX_cliente_contactos_ruc ON comercial.cliente_contactos(ruc);
 
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_cliente_contactos_estado')
+    CREATE NONCLUSTERED INDEX IX_cliente_contactos_estado ON comercial.cliente_contactos(estado);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_cliente_contactos_asignado')
+    CREATE NONCLUSTERED INDEX IX_cliente_contactos_asignado ON comercial.cliente_contactos(asignado_a);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_cliente_contactos_caso')
+    CREATE NONCLUSTERED INDEX IX_cliente_contactos_caso ON comercial.cliente_contactos(caso_id);
+
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_cotizaciones_codigo')
     CREATE NONCLUSTERED INDEX IX_cotizaciones_codigo ON comercial.cotizaciones(codigo);
 

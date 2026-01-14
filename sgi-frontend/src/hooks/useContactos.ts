@@ -1,10 +1,11 @@
 import { useState, useCallback } from 'react';
 import { contactosService } from '../services/contactos';
-import { Contacto } from '../types/contactos';
+import { Contacto, ContactosListResponse } from '../types/contactos';
 
 export const useContactos = () => {
     const [contacts, setContacts] = useState<Contacto[]>([]);
     const [loading, setLoading] = useState(false);
+    const [paginatedData, setPaginatedData] = useState<ContactosListResponse | null>(null);
 
     const fetchByRuc = useCallback(async (ruc: string) => {
         setLoading(true);
@@ -17,6 +18,29 @@ export const useContactos = () => {
             setLoading(false);
         }
     }, []);
+
+    const fetchPaginated = useCallback(async (
+        page: number = 1,
+        pageSize: number = 20,
+        search?: string,
+        estado?: string
+    ) => {
+        setLoading(true);
+        try {
+            const data = await contactosService.getPaginated(page, pageSize, search, estado);
+            setPaginatedData(data);
+            return data;
+        } catch (error) {
+            console.error(error);
+            return null;
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const getStats = async () => {
+        return await contactosService.getStats();
+    };
 
     const create = async (contact: Omit<Contacto, 'id'>) => {
         await contactosService.create(contact);
@@ -47,7 +71,10 @@ export const useContactos = () => {
     return {
         contacts,
         loading,
+        paginatedData,
         fetchByRuc,
+        fetchPaginated,
+        getStats,
         create,
         update,
         remove,
@@ -55,3 +82,4 @@ export const useContactos = () => {
         assignBatch
     };
 };
+

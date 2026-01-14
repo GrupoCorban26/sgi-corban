@@ -278,8 +278,8 @@ function ModalContent({
                         onBlur={() => handleBlur('nombre', nombre)}
                         placeholder={`Ej. ${entityType === 'departamento' ? 'Comercial' : entityType === 'area' ? 'Ventas' : 'Gerente'}`}
                         className={`w-full px-3 py-2.5 rounded-xl border outline-none text-sm transition-colors ${touched.has('nombre') && errors.nombre
-                                ? 'border-red-300 focus:ring-2 focus:ring-red-500/50 bg-red-50'
-                                : 'border-gray-200 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500'
+                            ? 'border-red-300 focus:ring-2 focus:ring-red-500/50 bg-red-50'
+                            : 'border-gray-200 focus:ring-2 focus:ring-indigo-500/50 focus:border-indigo-500'
                             }`}
                         disabled={isLoading}
                         autoFocus
@@ -292,8 +292,8 @@ function ModalContent({
                     )}
                 </div>
 
-                {/* Departamento (para áreas) */}
-                {entityType === 'area' && (
+                {/* Departamento (para áreas) - solo si no viene predefinido */}
+                {entityType === 'area' && !parentDepartamentoId && (
                     <div className="space-y-1.5">
                         <label htmlFor="departamento" className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                             Departamento <span className="text-red-500">*</span>
@@ -316,8 +316,8 @@ function ModalContent({
                             }}
                             onBlur={() => handleBlur('departamentoId', departamentoId)}
                             className={`w-full px-3 py-2.5 rounded-xl border outline-none bg-white text-sm cursor-pointer transition-colors ${touched.has('departamentoId') && errors.departamentoId
-                                    ? 'border-red-300 focus:ring-2 focus:ring-red-500/50 bg-red-50'
-                                    : 'border-gray-200 focus:ring-2 focus:ring-blue-500/50'
+                                ? 'border-red-300 focus:ring-2 focus:ring-red-500/50 bg-red-50'
+                                : 'border-gray-200 focus:ring-2 focus:ring-blue-500/50'
                                 }`}
                             disabled={isLoading || loadingDepartamentos}
                         >
@@ -332,9 +332,22 @@ function ModalContent({
                         )}
                     </div>
                 )}
+                {/* Mostrar departamento predefinido como solo lectura */}
+                {entityType === 'area' && parentDepartamentoId && (
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Departamento</label>
+                        <div className="px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-600 flex items-center gap-2">
+                            {loadingDepartamentos ? (
+                                <><Loader2 size={14} className="animate-spin" /> Cargando...</>
+                            ) : (
+                                departamentos.find(d => d.id === parentDepartamentoId)?.nombre || `Depto ID: ${parentDepartamentoId}`
+                            )}
+                        </div>
+                    </div>
+                )}
 
-                {/* Área (para cargos) */}
-                {entityType === 'cargo' && (
+                {/* Área (para cargos) - solo si no viene predefinido */}
+                {entityType === 'cargo' && !parentAreaId && (
                     <div className="space-y-1.5">
                         <label htmlFor="area" className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                             Área <span className="text-red-500">*</span>
@@ -357,8 +370,8 @@ function ModalContent({
                             }}
                             onBlur={() => handleBlur('areaId', areaId)}
                             className={`w-full px-3 py-2.5 rounded-xl border outline-none bg-white text-sm cursor-pointer transition-colors ${touched.has('areaId') && errors.areaId
-                                    ? 'border-red-300 focus:ring-2 focus:ring-red-500/50 bg-red-50'
-                                    : 'border-gray-200 focus:ring-2 focus:ring-purple-500/50'
+                                ? 'border-red-300 focus:ring-2 focus:ring-red-500/50 bg-red-50'
+                                : 'border-gray-200 focus:ring-2 focus:ring-purple-500/50'
                                 }`}
                             disabled={isLoading || loadingAreas}
                         >
@@ -371,6 +384,19 @@ function ModalContent({
                                 {errors.areaId}
                             </p>
                         )}
+                    </div>
+                )}
+                {/* Mostrar área predefinida como solo lectura */}
+                {entityType === 'cargo' && parentAreaId && (
+                    <div className="space-y-1.5">
+                        <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">Área</label>
+                        <div className="px-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm text-gray-600 flex items-center gap-2">
+                            {loadingAreas ? (
+                                <><Loader2 size={14} className="animate-spin" /> Cargando...</>
+                            ) : (
+                                areas.find(a => a.id === parentAreaId)?.nombre || `Área ID: ${parentAreaId}`
+                            )}
+                        </div>
                     </div>
                 )}
 

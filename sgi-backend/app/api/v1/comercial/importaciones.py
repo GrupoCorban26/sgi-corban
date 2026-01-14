@@ -23,7 +23,9 @@ async def upload_importaciones(
 async def list_importaciones(
     page: int = Query(1, gt=0),
     page_size: int = Query(20, gt=0, le=100),
-    search: str = Query(None, min_length=3),
+    search: str = Query(None),
+    sin_telefono: bool = Query(False),
     db: AsyncSession = Depends(get_db)
 ):
-    return await ImportacionesService.get_importaciones(db, page, page_size, search)
+    return await ImportacionesService.get_importaciones(db, page, page_size, search, sin_telefono)
+

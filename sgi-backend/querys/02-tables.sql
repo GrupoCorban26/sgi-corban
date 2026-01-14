@@ -499,6 +499,20 @@ BEGIN
 END
 GO
 
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'casos_llamada' AND schema_id = SCHEMA_ID('comercial'))
+BEGIN
+    CREATE TABLE comercial.casos_llamada(
+        id INT IDENTITY(1,1),
+        nombre VARCHAR(100),
+        contestado BIT NOT NULL DEFAULT 0,
+        created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+        updated_at DATETIME2
+    );
+    PRINT '✓ Tabla comercial.casos_llamada creada';
+END
+GO
+
+
 -- -----------------------------------------------------
 -- 4.3 CONTACTOS DE CLIENTES
 -- -----------------------------------------------------
@@ -509,16 +523,16 @@ BEGIN
         ruc CHAR(11) NOT NULL,
         cargo NVARCHAR(100),
         telefono VARCHAR(20) not null,
-        email NVARCHAR(100),
+        correo NVARCHAR(100),
         origen VARCHAR(30),
         is_client BIT NOT NULL DEFAULT 0,
         is_active BIT NOT NULL DEFAULT 1,
         -- Campos de asignación para leads
         asignado_a INT,                          -- Usuario comercial asignado
         fecha_asignacion DATETIME2,              -- Cuándo fue asignado
-        lote_asignacion INT,                     -- Número de lote
-        estado VARCHAR(30) DEFAULT 'DISPONIBLE', -- DISPONIBLE, EN_GESTION, CONTESTADO, NO_CONTESTO, NO_EXISTE, etc.
-        --
+        lote_asignacion INT,
+        caso_id int,
+        estado VARCHAR(30) DEFAULT 'DISPONIBLE', -- DISPONIBLE, EN_GESTION
         created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
         updated_at DATETIME2
     );

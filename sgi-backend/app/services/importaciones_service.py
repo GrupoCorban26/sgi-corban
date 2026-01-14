@@ -126,41 +126,42 @@ class ImportacionesService:
             raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
     @staticmethod
-    async def get_importaciones(db: AsyncSession, page: int, page_size: int, search: str = None):
-        """Lista importaciones con paginación."""
+    async def get_importaciones(db: AsyncSession, page: int, page_size: int, search: str = None, sin_telefono: bool = False):
+        """Lista importaciones con paginación. Opcionalmente filtra empresas sin teléfono registrado."""
         try:
-            result = await db.execute(
-                text("EXEC comercial.usp_listar_importaciones :page, :page_size, :search"),
-                {"page": page, "page_size": page_size, "search": search}
-            )
+            offset = (page - 1) * page_size
             
-            total_row = result.fetchone()
-            total = total_row[0] if total_row else 0
+            # Base query
+            base_where = """
+                WHERE (:search IS NULL OR ri.ruc LIKE '%' + :search + '%' OR ri.razon_social LIKE '%' + :search + '%')
+            """
             
-            if result.cursor.nextset():
-                rows = result.mappings().all()
-            else:
-                rows = []
+            # Si sin_telefono=True, excluir RUCs que tienen teléfonos
+            if sin_telefono:
+                base_where += """
+                    AND ri.ruc NOT IN (SELECT DISTINCT ruc FROM comercial.cliente_contactos WHERE is_active = 1)
+                """
             
-            return {"total": total, "page": page, "page_size": page_size, "data": rows}
-            
-        except Exception:
-            # Fallback
-            result = await db.execute(
-                text("""
-                    SELECT * FROM comercial.registro_importaciones
-                    WHERE (:search IS NULL OR ruc LIKE '%' + :search + '%' OR razon_social LIKE '%' + :search + '%')
-                    ORDER BY anio DESC
-                    OFFSET :offset ROWS FETCH NEXT :page_size ROWS ONLY
-                """),
-                {"search": search, "offset": (page - 1) * page_size, "page_size": page_size}
-            )
-            rows = result.mappings().all()
-            
-            count_result = await db.execute(
-                text("SELECT COUNT(*) FROM comercial.registro_importaciones WHERE (:search IS NULL OR ruc LIKE '%' + :search + '%' OR razon_social LIKE '%' + :search + '%')"),
-                {"search": search}
-            )
+            # Count query
+            count_query = f"""
+                SELECT COUNT(*) FROM comercial.registro_importaciones ri
+                {base_where}
+            """
+            count_result = await db.execute(text(count_query), {"search": search})
             total = count_result.scalar() or 0
             
+            # Data query
+            data_query = f"""
+                SELECT * FROM comercial.registro_importaciones ri
+                {base_where}
+                ORDER BY ri.anio DESC, ri.fob_anual DESC
+                OFFSET :offset ROWS FETCH NEXT :page_size ROWS ONLY
+            """
+            result = await db.execute(text(data_query), {"search": search, "offset": offset, "page_size": page_size})
+            rows = result.mappings().all()
+            
             return {"total": total, "page": page, "page_size": page_size, "data": rows}
+            
+        except Exception as e:
+            print(f"Error get_importaciones: {e}")
+            return {"total": 0, "page": page, "page_size": page_size, "data": []}

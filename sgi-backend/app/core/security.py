@@ -64,3 +64,28 @@ def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
     except (JWTError, ValueError):
         # Si el token fue manipulado o expiró, lanzamos el error
         raise credentials_exception
+
+
+def get_current_empleado_id(token: str = Depends(oauth2_scheme)) -> int:
+    """
+    Extrae el empleado_id del token JWT.
+    El empleado_id se guarda en el campo 'empleado_id' del token.
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Sesión inválida o expirada",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        empleado_id = payload.get("empleado_id")
+        
+        if empleado_id is None:
+            # Si no hay empleado_id en el token, usar el user_id como fallback
+            user_id = payload.get("sub")
+            return int(user_id) if user_id else 0
+            
+        return int(empleado_id)
+        
+    except (JWTError, ValueError):
+        raise credentials_exception

@@ -278,10 +278,18 @@ IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_clientes_comercia
     ALTER TABLE comercial.clientes ADD CONSTRAINT FK_clientes_comercial 
     FOREIGN KEY (comercial_encargado_id) REFERENCES adm.empleados(id);
 
--- Cliente Contactos (ya no tiene cliente_id, ahora usa ruc directamente)
-IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_cliente_contactos_comercial')
-    ALTER TABLE comercial.cliente_contactos ADD CONSTRAINT FK_cliente_contactos_comercial 
-    FOREIGN KEY (comercial_id) REFERENCES adm.empleados(id);
+-- Casos Llamada
+IF NOT EXISTS (SELECT * FROM sys.key_constraints WHERE name = 'PK_casos_llamada')
+    ALTER TABLE comercial.casos_llamada ADD CONSTRAINT PK_casos_llamada PRIMARY KEY (id);
+
+-- Cliente Contactos
+IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_cliente_contactos_asignado')
+    ALTER TABLE comercial.cliente_contactos ADD CONSTRAINT FK_cliente_contactos_asignado 
+    FOREIGN KEY (asignado_a) REFERENCES seg.usuarios(id);
+
+IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_cliente_contactos_caso')
+    ALTER TABLE comercial.cliente_contactos ADD CONSTRAINT FK_cliente_contactos_caso 
+    FOREIGN KEY (caso_id) REFERENCES comercial.casos_llamada(id);
 
 -- Cotizaciones
 IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_cotizaciones_cliente')

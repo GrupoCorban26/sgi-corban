@@ -2615,6 +2615,30 @@ ELSE
     PRINT '⚠ Rol ya asignado';
 GO
 
+-- =====================================================
+-- CASOS DE LLAMADA
+-- =====================================================
+PRINT '>> Insertando Casos de Llamada...';
+
+IF NOT EXISTS (SELECT 1 FROM comercial.casos_llamada WHERE nombre = 'No contestó')
+BEGIN
+    INSERT INTO comercial.casos_llamada (nombre, contestado, created_at)
+    VALUES 
+        ('No contestó', 0, GETDATE()),
+        ('Ocupado', 0, GETDATE()),
+        ('Número equivocado', 0, GETDATE()),
+        ('Buzón de voz', 0, GETDATE()),
+        ('Contestó - Interesado', 1, GETDATE()),
+        ('Contestó - No interesado', 1, GETDATE()),
+        ('Contestó - Volver a llamar', 1, GETDATE()),
+        ('Contestó - Solicita cotización', 1, GETDATE()),
+        ('Contestó - Ya tiene proveedor', 1, GETDATE());
+    PRINT '✓ Casos de Llamada insertados';
+END
+ELSE
+    PRINT '⚠ Casos de Llamada ya existen';
+GO
+
 PRINT '';
 PRINT '=====================================================';
 PRINT '✓ SEEDS COMPLETADOS';

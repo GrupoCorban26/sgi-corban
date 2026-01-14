@@ -148,6 +148,7 @@ export default function OrganizacionPage() {
             onOpenHistory={(e) => { setSelectedEntity(e); setShowHistory(true); }}
             onEdit={(e) => { setSelectedEmpleado(e); setIsEmpModalOpen(true); }}
             onNew={() => { setSelectedEmpleado(null); setIsEmpModalOpen(true); }}
+            onToggleStatus={(e) => { console.log('Toggle status:', e); /* TODO: Implementar toggle */ }}
           />
         )}
       </div>

@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import NavLateral from '@/components/layout/navLateral';
 import { Header } from '@/components/layout/Header';
 import { Role, MENU_ROLES } from '@/config/navLateral';
@@ -31,33 +32,41 @@ function getRoleFromCookie(): Role {
     try {
         const userDataStr = Cookies.get('user_data');
         if (!userDataStr) {
-            console.log('[MENU DEBUG] No se encontró cookie user_data');
             return 'comercial';
         }
 
         const userData: UserData = JSON.parse(userDataStr);
         const roles = userData.roles || [];
 
-        console.log('[MENU DEBUG] Roles del usuario:', roles);
-
-        // Buscar primer rol que tenga menú definido
         for (const role of roles) {
             const menuRole = ROLE_TO_MENU[role];
             if (menuRole && MENU_ROLES[menuRole]) {
-                console.log('[MENU DEBUG] Rol encontrado:', role, '-> menu:', menuRole);
                 return menuRole;
             }
         }
 
-        return 'comercial'; // fallback
+        return 'comercial';
     } catch (error) {
-        console.log('[MENU DEBUG] Error parseando user_data:', error);
         return 'comercial';
     }
 }
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
-    const role = getRoleFromCookie();
+    const [role, setRole] = useState<Role | null>(null);
+
+    useEffect(() => {
+        setRole(getRoleFromCookie());
+    }, []);
+
+    // Mostrar loading mientras se determina el rol (evita hydration mismatch)
+    if (role === null) {
+        return (
+            <div className="flex h-screen items-center justify-center bg-slate-50">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+        );
+    }
+
     return (
         <div className="flex h-screen overflow-hidden bg-slate-50">
             <NavLateral role={role} />
@@ -74,3 +83,4 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         </div>
     );
 }
+

@@ -33,7 +33,7 @@ BEGIN
     -- Validar duplicado exacto
     IF NOT EXISTS (SELECT 1 FROM comercial.cliente_contactos WHERE ruc = @Ruc AND telefono = @Telefono AND is_active = 1)
     BEGIN
-        INSERT INTO comercial.cliente_contactos (ruc, cargo, telefono, email, origen, is_client, is_active, estado)
+        INSERT INTO comercial.cliente_contactos (ruc, cargo, telefono, correo, origen, is_client, is_active, estado)
         VALUES (@Ruc, @Cargo, @Telefono, @Email, @Origen, @IsClient, 1, 'DISPONIBLE');
         
         SELECT CAST(SCOPE_IDENTITY() as INT) as id;
@@ -64,7 +64,7 @@ BEGIN
     SET 
         cargo = COALESCE(@Cargo, cargo),
         telefono = COALESCE(@Telefono, telefono),
-        email = COALESCE(@Email, email),
+        correo = COALESCE(@Email, correo),
         is_client = COALESCE(@IsClient, is_client),
         estado = COALESCE(@Estado, estado),
         updated_at = GETDATE()
@@ -192,3 +192,77 @@ BEGIN
     END
 END
 GO
+
+-- =============================================
+-- SP PARA LISTAR CONTACTOS PAGINADOS
+-- Retorna: ruc, razon_social (de clientes), telefono, correo, contestado, caso, estado
+-- Incluye estadísticas de registros disponibles
+-- =============================================
+CREATE OR ALTER PROCEDURE comercial.usp_listar_contactos_paginado
+    @Page INT = 1,
+    @PageSize INT = 20,
+    @Search NVARCHAR(100) = NULL,
+    @Estado VARCHAR(30) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    DECLARE @Offset INT = (@Page - 1) * @PageSize;
+    
+    -- Primero retornamos el total y estadísticas
+    SELECT 
+        (SELECT COUNT(*) FROM comercial.cliente_contactos WHERE is_active = 1) as total_registros,
+        (SELECT COUNT(*) FROM comercial.cliente_contactos WHERE is_active = 1 AND estado = 'DISPONIBLE') as disponibles,
+        (SELECT COUNT(*) FROM comercial.cliente_contactos WHERE is_active = 1 AND estado = 'ASIGNADO') as asignados,
+        (SELECT COUNT(*) FROM comercial.cliente_contactos WHERE is_active = 1 AND estado = 'EN_GESTION') as en_gestion,
+        (SELECT COUNT(*) 
+         FROM comercial.cliente_contactos cc
+         WHERE cc.is_active = 1
+           AND (@Search IS NULL OR cc.ruc LIKE '%' + @Search + '%' OR cc.telefono LIKE '%' + @Search + '%')
+           AND (@Estado IS NULL OR cc.estado = @Estado)
+        ) as total_filtrado;
+    
+    -- Luego retornamos los datos paginados
+    SELECT 
+        cc.id,
+        cc.ruc,
+        COALESCE(cl.razon_social, ri.razon_social) as razon_social,
+        cc.telefono,
+        cc.correo,
+        CASE WHEN caso.contestado = 1 THEN 'Sí' ELSE 'No' END as contestado,
+        caso.nombre as caso,
+        cc.estado,
+        cc.asignado_a,
+        cc.fecha_asignacion,
+        cc.created_at
+    FROM comercial.cliente_contactos cc
+    LEFT JOIN comercial.clientes cl ON cc.ruc = cl.ruc
+    LEFT JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
+    LEFT JOIN comercial.casos_llamada caso ON cc.caso_id = caso.id
+    WHERE cc.is_active = 1
+      AND (@Search IS NULL OR cc.ruc LIKE '%' + @Search + '%' OR cc.telefono LIKE '%' + @Search + '%' OR cl.razon_social LIKE '%' + @Search + '%')
+      AND (@Estado IS NULL OR cc.estado = @Estado)
+    ORDER BY cc.created_at DESC
+    OFFSET @Offset ROWS FETCH NEXT @PageSize ROWS ONLY;
+END
+GO
+
+-- =============================================
+-- SP PARA OBTENER ESTADÍSTICAS DE CONTACTOS
+-- =============================================
+CREATE OR ALTER PROCEDURE comercial.usp_estadisticas_contactos
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN estado = 'DISPONIBLE' THEN 1 ELSE 0 END) as disponibles,
+        SUM(CASE WHEN estado = 'ASIGNADO' THEN 1 ELSE 0 END) as asignados,
+        SUM(CASE WHEN estado = 'EN_GESTION' THEN 1 ELSE 0 END) as en_gestion,
+        SUM(CASE WHEN estado NOT IN ('DISPONIBLE', 'ASIGNADO', 'EN_GESTION') THEN 1 ELSE 0 END) as otros
+    FROM comercial.cliente_contactos
+    WHERE is_active = 1;
+END
+GO
+

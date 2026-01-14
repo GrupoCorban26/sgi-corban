@@ -39,7 +39,7 @@ export async function handleLoginAction(prevState: any, formData: FormData) {
     // 1. Guardar el token en las cookies (httpOnly para seguridad)
     const cookieStore = await cookies();
     cookieStore.set('token', data.access_token, {
-      httpOnly: true,
+      httpOnly: false, // Permitir acceso desde JavaScript para enviar con axios
       secure: process.env.NODE_ENV === 'production',
       maxAge: 60 * 60 * 24,
       path: '/',

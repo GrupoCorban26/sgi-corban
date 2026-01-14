@@ -1,11 +1,32 @@
 import axios from 'axios';
-import { Contacto } from '../types/contactos';
+import { Contacto, ContactosListResponse } from '../types/contactos';
 
-const API_URL = 'http://localhost:8000/api/v1';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 export const contactosService = {
     getByRuc: async (ruc: string): Promise<Contacto[]> => {
         const response = await axios.get(`${API_URL}/contactos/ruc/${ruc}`);
+        return response.data;
+    },
+
+    getPaginated: async (
+        page: number = 1,
+        pageSize: number = 20,
+        search?: string,
+        estado?: string
+    ): Promise<ContactosListResponse> => {
+        const params = new URLSearchParams();
+        params.append('page', page.toString());
+        params.append('page_size', pageSize.toString());
+        if (search) params.append('search', search);
+        if (estado) params.append('estado', estado);
+
+        const response = await axios.get(`${API_URL}/contactos/list/paginated?${params}`);
+        return response.data;
+    },
+
+    getStats: async () => {
+        const response = await axios.get(`${API_URL}/contactos/stats`);
         return response.data;
     },
 
@@ -34,8 +55,8 @@ export const contactosService = {
     },
 
     assignBatch: async (): Promise<Contacto[]> => {
-        // Requires Auth Token usually handling by axios interceptor
         const response = await axios.post(`${API_URL}/contactos/assign-batch`);
         return response.data;
     }
 };
+
