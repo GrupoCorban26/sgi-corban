@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request
 import logging
 # 1. Quitamos OAuth2PasswordRequestForm e importamos tu esquema
 from app.schemas.auth import UserLoginSchema 
 from sqlalchemy.ext.asyncio import AsyncSession # Asegúrate de usar AsyncSession si tu service es async
 from app.database.db_connection import get_db 
 from app.core import security
-from app.services.auth import obtener_usuario_por_correo
+from app.services.auth import obtener_usuario_por_correo, registrar_sesion, revocar_sesion
 
 router = APIRouter(prefix="/login", tags=["Seguridad"])
 
@@ -13,6 +13,7 @@ router = APIRouter(prefix="/login", tags=["Seguridad"])
 async def login(
     # 2. Cambiamos el Depends del formulario por tu Schema de Pydantic
     payload: UserLoginSchema, 
+    request: Request,
     db: AsyncSession = Depends(get_db) # Cambiado a AsyncSession para consistencia con tu service
 ):
     # 3. Accedemos a los datos mediante 'payload.correo' (ya no es .username)
@@ -49,6 +50,19 @@ async def login(
         }
     )
 
+    # 5. REGISTRAR SESIÓN EN BD
+    # Obtenemos IP y User-Agent del request
+    client_ip = request.client.host if request.client else None
+    user_agent = request.headers.get("user-agent")
+    
+    await registrar_sesion(
+        db, 
+        usuario_id=user_data['usuario_id'],
+        token=access_token,
+        ip=client_ip,
+        user_agent=user_agent
+    )
+
     # Devolvemos la respuesta
     return {
         "access_token": access_token,
@@ -61,3 +75,19 @@ async def login(
             "debe_cambiar_password": user_data['debe_cambiar_pass']
         }
     }
+
+@router.post("/logout")
+async def logout(
+    token: str = Depends(security.oauth2_scheme),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Cierra la sesión actual revocando el token en la base de datos.
+    """
+    revocado = await revocar_sesion(db, token)
+    if not revocado:
+        # Podríamos retornar 404 o 400, pero por seguridad a veces es mejor 200
+        # o simplemente informar que no se encontró sesión activa
+        pass
+        
+    return {"message": "Sesión cerrada exitosamente"}

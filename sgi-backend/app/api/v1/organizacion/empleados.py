@@ -15,9 +15,10 @@ from app.schemas.organizacion.empleados import (
 
 router = APIRouter(prefix="/empleados", tags=["Organización - Empleados"])
 
+
 @router.get("/", response_model=EmpleadoPaginationResponse)
 async def listar_empleados(
-    busqueda: Optional[str] = Query(None, description="Buscar por nombre o apellido"),
+    busqueda: Optional[str] = Query(None, description="Buscar por nombre, apellido o documento"),
     page: int = Query(1, ge=1), 
     page_size: int = Query(15, ge=1, le=100), 
     departamento_id: Optional[int] = Query(None, description="Filtrar por departamento organizacional"),
@@ -34,6 +35,7 @@ async def listar_empleados(
         page_size=page_size
     )
 
+
 @router.get("/dropdown", response_model=List[EmpleadoDropdown])
 async def get_empleados_dropdown(
     db: AsyncSession = Depends(get_db)
@@ -42,20 +44,49 @@ async def get_empleados_dropdown(
     service = EmpleadoService(db)
     return await service.get_dropdown()
 
-@router.post("/", response_model=OperationResult)
+
+@router.get("/dropdown/by-area/{area_id}", response_model=List[dict])
+async def get_empleados_dropdown_by_area(
+    area_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Obtiene empleados filtrados por área para dropdown"""
+    service = EmpleadoService(db)
+    return await service.get_dropdown_by_area(area_id)
+
+
+@router.get("/dropdown/by-departamento/{departamento_id}", response_model=List[dict])
+async def get_empleados_dropdown_by_departamento(
+    departamento_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Obtiene empleados filtrados por departamento para dropdown"""
+    service = EmpleadoService(db)
+    return await service.get_dropdown_by_departamento(departamento_id)
+
+
+@router.get("/{empleado_id}", response_model=dict)
+async def obtener_empleado(
+    empleado_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Obtiene un empleado por su ID"""
+    service = EmpleadoService(db)
+    result = await service.get_by_id(empleado_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Empleado no encontrado")
+    return result
+
+
+@router.post("/", response_model=OperationResult, status_code=status.HTTP_201_CREATED)
 async def crear_empleado(
     empleado: EmpleadoCreate,
     db: AsyncSession = Depends(get_db)
 ):
-    """Crea un nuevo empleado"""
+    """Crea un nuevo empleado. Validaciones en Python."""
     service = EmpleadoService(db)
-    result = await service.create(empleado)
-    if result.get("success") != 1:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result.get("message", "Error al crear empleado")
-        )
-    return result
+    return await service.create(empleado)
+
 
 @router.put("/{empleado_id}", response_model=OperationResult)
 async def actualizar_empleado(
@@ -63,43 +94,29 @@ async def actualizar_empleado(
     empleado: EmpleadoUpdate,
     db: AsyncSession = Depends(get_db)
 ):
-    """Actualiza un empleado existente"""
+    """Actualiza un empleado existente. Validaciones en Python."""
     service = EmpleadoService(db)
-    result = await service.update(empleado_id, empleado)
-    if result.get("success") != 1:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result.get("message", "Error al actualizar empleado")
-        )
-    return result
+    return await service.update(empleado_id, empleado)
+
 
 @router.delete("/{empleado_id}", response_model=OperationResult)
 async def desactivar_empleado(
     empleado_id: int,
     db: AsyncSession = Depends(get_db)
 ):
-    """Desactiva un empleado (soft delete) - asigna fecha_cese automáticamente"""
+    """
+    Desactiva un empleado (soft delete) - asigna fecha_cese automáticamente.
+    Valida que no sea jefe de otros o responsable de departamento/área.
+    """
     service = EmpleadoService(db)
-    result = await service.delete(empleado_id)
-    if result.get("success") != 1:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result.get("message", "Error al desactivar empleado")
-        )
-    return result
+    return await service.delete(empleado_id)
 
-@router.patch("/{empleado_id}/reactivar", response_model=OperationResult)
+
+@router.post("/{empleado_id}/reactivar", response_model=OperationResult)
 async def reactivar_empleado(
     empleado_id: int,
     db: AsyncSession = Depends(get_db)
 ):
     """Reactiva un empleado desactivado - limpia fecha_cese"""
     service = EmpleadoService(db)
-    result = await service.reactivate(empleado_id)
-    if result.get("success") != 1:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result.get("message", "Error al reactivar empleado")
-        )
-    return result
-
+    return await service.reactivate(empleado_id)

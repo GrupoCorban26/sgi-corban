@@ -19,6 +19,8 @@ interface ModalProps {
     onClose: () => void;
     entityType: EntityType;
     departamentoToEdit?: Departamento | null;
+    areaToEdit?: any | null; // Usar 'any' temporal o importar los tipos
+    cargoToEdit?: any | null;
     parentDepartamentoId?: number | null;
     parentAreaId?: number | null;
 }
@@ -32,6 +34,8 @@ interface EntityConfig {
 interface ModalContentProps {
     entityType: EntityType;
     departamentoToEdit: Departamento | null;
+    areaToEdit: any | null;
+    cargoToEdit: any | null;
     parentDepartamentoId: number | null;
     parentAreaId: number | null;
     isOpen: boolean;
@@ -73,6 +77,8 @@ const getEntityConfig = (entityType: EntityType, isEditing: boolean): EntityConf
 function ModalContent({
     entityType,
     departamentoToEdit,
+    areaToEdit,
+    cargoToEdit,
     parentDepartamentoId,
     parentAreaId,
     isOpen,
@@ -92,8 +98,8 @@ function ModalContent({
 
     // Mutations
     const { createMutation: createDeptoMutation, updateMutation: updateDeptoMutation } = useDepartamentos();
-    const { createMutation: createAreaMutation } = useAreas();
-    const { createMutation: createCargoMutation } = useCargos();
+    const { createMutation: createAreaMutation, updateMutation: updateAreaMutation } = useAreas();
+    const { createMutation: createCargoMutation, updateMutation: updateCargoMutation } = useCargos();
 
     // Dropdowns
     const { data: empleados = [], isLoading: loadingEmpleados } = useEmpleadosParaSelect();
@@ -101,8 +107,17 @@ function ModalContent({
     const { data: areas = [], isLoading: loadingAreas } = useAreasParaSelect();
 
     // Derivados
-    const isEditing = useMemo(() => !!departamentoToEdit, [departamentoToEdit]);
-    const isLoading = createDeptoMutation.isPending || updateDeptoMutation.isPending || createAreaMutation.isPending || createCargoMutation.isPending;
+    const isEditing = useMemo(() => {
+        if (entityType === 'departamento') return !!departamentoToEdit;
+        if (entityType === 'area') return !!areaToEdit;
+        if (entityType === 'cargo') return !!cargoToEdit;
+        return false;
+    }, [entityType, departamentoToEdit, areaToEdit, cargoToEdit]);
+
+    const isLoading = createDeptoMutation.isPending || updateDeptoMutation.isPending ||
+        createAreaMutation.isPending || updateAreaMutation.isPending ||
+        createCargoMutation.isPending || updateCargoMutation.isPending;
+
     const config = useMemo(() => getEntityConfig(entityType, isEditing), [entityType, isEditing]);
     const showResponsable = entityType === 'departamento' || entityType === 'area';
 
@@ -110,10 +125,19 @@ function ModalContent({
     useEffect(() => {
         if (!isOpen) return;
 
-        if (departamentoToEdit && entityType === 'departamento') {
+        if (entityType === 'departamento' && departamentoToEdit) {
             setNombre(departamentoToEdit.nombre || '');
             setDescripcion(departamentoToEdit.descripcion || '');
             setResponsableId(departamentoToEdit.responsable_id || null);
+        } else if (entityType === 'area' && areaToEdit) {
+            setNombre(areaToEdit.nombre || '');
+            setDescripcion(areaToEdit.descripcion || '');
+            setResponsableId(areaToEdit.responsable_id || null);
+            setDepartamentoId(areaToEdit.departamento_id || null);
+        } else if (entityType === 'cargo' && cargoToEdit) {
+            setNombre(cargoToEdit.nombre || '');
+            setDescripcion(cargoToEdit.descripcion || '');
+            setAreaId(cargoToEdit.area_id || null);
         } else {
             setNombre('');
             setDescripcion('');
@@ -123,7 +147,7 @@ function ModalContent({
         }
         setErrors({});
         setTouched(new Set());
-    }, [departamentoToEdit, isOpen, parentDepartamentoId, parentAreaId, entityType]);
+    }, [departamentoToEdit, areaToEdit, cargoToEdit, isOpen, parentDepartamentoId, parentAreaId, entityType]);
 
     // Validar un campo
     const validateField = (field: string, value: string | number | null): string | undefined => {
@@ -217,21 +241,33 @@ function ModalContent({
                 }
                 case 'area': {
                     if (!departamentoId) return;
-                    await createAreaMutation.mutateAsync({
+                    const payload = {
                         nombre: nombre.trim(),
                         descripcion: descripcion.trim() || null,
                         responsable_id: responsableId,
                         departamento_id: departamentoId,
-                    });
+                    };
+
+                    if (isEditing && areaToEdit) {
+                        await updateAreaMutation.mutateAsync({ id: areaToEdit.id, data: payload });
+                    } else {
+                        await createAreaMutation.mutateAsync(payload);
+                    }
                     break;
                 }
                 case 'cargo': {
                     if (!areaId) return;
-                    await createCargoMutation.mutateAsync({
+                    const payload = {
                         nombre: nombre.trim(),
                         descripcion: descripcion.trim() || null,
                         area_id: areaId,
-                    });
+                    };
+
+                    if (isEditing && cargoToEdit) {
+                        await updateCargoMutation.mutateAsync({ id: cargoToEdit.id, data: payload });
+                    } else {
+                        await createCargoMutation.mutateAsync(payload);
+                    }
                     break;
                 }
             }
@@ -240,7 +276,12 @@ function ModalContent({
         } catch (error: unknown) {
             toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Ocurrió un error');
         }
-    }, [validateForm, entityType, nombre, descripcion, responsableId, departamentoId, areaId, isEditing, departamentoToEdit, updateDeptoMutation, createDeptoMutation, createAreaMutation, createCargoMutation, config.successMessage, handleClose]);
+    }, [
+        validateForm, entityType, nombre, descripcion, responsableId, departamentoId, areaId,
+        isEditing, departamentoToEdit, areaToEdit, cargoToEdit,
+        updateDeptoMutation, createDeptoMutation, createAreaMutation, updateAreaMutation, createCargoMutation, updateCargoMutation,
+        config.successMessage, handleClose
+    ]);
 
     const hasErrors = Object.keys(errors).length > 0;
 
@@ -452,6 +493,8 @@ export default function ModalEntidad({
     onClose,
     entityType,
     departamentoToEdit = null,
+    areaToEdit = null,
+    cargoToEdit = null,
     parentDepartamentoId = null,
     parentAreaId = null,
 }: ModalProps) {
@@ -460,6 +503,8 @@ export default function ModalEntidad({
             <ModalContent
                 entityType={entityType}
                 departamentoToEdit={departamentoToEdit}
+                areaToEdit={areaToEdit}
+                cargoToEdit={cargoToEdit}
                 parentDepartamentoId={parentDepartamentoId}
                 parentAreaId={parentAreaId}
                 isOpen={isOpen}

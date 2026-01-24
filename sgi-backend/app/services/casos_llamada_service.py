@@ -1,55 +1,71 @@
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
 from sqlalchemy import text
 from fastapi import HTTPException
+from app.models.comercial import CasoLlamada
+from app.models.comercial import ClienteContacto
 
 class CasosLlamadaService:
 
     @staticmethod
     async def get_all(db: AsyncSession):
-        result = await db.execute(text("EXEC comercial.usp_listar_casos_llamada"))
-        return result.mappings().all()
+        stmt = select(CasoLlamada).order_by(CasoLlamada.contestado, CasoLlamada.nombre)
+        result = await db.execute(stmt)
+        return result.scalars().all()
 
     @staticmethod
     async def get_by_id(db: AsyncSession, id: int):
-        result = await db.execute(
-            text("EXEC comercial.usp_obtener_caso_llamada @Id=:id"),
-            {"id": id}
-        )
-        row = result.mappings().first()
-        if not row:
+        stmt = select(CasoLlamada).where(CasoLlamada.id == id)
+        result = await db.execute(stmt)
+        caso = result.scalars().first()
+        if not caso:
             raise HTTPException(status_code=404, detail="Caso no encontrado")
-        return row
+        return caso
 
     @staticmethod
     async def create(db: AsyncSession, data: dict):
-        result = await db.execute(
-            text("EXEC comercial.usp_crear_caso_llamada @Nombre=:nombre, @Contestado=:contestado"),
-            {"nombre": data["nombre"], "contestado": data.get("contestado", False)}
+        nuevo_caso = CasoLlamada(
+            nombre=data["nombre"],
+            contestado=data.get("contestado", False),
+            is_positive=data.get("is_positive", False)
         )
-        row = result.fetchone()
+        db.add(nuevo_caso)
         await db.commit()
-        return {"id": row[0] if row else None}
+        await db.refresh(nuevo_caso)
+        return {"id": nuevo_caso.id}
 
     @staticmethod
     async def update(db: AsyncSession, id: int, data: dict):
-        await db.execute(
-            text("EXEC comercial.usp_actualizar_caso_llamada @Id=:id, @Nombre=:nombre, @Contestado=:contestado"),
-            {"id": id, "nombre": data.get("nombre"), "contestado": data.get("contestado")}
-        )
+        stmt = select(CasoLlamada).where(CasoLlamada.id == id)
+        result = await db.execute(stmt)
+        caso = result.scalars().first()
+        
+        if not caso:
+             raise HTTPException(status_code=404, detail="Caso no encontrado")
+
+        if "nombre" in data:
+             caso.nombre = data["nombre"]
+        if "contestado" in data:
+             caso.contestado = data["contestado"]
+        if "is_positive" in data:
+             caso.is_positive = data["is_positive"]
+             
         await db.commit()
         return True
 
     @staticmethod
     async def delete(db: AsyncSession, id: int):
-        try:
-            await db.execute(
-                text("EXEC comercial.usp_eliminar_caso_llamada @Id=:id"),
-                {"id": id}
-            )
+        # Verificar uso
+        stmt_check = select(ClienteContacto).where(ClienteContacto.caso_id == id).limit(1)
+        res_check = await db.execute(stmt_check)
+        if res_check.scalars().first():
+             raise HTTPException(status_code=400, detail="No se puede eliminar: el caso está en uso por contactos.")
+        
+        stmt = select(CasoLlamada).where(CasoLlamada.id == id)
+        result = await db.execute(stmt)
+        caso = result.scalars().first()
+        
+        if caso:
+            await db.delete(caso)
             await db.commit()
-            return True
-        except Exception as e:
-            await db.rollback()
-            if "en uso" in str(e):
-                raise HTTPException(status_code=400, detail="No se puede eliminar: el caso está en uso")
-            raise HTTPException(status_code=500, detail=str(e))
+        return True

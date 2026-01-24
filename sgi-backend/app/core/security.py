@@ -1,6 +1,6 @@
 # app/core/security.py
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from dotenv import load_dotenv
 from jose import JWTError, jwt
@@ -32,17 +32,24 @@ def hashear_password(password: str) -> str:
 
 def crear_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
     to_encode.update({"role": data.get("role")})
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 # --- FUNCIÓN DE "VALIDACIÓN" (Para proteger rutas) ---
 
-def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
+from app.database.db_connection import get_db
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.services.auth import verificar_sesion_activa
+
+async def get_current_user_id(
+    token: str = Depends(oauth2_scheme),
+    db: AsyncSession = Depends(get_db)
+) -> int:
     """
     Esta función actúa como un 'guardia'. 
-    Si el token es inválido, detiene la petición antes de llegar al SP.
+    Si el token es inválido o la sesión está revocada, detiene la petición.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -57,6 +64,12 @@ def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
         user_id: str = payload.get("sub")
         
         if user_id is None:
+            raise credentials_exception
+            
+        # 3. VERIFICACIÓN DE SESIÓN ACTIVA EN BD
+        # Validamos que el token no haya sido revocado (logout)
+        is_active = await verificar_sesion_activa(db, token)
+        if not is_active:
             raise credentials_exception
             
         return int(user_id)

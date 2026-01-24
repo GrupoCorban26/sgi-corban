@@ -134,6 +134,6 @@ export const useEmpleadosSinUsuario = () => {
             const { data } = await api.get<EmpleadoSinUsuario[]>(`${USUARIOS_URL}/empleados/disponibles`);
             return data;
         },
-        staleTime: 1000 * 60 * 2,
+        staleTime: 0,
     });
 };

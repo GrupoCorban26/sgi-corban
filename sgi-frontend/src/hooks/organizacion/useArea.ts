@@ -32,6 +32,7 @@ export const useAreas = (busqueda = '', departamentoId: number | null = null, pa
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['areas'] });
+            queryClient.invalidateQueries({ queryKey: ['areas-select'] });
         },
     });
 
@@ -43,6 +44,7 @@ export const useAreas = (busqueda = '', departamentoId: number | null = null, pa
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['areas'] });
+            queryClient.invalidateQueries({ queryKey: ['areas-select'] });
         },
     });
 
@@ -54,6 +56,7 @@ export const useAreas = (busqueda = '', departamentoId: number | null = null, pa
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['areas'] });
+            queryClient.invalidateQueries({ queryKey: ['areas-select'] });
         },
     });
 
@@ -85,7 +88,7 @@ export const useAreasByDepartamento = (deptoId: number | null) => {
             return data;
         },
         enabled: !!deptoId, // Solo ejecuta si hay deptoId
-        staleTime: 1000 * 60 * 2, // 2 minutos de caché
+        staleTime: 0, // Siempre refetch para obtener datos actualizados
     });
 };
 
@@ -97,6 +100,6 @@ export const useAreasParaSelect = () => {
             const { data } = await axios.get<AreaOption[]>(`${AREAS_URL}/dropdown`);
             return data;
         },
-        staleTime: 1000 * 60 * 5, // 5 minutos de caché
+        staleTime: 0, // Siempre refetch para obtener datos actualizados
     });
 };

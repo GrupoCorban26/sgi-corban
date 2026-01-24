@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { ExcelUploader } from '@/components/common/ExcelUploader';
 import { ContactsModal } from '@/components/importaciones/ContactsModal';
-import { Search, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+import { Search, AlertCircle, CheckCircle, Loader2, ArrowDownWideNarrow } from 'lucide-react';
 import { useImportaciones } from '@/hooks/useImportaciones';
 
 export default function TransaccionesPage() {
@@ -18,8 +18,11 @@ export default function TransaccionesPage() {
         setSearch,
         sinTelefono,
         setSinTelefono,
+        sortByRuc,
+        setSortByRuc,
         pageSize,
-        uploadFile
+        uploadFile,
+        refresh  // Agregar refresh para poder actualizar la lista
     } = useImportaciones();
 
     const [selectedRuc, setSelectedRuc] = useState<string | null>(null);
@@ -44,6 +47,20 @@ export default function TransaccionesPage() {
     const handleRowClick = (ruc: string, razonSocial: string) => {
         setSelectedRuc(ruc);
         setSelectedRazonSocial(razonSocial);
+    };
+
+    const handleToggleSortRuc = () => {
+        if (sortByRuc === 'desc') {
+            setSortByRuc(null); // Desactivar ordenamiento
+        } else {
+            setSortByRuc('desc'); // Ordenar de mayor a menor
+        }
+        setPage(1); // Volver a la primera página
+    };
+
+    // Refrescar lista cuando se crea/elimina un contacto (para que desaparezca del filtro "sin teléfono")
+    const handleContactCreated = () => {
+        refresh();
     };
 
     return (
@@ -99,6 +116,17 @@ export default function TransaccionesPage() {
                                 className="pl-9 pr-4 py-2 border rounded-lg text-sm w-full focus:ring-2 focus:ring-blue-500 outline-none"
                             />
                         </div>
+                        <button
+                            onClick={handleToggleSortRuc}
+                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 border ${sortByRuc === 'desc'
+                                ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
+                                : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                                }`}
+                            title="Ordenar RUC de mayor a menor"
+                        >
+                            <ArrowDownWideNarrow className="w-4 h-4" />
+                            RUC {sortByRuc === 'desc' ? '↓' : ''}
+                        </button>
                         <label className="flex items-center gap-2 cursor-pointer">
                             <input
                                 type="checkbox"
@@ -165,7 +193,22 @@ export default function TransaccionesPage() {
                     >
                         Anterior
                     </button>
-                    <span className="text-sm text-gray-600">Página {page} de {Math.ceil(total / pageSize) || 1}</span>
+                    <div className="flex items-center gap-2 text-sm text-gray-600">
+                        <span>Página</span>
+                        <input
+                            type="number"
+                            min={1}
+                            max={Math.ceil(total / pageSize) || 1}
+                            value={page}
+                            onChange={(e) => {
+                                const newPage = parseInt(e.target.value) || 1;
+                                const maxPage = Math.ceil(total / pageSize) || 1;
+                                setPage(Math.max(1, Math.min(newPage, maxPage)));
+                            }}
+                            className="w-16 px-2 py-1 border rounded text-center focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                        <span>de {Math.ceil(total / pageSize) || 1}</span>
+                    </div>
                     <button
                         disabled={data.length < pageSize || loading}
                         onClick={() => setPage(p => p + 1)}
@@ -182,6 +225,7 @@ export default function TransaccionesPage() {
                     razonSocial={selectedRazonSocial}
                     isOpen={true}
                     onClose={() => setSelectedRuc(null)}
+                    onContactCreated={handleContactCreated}
                 />
             )}
         </div>

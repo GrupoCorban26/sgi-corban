@@ -14,9 +14,10 @@ interface ContactsModalProps {
     razonSocial: string;
     isOpen: boolean;
     onClose: () => void;
+    onContactCreated?: () => void; // Callback para refrescar lista cuando se agrega contacto
 }
 
-export const ContactsModal: React.FC<ContactsModalProps> = ({ ruc, razonSocial, isOpen, onClose }) => {
+export const ContactsModal: React.FC<ContactsModalProps> = ({ ruc, razonSocial, isOpen, onClose, onContactCreated }) => {
     const { contacts, loading, fetchByRuc, create, remove } = useContactos();
     const [showAddForm, setShowAddForm] = useState(false);
     const [newContact, setNewContact] = useState({ telefono: '', email: '', cargo: '' });
@@ -31,6 +32,8 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ ruc, razonSocial, 
         if (!window.confirm('¿Seguro de eliminar este contacto?')) return;
         await remove(id);
         fetchByRuc(ruc);
+        // También notificar al padre por si el delete afecta la vista filtrada
+        onContactCreated?.();
     };
 
     const handleAdd = async () => {
@@ -50,6 +53,8 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ ruc, razonSocial, 
             setNewContact({ telefono: '', email: '', cargo: '' });
             setShowAddForm(false);
             fetchByRuc(ruc);
+            // Notificar al padre para que refresque la lista filtrada
+            onContactCreated?.();
         } catch (e) {
             alert('Error al agregar contacto');
             console.error(e);

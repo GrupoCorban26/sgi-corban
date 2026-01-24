@@ -4,13 +4,14 @@ import { ImportacionResponse } from '../types/importaciones';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 export const importacionesService = {
-    getImportaciones: async (page: number, pageSize: number, search?: string, sinTelefono?: boolean): Promise<ImportacionResponse> => {
+    getImportaciones: async (page: number, pageSize: number, search?: string, sinTelefono?: boolean, sortByRuc?: string): Promise<ImportacionResponse> => {
         const response = await axios.get(`${API_URL}/importaciones/`, {
             params: {
                 page,
                 page_size: pageSize,
                 ...(search ? { search } : {}),
-                ...(sinTelefono ? { sin_telefono: true } : {})
+                ...(sinTelefono ? { sin_telefono: true } : {}),
+                ...(sortByRuc ? { sort_by_ruc: sortByRuc } : {})
             }
         });
         return response.data;

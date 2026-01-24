@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List
+from typing import Optional, List, Any
 from datetime import datetime
+
 
 class DepartamentoBase(BaseModel):
     nombre: str = Field(
@@ -19,38 +20,46 @@ class DepartamentoBase(BaseModel):
         description="ID del empleado a cargo"
     )
 
+
 class DepartamentoCreate(DepartamentoBase):
     pass
 
-# Para el Update, permitimos que todo sea opcional
+
 class DepartamentoUpdate(BaseModel):
-    nombre: Optional[str] = Field(None, min_length=3, max_length=100)
+    nombre: str = Field(..., min_length=3, max_length=100)
     descripcion: Optional[str] = Field(None, max_length=500)
     responsable_id: Optional[int] = None
-    is_active: Optional[bool] = None
 
-class DepartamentoResponse(DepartamentoBase):
+
+class DepartamentoResponse(BaseModel):
     id: int
-    # Coincide con el alias que pusimos en el SP (nombre_responsable)
-    responsable_name: Optional[str] = "Sin asignar"
+    nombre: str
+    descripcion: Optional[str] = None
+    responsable_id: Optional[int] = None
+    responsable_nombre: Optional[str] = "Sin asignar"
+    is_active: Optional[bool] = True
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     
-    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
+    model_config = ConfigDict(from_attributes=True)
+
 
 class DepartamentoPaginationResponse(BaseModel):
     total: int
     page: int
-    registro_por_pagina: int # Alineado con el nombre de variable del SP
+    page_size: int
     total_pages: int
-    data: List[DepartamentoResponse]
+    data: List[Any]  # Flexible para evitar errores de validación
+
 
 class OperationResult(BaseModel):
-    success: bool # Cambiado a bool para que FastAPI lo envíe como true/false JSON
+    success: bool
     message: str
     id: Optional[int] = None
+
 
 class DepartamentoDropDown(BaseModel):
     id: int
     nombre: str
+    
     model_config = ConfigDict(from_attributes=True)

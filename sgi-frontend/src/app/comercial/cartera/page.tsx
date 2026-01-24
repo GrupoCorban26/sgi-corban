@@ -21,6 +21,8 @@ import { useClientes, useClientesStats } from '@/hooks/useClientes';
 import { Cliente } from '@/types/cliente';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import ModalCliente from './components/modal-cliente';
+import ModalContactosCliente from './components/modal-contactos-cliente';
+
 const ESTADO_COLORS = {
   'PROSPECTO': 'bg-yellow-100 text-yellow-700',
   'CLIENTE': 'bg-green-100 text-green-700',
@@ -38,6 +40,11 @@ export default function CarteraPage() {
   const [clienteToEdit, setClienteToEdit] = useState<Cliente | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [clienteToDelete, setClienteToDelete] = useState<Cliente | null>(null);
+
+  // Modal de contactos
+  const [isContactosModalOpen, setIsContactosModalOpen] = useState(false);
+  const [contactosRuc, setContactosRuc] = useState('');
+  const [contactosRazonSocial, setContactosRazonSocial] = useState('');
 
   // Data
   const {
@@ -66,6 +73,12 @@ export default function CarteraPage() {
   const handleOpenEdit = (cliente: Cliente) => {
     setClienteToEdit(cliente);
     setIsModalOpen(true);
+  };
+
+  const handleClienteCreado = (ruc: string, razonSocial: string) => {
+    setContactosRuc(ruc);
+    setContactosRazonSocial(razonSocial);
+    setIsContactosModalOpen(true);
   };
 
   const handleOpenDelete = (cliente: Cliente) => {
@@ -288,6 +301,14 @@ export default function CarteraPage() {
         isOpen={isModalOpen}
         onClose={() => { setIsModalOpen(false); setClienteToEdit(null); }}
         clienteToEdit={clienteToEdit}
+        onClienteCreado={handleClienteCreado}
+      />
+
+      <ModalContactosCliente
+        isOpen={isContactosModalOpen}
+        onClose={() => { setIsContactosModalOpen(false); setContactosRuc(''); setContactosRazonSocial(''); }}
+        ruc={contactosRuc}
+        razonSocial={contactosRazonSocial}
       />
 
       <ConfirmModal

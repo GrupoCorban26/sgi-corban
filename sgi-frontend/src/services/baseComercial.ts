@@ -1,11 +1,15 @@
 import axios from 'axios';
-import { ContactoAsignado, CargarBaseResponse, FiltrosBaseResponse, CasoLlamada } from '@/types/base-comercial';
+import Cookies from 'js-cookie';
+import { ContactoAsignado, CargarBaseResponse, FiltrosBaseResponse, CasoLlamada, FeedbackResponse } from '@/types/base-comercial';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
 const getAuthHeaders = () => {
-    const token = typeof window !== 'undefined' ? localStorage.getItem('access_token') : null;
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    const token = Cookies.get('token');
+    return {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`
+    };
 };
 
 export const baseComercialService = {
@@ -22,10 +26,14 @@ export const baseComercialService = {
     /**
      * Carga 50 contactos nuevos de la base filtrada
      */
-    cargarBase: async (paisOrigen?: string, partidaArancelaria?: string): Promise<CargarBaseResponse> => {
+    cargarBase: async (paisOrigen?: string[], partidaArancelaria?: string[]): Promise<CargarBaseResponse> => {
         const params = new URLSearchParams();
-        if (paisOrigen) params.append('pais_origen', paisOrigen);
-        if (partidaArancelaria) params.append('partida_arancelaria', partidaArancelaria);
+        if (paisOrigen && paisOrigen.length > 0) {
+            paisOrigen.forEach(p => params.append('pais_origen', p));
+        }
+        if (partidaArancelaria && partidaArancelaria.length > 0) {
+            partidaArancelaria.forEach(p => params.append('partida_arancelaria', p));
+        }
 
         const response = await axios.post(
             `${API_URL}/contactos/cargar-base?${params.toString()}`,
@@ -37,22 +45,11 @@ export const baseComercialService = {
 
     /**
      * Actualiza el feedback de un contacto
+     * Ahora también guarda fecha_llamada y crea cliente si caso es positivo
      */
-    actualizarFeedback: async (id: number, casoId: number, comentario: string): Promise<{ success: boolean }> => {
+    actualizarFeedback: async (id: number, casoId: number, comentario: string): Promise<FeedbackResponse> => {
         const response = await axios.put(
             `${API_URL}/contactos/${id}/feedback?caso_id=${casoId}&comentario=${encodeURIComponent(comentario)}`,
-            {},
-            { headers: getAuthHeaders() }
-        );
-        return response.data;
-    },
-
-    /**
-     * Envía todo el feedback y marca como gestionados
-     */
-    enviarFeedbackLote: async (): Promise<{ success: boolean; contactos_procesados: number }> => {
-        const response = await axios.post(
-            `${API_URL}/contactos/enviar-feedback`,
             {},
             { headers: getAuthHeaders() }
         );

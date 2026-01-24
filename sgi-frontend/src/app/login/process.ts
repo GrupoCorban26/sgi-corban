@@ -74,15 +74,10 @@ export async function handleLoginAction(prevState: any, formData: FormData) {
 
     const roles: string[] = data.user.roles || [];
 
-    // DEBUG: Ver qué roles llegaron
-    console.log('[LOGIN DEBUG] Roles recibidos:', roles);
-    console.log('[LOGIN DEBUG] data.user:', data.user);
-
     // Buscar el primer rol que tenga ruta definida
     for (const role of Object.keys(ROLE_ROUTES)) {
       if (roles.includes(role)) {
         targetPath = ROLE_ROUTES[role];
-        console.log('[LOGIN DEBUG] Rol encontrado:', role, '-> redirigiendo a:', targetPath);
         break;
       }
     }

@@ -20,7 +20,7 @@ export function useCargarBase() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ paisOrigen, partidaArancelaria }: { paisOrigen?: string; partidaArancelaria?: string }) =>
+        mutationFn: ({ paisOrigen, partidaArancelaria }: { paisOrigen?: string[]; partidaArancelaria?: string[] }) =>
             baseComercialService.cargarBase(paisOrigen, partidaArancelaria),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['mis-contactos'] });
@@ -43,19 +43,7 @@ export function useActualizarFeedback() {
     });
 }
 
-/**
- * Hook para enviar todo el feedback
- */
-export function useEnviarFeedbackLote() {
-    const queryClient = useQueryClient();
 
-    return useMutation({
-        mutationFn: baseComercialService.enviarFeedbackLote,
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['mis-contactos'] });
-        }
-    });
-}
 
 /**
  * Hook para obtener filtros (países y partidas)
@@ -88,12 +76,19 @@ export function useBaseComercial() {
     const casos = useCasosLlamada();
     const cargarBaseMutation = useCargarBase();
     const actualizarFeedbackMutation = useActualizarFeedback();
-    const enviarFeedbackMutation = useEnviarFeedbackLote();
+
+    const contactos = misContactos.data || [];
 
     // Verificar si todos los contactos tienen feedback completo
-    const contactos = misContactos.data || [];
     const todosTienenFeedback = contactos.length > 0 &&
         contactos.every((c: ContactoAsignado) => c.caso_id !== null && c.comentario && c.comentario.trim() !== '');
+
+    // Verificar si todos los contactos están guardados (tienen fecha_llamada)
+    const todosGuardados = contactos.length > 0 &&
+        contactos.every((c: ContactoAsignado) => c.fecha_llamada !== null);
+
+    // Verificar si hay contactos sin guardar
+    const tieneContactosSinGuardar = contactos.some((c: ContactoAsignado) => c.fecha_llamada === null);
 
     return {
         // Data
@@ -106,6 +101,8 @@ export function useBaseComercial() {
         isLoadingContactos: misContactos.isLoading,
         isFetching: misContactos.isFetching,
         todosTienenFeedback,
+        todosGuardados,
+        tieneContactosSinGuardar,
         tieneContactos: contactos.length > 0,
 
         // Mutations
@@ -114,9 +111,6 @@ export function useBaseComercial() {
 
         actualizarFeedback: actualizarFeedbackMutation.mutateAsync,
         isActualizandoFeedback: actualizarFeedbackMutation.isPending,
-
-        enviarFeedback: enviarFeedbackMutation.mutateAsync,
-        isEnviandoFeedback: enviarFeedbackMutation.isPending,
 
         // Refetch
         refetch: misContactos.refetch

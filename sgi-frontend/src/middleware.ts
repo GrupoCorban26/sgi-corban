@@ -82,7 +82,6 @@ export function middleware(request: NextRequest) {
     if (pathname === '/login' || pathname === '/login/') {
         if (token && userData && userData.roles && userData.roles.length > 0) {
             const defaultPath = getDefaultPath(userData.roles);
-            console.log(`[MIDDLEWARE] Usuario ya logueado, redirigiendo de /login a ${defaultPath}`);
             return NextResponse.redirect(new URL(defaultPath, request.url));
         }
         // No está logueado, permitir ver login
@@ -108,7 +107,6 @@ export function middleware(request: NextRequest) {
     if (!isAllowed) {
         // No tiene permiso -> redirigir a su ruta por defecto
         const defaultPath = getDefaultPath(userData.roles);
-        console.log(`[MIDDLEWARE] Usuario sin permiso para ${pathname}, redirigiendo a ${defaultPath}`);
         return NextResponse.redirect(new URL(defaultPath, request.url));
     }
 

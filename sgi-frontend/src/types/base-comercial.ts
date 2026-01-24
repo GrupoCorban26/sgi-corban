@@ -2,15 +2,19 @@
 export interface ContactoAsignado {
     id: number;
     ruc: string;
+    nombre: string | null;
     razon_social: string;
     telefono: string;
     correo: string | null;
+    cargo: string | null;
     contesto: number; // 0 o 1
     caso_id: number | null;
     caso_nombre: string | null;
     comentario: string | null;
     estado: string;
     fecha_asignacion: string;
+    fecha_llamada: string | null;
+    is_client: boolean;
 }
 
 export interface CasoLlamada {
@@ -44,4 +48,9 @@ export interface CargarBaseResponse {
 export interface FeedbackPayload {
     caso_id: number;
     comentario: string;
+}
+
+export interface FeedbackResponse {
+    success: boolean;
+    mensaje?: string;
 }

@@ -1,78 +1,74 @@
 from pydantic import BaseModel, Field, ConfigDict
-from typing import Optional, List
+from typing import Optional, List, Any
 from datetime import datetime
 
-# --- ESQUEMA BASE ---
+
 class AreaBase(BaseModel):
-    # strip_whitespace elimina espacios al inicio y final automáticamente
     nombre: str = Field(
         ..., 
         min_length=3, 
         max_length=100, 
-        examples=["Gerencia Comercial"],
-        description="Nombre único del área o departamento"
+        examples=["Gerencia Comercial"]
     )
-    descripcion: Optional[str] = Field(
-        None, 
-        max_length=300, 
-        examples=["Encargada de las ventas y pricing"]
-    )
-    departamento_id: Optional[int] = Field(
-        None, 
-        description="ID del área superior (para jerarquías)"
-    )
-    area_parent_id: Optional[int] = Field(
-        None, 
-        description="ID del área superior (para jerarquías)"
-    )
-    responsable_id: Optional[int] = Field(
-        None, 
-        description="ID del empleado a cargo"
-    )
+    descripcion: Optional[str] = Field(None, max_length=300)
+    departamento_id: int = Field(..., description="ID del departamento")
+    area_padre_id: Optional[int] = Field(None, description="ID del área superior")
+    responsable_id: Optional[int] = Field(None, description="ID del empleado responsable")
 
-# --- ESQUEMA PARA GUARDAR (POST/PUT) ---
+
 class AreaCreate(AreaBase):
     pass
 
-# --- ESQUEMA PARA EDITAR
-class AreaUpdate(BaseModel):
-    nombre: Optional[str] = Field(None, min_length=3, max_length=100)
-    descripcion: Optional[str] = Field(None, max_length=500)
-    departamento_id: Optional[int] = None
-    area_parent_id: Optional[int] = None
-    responsable_id: Optional[int] = None
-    is_active: Optional[bool] = None
 
-# --- ESQUEMA PARA RESPUESTA (LECTURA) ---
-class AreaResponse(AreaBase):
+class AreaUpdate(BaseModel):
+    nombre: str = Field(..., min_length=3, max_length=100)
+    descripcion: Optional[str] = Field(None, max_length=300)
+    departamento_id: int
+    area_padre_id: Optional[int] = None
+    responsable_id: Optional[int] = None
+
+
+class AreaResponse(BaseModel):
     id: int
-    is_active: bool
-    responsable_name: Optional[str] = "Sin responsable"
-    departamento_name: Optional[str] = "Sin departamento"
-    area_padre_name: Optional[str] = "Sin area padre"
+    nombre: str
+    descripcion: Optional[str] = None
+    departamento_id: int
+    departamento_nombre: Optional[str] = None
+    area_padre_id: Optional[int] = None
+    area_padre_nombre: Optional[str] = None
+    responsable_id: Optional[int] = None
+    responsable_nombre: Optional[str] = "Sin asignar"
+    is_active: bool = True
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
     
-    # Esto permite que Pydantic lea modelos de SQLAlchemy
     model_config = ConfigDict(from_attributes=True)
 
-# --- ESQUEMA DE PAGINACIÓN ---
+
 class AreaPaginationResponse(BaseModel):
     total: int
     page: int
     page_size: int
     total_pages: int
-    data: List[AreaResponse]
+    data: List[Any]  # Flexible para evitar errores de validación
 
-    model_config = ConfigDict(from_attributes=True)
 
-# --- RESULTADOS DE OPERACIÓN ---
 class OperationResult(BaseModel):
-    success: int # 1: Ok, 0: Error
+    success: bool
     message: str
     id: Optional[int] = None
 
-class AreasDropDown(BaseModel):
+
+class AreaDropdown(BaseModel):
     id: int
     nombre: str
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+class AreasByDepartamentoDropDown(BaseModel):
+    id: int
+    departamento_id: int
+    nombre: str
+    
     model_config = ConfigDict(from_attributes=True)

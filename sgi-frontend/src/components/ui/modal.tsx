@@ -48,14 +48,24 @@ export function ModalBase({
     const [shouldRender, setShouldRender] = useState(false);
 
     // Manejar apertura
+    // Manejar apertura y cierre externo
     useEffect(() => {
         if (isOpen) {
             setShouldRender(true);
             setIsClosing(false);
+        } else if (shouldRender && !isClosing) {
+            // Si el modal se cierra desde fuera (ej: botón Cancelar o éxito en operación)
+            // y todavía está renderizado, iniciamos la animación de salida
+            setIsClosing(true);
+            const timer = setTimeout(() => {
+                setShouldRender(false);
+                setIsClosing(false);
+            }, CLOSE_ANIMATION_DURATION);
+            return () => clearTimeout(timer);
         }
-    }, [isOpen]);
+    }, [isOpen, shouldRender, isClosing]);
 
-    // Función para cerrar con animación
+    // Función para cerrar con animación (interno - click en overlay o X)
     const handleClose = useCallback(() => {
         if (disableClose) return;
 
@@ -84,7 +94,7 @@ export function ModalBase({
 
     return (
         <ModalContext.Provider value={{ handleClose, isClosing, disableClose }}>
-            <div className="fixed inset-0 z-50 overflow-hidden">
+            <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center p-4">
                 {/* Overlay */}
                 <div
                     className={`absolute inset-0 bg-gray-900/40 backdrop-blur-sm ${isClosing ? 'overlay-animate-out' : 'overlay-animate-in'
@@ -96,7 +106,7 @@ export function ModalBase({
                 {/* Modal Container */}
                 <div
                     className={`${isClosing ? 'modal-animate-out' : 'modal-animate-in'
-                        } bg-white w-full ${maxWidth} rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden`}
+                        } bg-white w-full ${maxWidth} rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden relative z-10`}
                 >
                     {children}
                 </div>

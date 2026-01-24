@@ -1,0 +1,114 @@
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Numeric, Text
+from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
+from .base import Base
+
+class RegistroImportacion(Base):
+    __tablename__ = "registro_importaciones"
+    __table_args__ = {"schema": "comercial"}
+
+    id = Column(Integer, primary_key=True, index=True)
+    ruc = Column(String(11))
+    anio = Column(String(4))
+    razon_social = Column(String(150))
+    aduanas = Column(String(255))
+    via_transporte = Column(String(150))
+    paises_origen = Column(String(2000))
+    puertos_embarque = Column(Text) # varchar(max)
+    embarcadores = Column(Text)
+    agente_aduanas = Column(Text)
+    partida_arancelaria_cod = Column(Text)
+    partida_arancelaria_descripcion = Column(Text)
+    fob_min = Column(Numeric(12, 2))
+    fob_max = Column(Numeric(12, 2))
+    fob_prom = Column(Numeric(12, 2))
+    fob_anual = Column(Numeric(12, 2))
+    total_operaciones = Column(Integer)
+    cantidad_agentes = Column(Integer)
+    cantidad_paises = Column(Integer)
+    cantidad_partidas = Column(Integer)
+    primera_importacion = Column(Date)
+    ultima_importacion = Column(Date)
+
+class CasoLlamada(Base):
+    __tablename__ = "casos_llamada"
+    __table_args__ = {"schema": "comercial"}
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(100))
+    contestado = Column(Boolean, default=False, nullable=False)
+    # is_positive removido para no alterar BD
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+class Cliente(Base):
+    __tablename__ = "clientes"
+    __table_args__ = {"schema": "comercial"}
+
+    id = Column(Integer, primary_key=True, index=True)
+    ruc = Column(String(11))
+    razon_social = Column(String(255), nullable=False)
+    nombre_comercial = Column(String(255))
+    direccion_fiscal = Column(String(255))
+    distrito_id = Column(Integer, ForeignKey("core.distritos.id"))
+    area_encargada_id = Column(Integer, ForeignKey("adm.areas.id"))
+    comercial_encargado_id = Column(Integer, ForeignKey("seg.usuarios.id"))
+    ultimo_contacto = Column(DateTime(timezone=True))
+    comentario_ultima_llamada = Column(String(500))
+    proxima_fecha_contacto = Column(Date)
+    tipo_estado = Column(String(20), default="PROSPECTO", nullable=False)
+    origen = Column(String(50))
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_by = Column(Integer)
+    updated_by = Column(Integer)
+
+    distrito = relationship("app.models.core.Distrito")
+    area_encargada = relationship("app.models.administrativo.Area")
+    comercial = relationship("app.models.seguridad.Usuario", foreign_keys=[comercial_encargado_id])
+
+class ClienteContacto(Base):
+    __tablename__ = "cliente_contactos"
+    __table_args__ = {"schema": "comercial"}
+
+    id = Column(Integer, primary_key=True, index=True)
+    ruc = Column(String(11), nullable=False)
+    nombre = Column(String(150))
+    cargo = Column(String(100))
+    telefono = Column(String(20), nullable=False)
+    correo = Column(String(100))
+    origen = Column(String(30))
+    is_client = Column(Boolean, default=False, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    
+    # Asignación
+    asignado_a = Column(Integer, ForeignKey("seg.usuarios.id"))
+    fecha_asignacion = Column(DateTime(timezone=True))
+    lote_asignacion = Column(Integer)
+    caso_id = Column(Integer, ForeignKey("comercial.casos_llamada.id"))
+    estado = Column(String(30), default="DISPONIBLE")
+    comentario = Column(String(500))
+    fecha_llamada = Column(DateTime(timezone=True))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    usuario_asignado = relationship("app.models.seguridad.Usuario")
+    caso = relationship("CasoLlamada")
+
+class LeadFeedback(Base):
+    __tablename__ = "lead_feedback"
+    __table_args__ = {"schema": "comercial"}
+
+    id = Column(Integer, primary_key=True, index=True)
+    lead_id = Column(Integer, nullable=False) # Or ForeignKey if table exists
+    comercial_id = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=False)
+    estado_llamada = Column(String(30), nullable=False)
+    fecha_contacto = Column(DateTime(timezone=True), nullable=False)
+    proxima_fecha_contacto = Column(Date)
+    comentario = Column(String(500))
+    cliente_id = Column(Integer, ForeignKey("comercial.clientes.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    comercial = relationship("app.models.seguridad.Usuario")
+    cliente = relationship("Cliente")

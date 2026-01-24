@@ -19,6 +19,7 @@ import ModalGestionarEmpleado from './components/modals/modal-empleado';
 import { useDepartamentos } from '@/hooks/organizacion/useDepartamento';
 import { useAreas } from '@/hooks/organizacion/useArea';
 import { useCargos } from '@/hooks/organizacion/useCargo';
+import { useEmpleados } from '@/hooks/organizacion/useEmpleado';
 import { Departamento } from '@/types/organizacion/departamento';
 import { Area } from '@/types/organizacion/area';
 import { Cargo } from '@/types/organizacion/cargo';
@@ -33,6 +34,8 @@ export default function OrganizacionPage() {
   const [isEntityModalOpen, setIsEntityModalOpen] = useState(false);
   const [modalType, setModalType] = useState<'departamento' | 'area' | 'cargo'>('departamento');
   const [departamentoToEdit, setDepartamentoToEdit] = useState<Departamento | null>(null);
+  const [areaToEdit, setAreaToEdit] = useState<Area | null>(null);
+  const [cargoToEdit, setCargoToEdit] = useState<Cargo | null>(null);
   const [parentDepartamentoId, setParentDepartamentoId] = useState<number | null>(null);
   const [parentAreaId, setParentAreaId] = useState<number | null>(null);
 
@@ -40,19 +43,21 @@ export default function OrganizacionPage() {
   const [isEmpModalOpen, setIsEmpModalOpen] = useState(false);
   const [selectedEmpleado, setSelectedEmpleado] = useState<Empleado | null>(null);
 
-  // Modal Confirmación
   const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
-  const [entityToDelete, setEntityToDelete] = useState<{ type: 'departamento' | 'area' | 'cargo'; data: Departamento | Area | Cargo } | null>(null);
+  const [entityToDelete, setEntityToDelete] = useState<{ type: 'departamento' | 'area' | 'cargo' | 'empleado'; data: Departamento | Area | Cargo | Empleado } | null>(null);
 
   // Mutations
   const { deleteMutation: deleteDeptoMutation } = useDepartamentos();
   const { deleteMutation: deleteAreaMutation } = useAreas();
   const { deleteMutation: deleteCargoMutation } = useCargos();
+  const { deleteMutation: deleteEmpleadoMutation, reactivateMutation: reactivateEmpleadoMutation } = useEmpleados();
 
   // --- Handlers Crear ---
   const handleOpenCreate = (type: 'departamento' | 'area' | 'cargo', parentDepto?: number, parentArea?: number) => {
     setModalType(type);
     setDepartamentoToEdit(null);
+    setAreaToEdit(null);
+    setCargoToEdit(null);
     setParentDepartamentoId(parentDepto ?? null);
     setParentAreaId(parentArea ?? null);
     setIsEntityModalOpen(true);
@@ -62,12 +67,16 @@ export default function OrganizacionPage() {
   const handleEditDepartamento = (depto: Departamento) => {
     setModalType('departamento');
     setDepartamentoToEdit(depto);
+    setAreaToEdit(null);
+    setCargoToEdit(null);
     setIsEntityModalOpen(true);
   };
 
   const handleEditArea = (area: Area) => {
     setModalType('area');
     setDepartamentoToEdit(null);
+    setAreaToEdit(area);
+    setCargoToEdit(null);
     setParentDepartamentoId(area.departamento_id);
     setIsEntityModalOpen(true);
   };
@@ -75,34 +84,63 @@ export default function OrganizacionPage() {
   const handleEditCargo = (cargo: Cargo) => {
     setModalType('cargo');
     setDepartamentoToEdit(null);
+    setAreaToEdit(null);
+    setCargoToEdit(cargo);
     setParentAreaId(cargo.area_id);
     setIsEntityModalOpen(true);
   };
 
-  // --- Handlers Eliminar ---
+  // --- Handlers Eliminar / Desactivar ---
   const handleDelete = (type: 'departamento' | 'area' | 'cargo', data: Departamento | Area | Cargo) => {
     setEntityToDelete({ type, data });
     setIsConfirmModalOpen(true);
   };
 
+  const handleToggleStatus = (empleado: Empleado) => {
+    setEntityToDelete({ type: 'empleado', data: empleado });
+    setIsConfirmModalOpen(true);
+  }
+
   const handleConfirmDelete = async () => {
     if (!entityToDelete) return;
     try {
       const { type, data } = entityToDelete;
-      if (type === 'departamento') await deleteDeptoMutation.mutateAsync((data as Departamento).id);
-      else if (type === 'area') await deleteAreaMutation.mutateAsync((data as Area).id);
-      else if (type === 'cargo') await deleteCargoMutation.mutateAsync((data as Cargo).id);
-      toast.success(`${type.charAt(0).toUpperCase() + type.slice(1)} desactivado`);
+
+      if (type === 'departamento') {
+        await deleteDeptoMutation.mutateAsync((data as Departamento).id);
+        toast.success('Departamento desactivado');
+      }
+      else if (type === 'area') {
+        await deleteAreaMutation.mutateAsync((data as Area).id);
+        toast.success('Área desactivada');
+      }
+      else if (type === 'cargo') {
+        await deleteCargoMutation.mutateAsync((data as Cargo).id);
+        toast.success('Cargo desactivado');
+      }
+      else if (type === 'empleado') {
+        const emp = data as Empleado;
+        if (emp.is_active) {
+          await deleteEmpleadoMutation.mutateAsync(emp.id);
+          toast.success('Colaborador desactivado');
+        } else {
+          await reactivateEmpleadoMutation.mutateAsync(emp.id);
+          toast.success('Colaborador reactivado');
+        }
+      }
+
       setIsConfirmModalOpen(false);
       setEntityToDelete(null);
     } catch (error: unknown) {
-      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Error al desactivar');
+      toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Error al procesar la solicitud');
     }
   };
 
   const handleCloseEntityModal = () => {
     setIsEntityModalOpen(false);
     setDepartamentoToEdit(null);
+    setAreaToEdit(null);
+    setCargoToEdit(null);
     setParentDepartamentoId(null);
     setParentAreaId(null);
   };
@@ -148,7 +186,7 @@ export default function OrganizacionPage() {
             onOpenHistory={(e) => { setSelectedEntity(e); setShowHistory(true); }}
             onEdit={(e) => { setSelectedEmpleado(e); setIsEmpModalOpen(true); }}
             onNew={() => { setSelectedEmpleado(null); setIsEmpModalOpen(true); }}
-            onToggleStatus={(e) => { console.log('Toggle status:', e); /* TODO: Implementar toggle */ }}
+            onToggleStatus={handleToggleStatus}
           />
         )}
       </div>
@@ -159,6 +197,8 @@ export default function OrganizacionPage() {
         onClose={handleCloseEntityModal}
         entityType={modalType}
         departamentoToEdit={departamentoToEdit}
+        areaToEdit={areaToEdit}
+        cargoToEdit={cargoToEdit}
         parentDepartamentoId={parentDepartamentoId}
         parentAreaId={parentAreaId}
       />
@@ -169,11 +209,17 @@ export default function OrganizacionPage() {
         isOpen={isConfirmModalOpen}
         onClose={() => { setIsConfirmModalOpen(false); setEntityToDelete(null); }}
         onConfirm={handleConfirmDelete}
-        title={`¿Desactivar ${entityToDelete?.type}?`}
-        message={`Estás a punto de desactivar "${(entityToDelete?.data as { nombre?: string })?.nombre}". Esta acción se puede revertir.`}
-        confirmText="Desactivar"
-        isLoading={deleteDeptoMutation.isPending || deleteAreaMutation.isPending || deleteCargoMutation.isPending}
-        variant="danger"
+        title={entityToDelete?.type === 'empleado'
+          ? ((entityToDelete.data as Empleado).is_active ? '¿Desactivar Colaborador?' : '¿Reactivar Colaborador?')
+          : `¿Desactivar ${entityToDelete?.type}?`}
+        message={entityToDelete?.type === 'empleado'
+          ? `Estás a punto de ${(entityToDelete.data as Empleado).is_active ? 'desactivar' : 'reactivar'} a "${(entityToDelete.data as Empleado).nombres}".`
+          : `Estás a punto de desactivar "${(entityToDelete?.data as { nombre?: string })?.nombre}". Esta acción se puede revertir.`}
+        confirmText={entityToDelete?.type === 'empleado'
+          ? ((entityToDelete.data as Empleado).is_active ? 'Desactivar' : 'Reactivar')
+          : "Desactivar"}
+        isLoading={deleteDeptoMutation.isPending || deleteAreaMutation.isPending || deleteCargoMutation.isPending || deleteEmpleadoMutation.isPending || reactivateEmpleadoMutation.isPending}
+        variant={entityToDelete?.type === 'empleado' && !(entityToDelete.data as Empleado).is_active ? 'warning' : 'danger'}
       />
 
       {showHistory && <AuditoriaPanel onClose={() => setShowHistory(false)} entity={selectedEntity} />}

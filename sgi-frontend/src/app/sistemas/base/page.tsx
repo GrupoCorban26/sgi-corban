@@ -10,7 +10,7 @@ import { baseService } from '@/services/base';
 import { BaseContacto, BaseStats } from '@/types/base';
 import {
     Search, Users, Phone, Building2, TrendingUp,
-    ChevronLeft, ChevronRight, Loader2
+    ChevronLeft, ChevronRight, Loader2, ArrowDownWideNarrow, ArrowUpDown
 } from 'lucide-react';
 
 export default function BasePage() {
@@ -21,6 +21,7 @@ export default function BasePage() {
     const [pageSize] = useState(20);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(false);
+    const [sortByRucDesc, setSortByRucDesc] = useState(false);
 
     const loadData = useCallback(async () => {
         setLoading(true);

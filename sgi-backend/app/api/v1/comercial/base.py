@@ -24,51 +24,58 @@ async def get_base_comercial(
     """
     offset = (page - 1) * page_size
     
-    base_where = """
-        WHERE ri.ruc >= '20400000000'
-          AND (ri.fob_max IS NULL OR ri.fob_max <= 300000)
-          AND cc.is_active = 1
-          AND cc.estado = 'DISPONIBLE'
-          AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)
-    """
+    # Query consolidada: data + stats en una sola llamada
+    search_param = search if search else None
     
-    if search:
-        base_where += """
-          AND (ri.ruc LIKE '%' + :search + '%' OR ri.razon_social LIKE '%' + :search + '%')
-        """
-    
-    # Count
-    count_query = f"""
-        SELECT COUNT(DISTINCT cc.id)
-        FROM comercial.cliente_contactos cc
-        INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
-        {base_where}
-    """
-    count_result = await db.execute(text(count_query), {"search": search})
-    total = count_result.scalar() or 0
-    
-    # Estadísticas adicionales (queries separadas para evitar problemas)
-    stats_query = text("""
+    # Query principal con CTEs para optimizar
+    query = text("""
+        WITH base_filter AS (
+            SELECT 
+                cc.id,
+                cc.ruc,
+                ri.razon_social,
+                cc.telefono,
+                cc.correo,
+                cc.estado,
+                ri.fob_max,
+                ri.fob_anual,
+                ri.total_operaciones,
+                ri.ultima_importacion
+            FROM comercial.cliente_contactos cc
+            INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
+            WHERE ri.ruc >= '20400000000'
+              AND (ri.fob_max IS NULL OR ri.fob_max <= 300000)
+              AND cc.is_active = 1
+              AND cc.estado = 'DISPONIBLE'
+              AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)
+              AND (:search IS NULL OR ri.ruc LIKE '%' + :search + '%' OR ri.razon_social LIKE '%' + :search + '%')
+        ),
+        stats AS (
+            SELECT 
+                (SELECT COUNT(DISTINCT ruc) FROM comercial.registro_importaciones 
+                 WHERE ruc >= '20400000000' AND (fob_max IS NULL OR fob_max <= 300000)
+                   AND ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)) as empresas_transacciones,
+                (SELECT COUNT(DISTINCT cc2.ruc) FROM comercial.cliente_contactos cc2
+                 INNER JOIN comercial.registro_importaciones ri2 ON cc2.ruc = ri2.ruc
+                 WHERE ri2.ruc >= '20400000000' AND (ri2.fob_max IS NULL OR ri2.fob_max <= 300000)
+                   AND cc2.is_active = 1
+                   AND cc2.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)) as empresas_con_telefono,
+                (SELECT COUNT(*) FROM base_filter) as total_contactos
+        )
         SELECT 
-            (SELECT COUNT(DISTINCT ruc) FROM comercial.registro_importaciones 
-             WHERE ruc >= '20400000000' AND (fob_max IS NULL OR fob_max <= 300000)
-               AND ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)) as empresas_transacciones,
-            (SELECT COUNT(DISTINCT cc2.ruc) FROM comercial.cliente_contactos cc2
-             INNER JOIN comercial.registro_importaciones ri2 ON cc2.ruc = ri2.ruc
-             WHERE ri2.ruc >= '20400000000' AND (ri2.fob_max IS NULL OR ri2.fob_max <= 300000)
-               AND cc2.is_active = 1
-               AND cc2.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)) as empresas_con_telefono,
-            (SELECT COUNT(*) FROM comercial.cliente_contactos cc3
-             INNER JOIN comercial.registro_importaciones ri3 ON cc3.ruc = ri3.ruc
-             WHERE ri3.ruc >= '20400000000' AND (ri3.fob_max IS NULL OR ri3.fob_max <= 300000)
-               AND cc3.is_active = 1 AND cc3.estado = 'DISPONIBLE'
-               AND cc3.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)) as contactos_disponibles
+            (SELECT COUNT(*) FROM base_filter) as total_count,
+            (SELECT empresas_transacciones FROM stats) as empresas_transacciones,
+            (SELECT empresas_con_telefono FROM stats) as empresas_con_telefono,
+            (SELECT total_contactos FROM stats) as total_contactos;
     """)
-    stats_result = await db.execute(stats_query)
+    
+    stats_result = await db.execute(query, {"search": search_param})
     stats_row = stats_result.fetchone()
     
-    # Data
-    data_query = f"""
+    total = stats_row[0] if stats_row else 0
+    
+    # Data query con paginación
+    data_query = text("""
         SELECT 
             cc.id,
             cc.ruc,
@@ -82,11 +89,17 @@ async def get_base_comercial(
             ri.ultima_importacion
         FROM comercial.cliente_contactos cc
         INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
-        {base_where}
+        WHERE ri.ruc >= '20400000000'
+          AND (ri.fob_max IS NULL OR ri.fob_max <= 300000)
+          AND cc.is_active = 1
+          AND cc.estado = 'DISPONIBLE'
+          AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)
+          AND (:search IS NULL OR ri.ruc LIKE '%' + :search + '%' OR ri.razon_social LIKE '%' + :search + '%')
         ORDER BY ri.fob_anual DESC, ri.total_operaciones DESC
         OFFSET :offset ROWS FETCH NEXT :page_size ROWS ONLY
-    """
-    result = await db.execute(text(data_query), {"search": search, "offset": offset, "page_size": page_size})
+    """)
+    
+    result = await db.execute(data_query, {"search": search_param, "offset": offset, "page_size": page_size})
     data = result.mappings().all()
     
     return {
@@ -94,9 +107,9 @@ async def get_base_comercial(
         "page": page,
         "page_size": page_size,
         "stats": {
-            "empresas_transacciones": stats_row[0] if stats_row else 0,
-            "empresas_con_telefono": stats_row[1] if stats_row else 0,
-            "total_contactos": stats_row[2] if stats_row else 0,
+            "empresas_transacciones": stats_row[1] if stats_row else 0,
+            "empresas_con_telefono": stats_row[2] if stats_row else 0,
+            "total_contactos": stats_row[3] if stats_row else 0,
         },
         "data": data
     }

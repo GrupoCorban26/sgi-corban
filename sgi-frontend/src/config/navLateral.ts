@@ -1,7 +1,6 @@
 export const MENU_ROLES = {
   comercial: [
     { label: 'Inicio', href: '/comercial/' },
-    { label: 'Prospección', href: '/comercial/prospeccion', icon: 'UserPlusIcon' },
     { label: 'Base', href: '/comercial/base' },
     { label: 'Cotizaciones', href: '/comercial/cotizaciones' },
     { label: 'Ordenes', href: '/comercial/ordenes' },

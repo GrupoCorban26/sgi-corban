@@ -37,6 +37,7 @@ export const useDepartamentos = (busqueda = '', page = 1, pageSize = 15) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['departamentos'] });
+      queryClient.invalidateQueries({ queryKey: ['departamentos-select'] });
     },
   });
 
@@ -48,6 +49,7 @@ export const useDepartamentos = (busqueda = '', page = 1, pageSize = 15) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['departamentos'] });
+      queryClient.invalidateQueries({ queryKey: ['departamentos-select'] });
     },
   });
 
@@ -59,6 +61,7 @@ export const useDepartamentos = (busqueda = '', page = 1, pageSize = 15) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['departamentos'] });
+      queryClient.invalidateQueries({ queryKey: ['departamentos-select'] });
     },
   });
 
@@ -91,7 +94,7 @@ export const useEmpleadosParaSelect = () => {
       const { data } = await axios.get<EmpleadoOption[]>(`${EMPLEADOS_URL}/dropdown`);
       return data;
     },
-    staleTime: 1000 * 60 * 5, // 5 minutos de caché
+    staleTime: 0, // Siempre refetch para obtener datos actualizados
   });
 };
 
@@ -106,6 +109,6 @@ export const useDepartamentosParaSelect = () => {
       const { data } = await axios.get<DepartamentoOption[]>(`${DEPTOS_URL}/dropdown`);
       return data;
     },
-    staleTime: 1000 * 60 * 5, // 5 minutos de caché
+    staleTime: 0, // Siempre refetch para obtener datos actualizados
   });
 };

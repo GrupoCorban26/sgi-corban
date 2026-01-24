@@ -17,6 +17,17 @@ async def get_clientes_dropdown(db: AsyncSession = Depends(get_db)):
     return await service.get_dropdown()
 
 
+@router.get("/recordatorios")
+async def get_recordatorios(
+    days: int = Query(5, ge=1, le=30, description="Días a futuro para buscar"),
+    db: AsyncSession = Depends(get_db),
+    empleado_id: int = Depends(get_current_empleado_id)
+):
+    """Obtiene recordatorios de llamadas próximos para el comercial actual"""
+    service = ClientesService(db)
+    return await service.get_recordatorios(comercial_id=empleado_id, days=days)
+
+
 @router.get("/stats")
 async def get_clientes_stats(
     comercial_id: Optional[int] = Query(None),

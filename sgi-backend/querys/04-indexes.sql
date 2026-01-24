@@ -186,7 +186,11 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_ordenes_estado')
 
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_ordenes_cotizacion')
     CREATE NONCLUSTERED INDEX IX_ordenes_cotizacion ON comercial.ordenes(cotizacion_id);
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_activo_historial_activo')
+    CREATE INDEX IX_activo_historial_activo ON adm.activo_historial(activo_id);
 
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_activo_historial_fecha')
+    CREATE INDEX IX_activo_historial_fecha ON adm.activo_historial(fecha_cambio DESC);
 PRINT '✓ Índices comercial creados';
 GO
 

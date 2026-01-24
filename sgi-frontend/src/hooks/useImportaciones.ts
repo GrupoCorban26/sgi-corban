@@ -12,6 +12,7 @@ export const useImportaciones = () => {
     const [pageSize] = useState(20);
     const [search, setSearch] = useState('');
     const [sinTelefono, setSinTelefono] = useState(false);
+    const [sortByRuc, setSortByRuc] = useState<string | null>(null);
 
     // Debounce de 500ms para la búsqueda
     const debouncedSearch = useDebounce(search, 500);
@@ -20,7 +21,13 @@ export const useImportaciones = () => {
         setLoading(true);
         setError(null);
         try {
-            const res = await importacionesService.getImportaciones(page, pageSize, debouncedSearch, sinTelefono);
+            const res = await importacionesService.getImportaciones(
+                page,
+                pageSize,
+                debouncedSearch,
+                sinTelefono,
+                sortByRuc || undefined
+            );
             setData(res.data);
             setTotal(res.total);
         } catch (err: any) {
@@ -30,7 +37,7 @@ export const useImportaciones = () => {
         } finally {
             setLoading(false);
         }
-    }, [page, pageSize, debouncedSearch, sinTelefono]);
+    }, [page, pageSize, debouncedSearch, sinTelefono, sortByRuc]);
 
     useEffect(() => {
         fetchImportaciones();
@@ -64,9 +71,10 @@ export const useImportaciones = () => {
         setSearch,
         sinTelefono,
         setSinTelefono,
+        sortByRuc,
+        setSortByRuc,
         pageSize,
         uploadFile,
         refresh: fetchImportaciones
     };
 };
-

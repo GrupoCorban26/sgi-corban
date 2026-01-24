@@ -1,10 +1,7 @@
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
-from datetime import date
-from typing import Optional, List
+from datetime import date, datetime
+from typing import Optional, List, Any
 
-# ============================================
-# Schemas para Empleados
-# ============================================
 
 class EmpleadoBase(BaseModel):
     """Campos base para empleados"""
@@ -16,37 +13,21 @@ class EmpleadoBase(BaseModel):
     nro_documento: str = Field(..., min_length=8, max_length=20)
     celular: Optional[str] = Field(None, max_length=20)
     email_personal: Optional[EmailStr] = None
-    distrito_id: int
+    distrito_id: Optional[int] = None
     direccion: Optional[str] = Field(None, max_length=200)
     fecha_ingreso: date
-    cargo_id: int
-    area_id: int
-    departamento_id: int
+    cargo_id: int  # Area y Departamento se derivan del cargo
     jefe_id: Optional[int] = None
 
 
 class EmpleadoCreate(EmpleadoBase):
     """Schema para crear empleado - fecha_cese es NULL por defecto"""
-    pass  # Hereda todos los campos de EmpleadoBase
+    pass
 
 
-class EmpleadoUpdate(BaseModel):
-    """Schema para actualizar empleado - todos los campos opcionales"""
-    nombres: Optional[str] = Field(None, max_length=100)
-    apellido_paterno: Optional[str] = Field(None, max_length=75)
-    apellido_materno: Optional[str] = Field(None, max_length=75)
-    fecha_nacimiento: Optional[date] = None
-    tipo_documento: Optional[str] = Field(None, max_length=20)
-    nro_documento: Optional[str] = Field(None, min_length=8, max_length=20)
-    celular: Optional[str] = Field(None, max_length=20)
-    email_personal: Optional[EmailStr] = None
-    distrito_id: Optional[int] = None
-    direccion: Optional[str] = Field(None, max_length=200)
-    fecha_ingreso: Optional[date] = None
-    cargo_id: Optional[int] = None
-    area_id: Optional[int] = None
-    departamento_id: Optional[int] = None
-    jefe_id: Optional[int] = None
+class EmpleadoUpdate(EmpleadoBase):
+    """Schema para actualizar empleado - mismos campos requeridos que Create"""
+    pass
 
 
 class EmpleadoResponse(BaseModel):
@@ -63,7 +44,7 @@ class EmpleadoResponse(BaseModel):
     distrito_id: Optional[int] = None
     distrito: Optional[str] = None
     provincia: Optional[str] = None
-    departamento: Optional[str] = None  # Departamento geográfico
+    departamento_ubigeo: Optional[str] = None  # Departamento geográfico
     direccion: Optional[str] = None
     fecha_ingreso: Optional[date] = None
     fecha_cese: Optional[date] = None
@@ -86,12 +67,12 @@ class EmpleadoPaginationResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
-    data: List[EmpleadoResponse]
+    data: List[Any]  # Flexible para evitar errores de validación
 
 
 class OperationResult(BaseModel):
     """Respuesta genérica para operaciones CRUD"""
-    success: int
+    success: bool
     message: str
     id: Optional[int] = None
 

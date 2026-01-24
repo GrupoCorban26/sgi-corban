@@ -12,6 +12,7 @@ class ClienteBase(BaseModel):
     tipo_estado: str = Field(default="PROSPECTO", max_length=20)
     origen: Optional[str] = Field(None, max_length=50)
     comentario_ultima_llamada: Optional[str] = Field(None, max_length=500)
+    ultimo_contacto: Optional[datetime] = None
     proxima_fecha_contacto: Optional[date] = None
 
 

@@ -23,8 +23,9 @@ DB_URL = (
     f"driver={DB_DRIVER}&TrustServerCertificate=yes"
 )
 
-# 3. Crear el motor asíncrono
-engine = create_async_engine(DB_URL, echo=True)
+# 3. Crear el motor asíncrono (echo=True solo si DB_ECHO=true)
+DB_ECHO = os.getenv("DB_ECHO", "false").lower() == "true"
+engine = create_async_engine(DB_URL, echo=DB_ECHO)
 
 # Fábrica de sesiones
 AsyncSessionLocal = async_sessionmaker(

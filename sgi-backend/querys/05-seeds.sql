@@ -2549,7 +2549,7 @@ BEGIN
     INSERT INTO seg.usuarios (empleado_id, correo_corp, password_hash)
     VALUES 
     -- Password: admin1234 (generado con bcrypt)
-        (1, 'admin@grupocorban.pe', '$2b$12$1/tg1PP/TI39uVknPx4htOsIFcLxk6.o79QhzzHDZf0Bfl6WSgwri');
+        (1, 'admin@grupocorban.pe', '$2b$12$1uSChYv3lnmphKvEzMhFUegElZqX1vKn8qDvEgOiGi7G.nY8DpyL2');
     PRINT '✓ Usuario Admin insertado';
 END
 ELSE
@@ -2582,7 +2582,7 @@ BEGIN
     INSERT INTO seg.usuarios (empleado_id, correo_corp, password_hash)
     VALUES 
     -- Password: admin1234 (generado con bcrypt)
-        (2, 'sistemas@grupocorban.pe', '$2b$12$1/tg1PP/TI39uVknPx4htOsIFcLxk6.o79QhzzHDZf0Bfl6WSgwri');
+        (2, 'sistemas@grupocorban.pe', '$2b$12$1uSChYv3lnmphKvEzMhFUegElZqX1vKn8qDvEgOiGi7G.nY8DpyL2');
     PRINT '✓ Usuario Admin insertado';
 END
 ELSE

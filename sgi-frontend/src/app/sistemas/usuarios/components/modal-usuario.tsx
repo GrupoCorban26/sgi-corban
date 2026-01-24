@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import { useUsuarios, useRoles, useEmpleadosSinUsuario } from '@/hooks/useUsuarios';
 import { Usuario, UsuarioCreate, UsuarioUpdate } from '@/types/usuario';
 import { ModalBase, ModalHeader, ModalFooter, useModalContext } from '@/components/ui/modal';
+import { SearchableSelect } from '@/components/ui/SearchableSelect';
 
 // ============================================
 // TIPOS
@@ -222,47 +223,33 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
 
                 {/* Empleado (solo crear) */}
                 {!isEditMode && (
-                    <div className="space-y-1.5">
-                        <label htmlFor="empleado" className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                            Empleado <span className="text-red-500">*</span>
-                        </label>
-                        <select
-                            id="empleado"
-                            value={empleadoId}
-                            onChange={(e) => {
-                                const val = e.target.value ? Number(e.target.value) : '';
-                                setEmpleadoId(val);
-                                if (touched.has('empleado')) {
-                                    const error = validateField('empleado', val);
-                                    setErrors(prev => {
-                                        const newErrors = { ...prev };
-                                        if (error) newErrors.empleado = error;
-                                        else delete newErrors.empleado;
-                                        return newErrors;
-                                    });
-                                }
-                            }}
-                            onBlur={() => handleBlur('empleado', empleadoId)}
-                            className={`w-full px-3 py-2.5 rounded-xl border outline-none bg-white text-sm cursor-pointer transition-colors ${touched.has('empleado') && errors.empleado
-                                ? 'border-red-300 focus:ring-2 focus:ring-red-500/50 bg-red-50'
-                                : 'border-gray-200 focus:ring-2 focus:ring-indigo-500/50'
-                                }`}
-                            disabled={isLoading || loadingEmpleados}
-                        >
-                            <option value="">Seleccionar empleado...</option>
-                            {empleadosDisponibles.map((emp) => (
-                                <option key={emp.id} value={emp.id}>
-                                    {emp.nombre_completo} - {emp.cargo_nombre || 'Sin cargo'}
-                                </option>
-                            ))}
-                        </select>
-                        {touched.has('empleado') && errors.empleado && (
-                            <p className="text-xs text-red-500 flex items-center gap-1">
-                                <AlertCircle size={12} />
-                                {errors.empleado}
-                            </p>
-                        )}
-                    </div>
+                    <SearchableSelect
+                        label="Empleado"
+                        required
+                        value={empleadoId === '' ? null : empleadoId}
+                        onChange={(val) => {
+                            const newVal = val === null ? '' : Number(val);
+                            setEmpleadoId(newVal);
+                            if (touched.has('empleado')) {
+                                const error = validateField('empleado', newVal);
+                                setErrors(prev => {
+                                    const newErrors = { ...prev };
+                                    if (error) newErrors.empleado = error;
+                                    else delete newErrors.empleado;
+                                    return newErrors;
+                                });
+                            }
+                        }}
+                        options={empleadosDisponibles.map(emp => ({
+                            value: emp.id,
+                            label: emp.nombre_completo,
+                            description: emp.cargo_nombre || 'Sin cargo'
+                        }))}
+                        placeholder="Buscar empleado..."
+                        searchPlaceholder="Buscar por nombre..."
+                        disabled={isLoading || loadingEmpleados}
+                        error={touched.has('empleado') ? errors.empleado : undefined}
+                    />
                 )}
 
                 {/* Correo Corporativo */}

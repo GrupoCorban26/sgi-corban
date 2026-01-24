@@ -243,6 +243,44 @@ BEGIN
 END
 GO
 
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'estado_activo' AND schema_id = SCHEMA_ID('adm'))
+BEGIN
+    CREATE TABLE adm.estado_activo(
+        id INT IDENTITY(1,1),
+        nombre NVARCHAR(50) NOT NULL,
+        descripcion NVARCHAR(300),
+        created_at DATETIME2 NOT NULL DEFAULT GETDATE(),
+        updated_at DATETIME2
+    );
+    PRINT '✓ Tabla adm.estado_activo creada';
+END
+GO
+
+IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'activo_historial' AND schema_id = SCHEMA_ID('adm'))
+BEGIN
+    CREATE TABLE adm.activo_historial(
+        id INT IDENTITY(1,1),
+        activo_id INT NOT NULL,
+        estado_anterior NVARCHAR(50),
+        estado_nuevo NVARCHAR(50) NOT NULL,
+        motivo NVARCHAR(100) NOT NULL,  -- 'CREACION', 'ASIGNACION', 'DEVOLUCION', 'REPARACION', 'DETERIORO', 'BAJA'
+        observaciones NVARCHAR(500),
+        empleado_activo_id INT,          -- Referencia a la asignación (si aplica)
+        registrado_por INT,              -- Usuario que hizo el cambio
+        fecha_cambio DATETIME2 NOT NULL DEFAULT GETDATE()
+    );
+    
+    -- Índices para consultas frecuentes
+    
+    
+    PRINT '✓ Tabla adm.activo_historial creada';
+END
+GO
+
+
+
+
+
 -- -----------------------------------------------------
 -- 2.6 EMPLEADOS
 -- -----------------------------------------------------

@@ -9,11 +9,11 @@ from app.schemas.organizacion.areas import (
     AreaUpdate, 
     AreaPaginationResponse,
     OperationResult,
-    AreaResponse,
-    AreasDropDown
+    AreaResponse
 )
 
 router = APIRouter(prefix="/areas", tags=["Organización - Areas"])
+
 
 @router.get("/", response_model=AreaPaginationResponse)
 async def listar_areas(
@@ -27,37 +27,58 @@ async def listar_areas(
     service = AreaService(db)
     return await service.get_all(busqueda=busqueda, departamento_id=departamento_id, page=page, page_size=page_size)
 
-@router.get("/dropdown", response_model=List[AreasDropDown])
+
+@router.get("/dropdown", response_model=List[dict])
 async def get_areas_dropdown(
     db: AsyncSession = Depends(get_db)
 ):
     """Obtiene lista simple de áreas para dropdown"""
     service = AreaService(db)
-    return await service.get_areas_dropdown()
+    return await service.get_dropdown()
 
-@router.get("/by-departamento/{depto_id}", response_model=List[AreaResponse])
+
+@router.get("/dropdown/by-departamento/{departamento_id}", response_model=List[dict])
+async def get_areas_dropdown_by_departamento(
+    departamento_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Obtiene áreas filtradas por departamento para dropdown"""
+    service = AreaService(db)
+    return await service.get_dropdown_by_departamento(departamento_id)
+
+
+@router.get("/by-departamento/{depto_id}", response_model=List[dict])
 async def listar_areas_por_departamento(
     depto_id: int,
     db: AsyncSession = Depends(get_db)
 ):
-    """Obtiene todas las áreas de un departamento específico (para expandir en árbol)"""
+    """Obtiene todas las áreas de un departamento específico"""
     service = AreaService(db)
     return await service.get_by_departamento(depto_id)
 
-@router.post("/", response_model=OperationResult)
+
+@router.get("/{area_id}", response_model=dict)
+async def obtener_area(
+    area_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Obtiene un área por su ID"""
+    service = AreaService(db)
+    result = await service.get_by_id(area_id)
+    if not result:
+        raise HTTPException(status_code=404, detail="Área no encontrada")
+    return result
+
+
+@router.post("/", response_model=OperationResult, status_code=status.HTTP_201_CREATED)
 async def crear_area(
     area: AreaCreate,
     db: AsyncSession = Depends(get_db)
 ):
-    """Crea una nueva área"""
+    """Crea una nueva área. Validaciones en Python."""
     service = AreaService(db)
-    result = await service.create(area)
-    if result.get("success") != 1:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result.get("message", "Error al crear área")
-        )
-    return result
+    return await service.create(area)
+
 
 @router.put("/{area_id}", response_model=OperationResult)
 async def actualizar_area(
@@ -65,27 +86,26 @@ async def actualizar_area(
     area: AreaUpdate,
     db: AsyncSession = Depends(get_db)
 ):
-    """Actualiza un área existente"""
+    """Actualiza un área existente. Validaciones en Python."""
     service = AreaService(db)
-    result = await service.update(area_id, area)
-    if result.get("success") != 1:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result.get("message", "Error al actualizar área")
-        )
-    return result
+    return await service.update(area_id, area)
+
 
 @router.delete("/{area_id}", response_model=OperationResult)
 async def desactivar_area(
     area_id: int,
     db: AsyncSession = Depends(get_db)
 ):
-    """Desactiva un área (soft delete)"""
+    """Desactiva un área (soft delete). Valida que no tenga sub-áreas o empleados activos."""
     service = AreaService(db)
-    result = await service.delete(area_id)
-    if result.get("success") != 1:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=result.get("message", "Error al desactivar área")
-        )
-    return result
+    return await service.delete(area_id)
+
+
+@router.post("/{area_id}/reactivar", response_model=OperationResult)
+async def reactivar_area(
+    area_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Reactiva un área previamente desactivada"""
+    service = AreaService(db)
+    return await service.reactivate(area_id)

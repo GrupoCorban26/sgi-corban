@@ -32,6 +32,7 @@ export const useCargos = (busqueda = '', areaId: number | null = null, page = 1,
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['cargos'] });
+            queryClient.invalidateQueries({ queryKey: ['cargos-select'] });
         },
     });
 
@@ -43,6 +44,7 @@ export const useCargos = (busqueda = '', areaId: number | null = null, page = 1,
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['cargos'] });
+            queryClient.invalidateQueries({ queryKey: ['cargos-select'] });
         },
     });
 
@@ -54,6 +56,7 @@ export const useCargos = (busqueda = '', areaId: number | null = null, page = 1,
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['cargos'] });
+            queryClient.invalidateQueries({ queryKey: ['cargos-select'] });
         },
     });
 
@@ -85,7 +88,7 @@ export const useCargosByArea = (areaId: number | null) => {
             return data;
         },
         enabled: !!areaId,
-        staleTime: 1000 * 60 * 2, // 2 minutos de caché
+        staleTime: 0, // Siempre refetch para obtener datos actualizados
     });
 };
 
@@ -99,6 +102,6 @@ export const useCargosParaSelect = () => {
             const { data } = await axios.get<CargoOption[]>(`${CARGOS_URL}/dropdown`);
             return data;
         },
-        staleTime: 1000 * 60 * 5, // 5 minutos de caché
+        staleTime: 0, // Siempre refetch para obtener datos actualizados
     });
 };

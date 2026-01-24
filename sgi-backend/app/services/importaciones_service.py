@@ -95,7 +95,7 @@ class ImportacionesService:
                 df['anio'] = df['anio'].apply(lambda x: str(int(x)) if pd.notna(x) else None)
             
             # 1. Truncate
-            await db.execute(text("EXEC comercial.usp_limpiar_registro_importaciones"))
+            await db.execute(text("TRUNCATE TABLE comercial.registro_importaciones"))
             
             # 2. Bulk Insert
             records = df.to_dict(orient='records')
@@ -126,7 +126,7 @@ class ImportacionesService:
             raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
     @staticmethod
-    async def get_importaciones(db: AsyncSession, page: int, page_size: int, search: str = None, sin_telefono: bool = False):
+    async def get_importaciones(db: AsyncSession, page: int, page_size: int, search: str = None, sin_telefono: bool = False, sort_by_ruc: str = None):
         """Lista importaciones con paginación. Opcionalmente filtra empresas sin teléfono registrado."""
         try:
             offset = (page - 1) * page_size
@@ -142,6 +142,14 @@ class ImportacionesService:
                     AND ri.ruc NOT IN (SELECT DISTINCT ruc FROM comercial.cliente_contactos WHERE is_active = 1)
                 """
             
+            # Determinar el ORDER BY
+            if sort_by_ruc == 'desc':
+                order_by = "ORDER BY ri.ruc DESC"
+            elif sort_by_ruc == 'asc':
+                order_by = "ORDER BY ri.ruc ASC"
+            else:
+                order_by = "ORDER BY ri.anio DESC, ri.fob_anual DESC"
+            
             # Count query
             count_query = f"""
                 SELECT COUNT(*) FROM comercial.registro_importaciones ri
@@ -154,7 +162,7 @@ class ImportacionesService:
             data_query = f"""
                 SELECT * FROM comercial.registro_importaciones ri
                 {base_where}
-                ORDER BY ri.anio DESC, ri.fob_anual DESC
+                {order_by}
                 OFFSET :offset ROWS FETCH NEXT :page_size ROWS ONLY
             """
             result = await db.execute(text(data_query), {"search": search, "offset": offset, "page_size": page_size})

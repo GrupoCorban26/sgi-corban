@@ -18,6 +18,20 @@ PRINT '>> Agregando Primary Keys - Schema core...';
 IF NOT EXISTS (SELECT * FROM sys.key_constraints WHERE name = 'PK_core_departamentos')
     ALTER TABLE core.departamentos ADD CONSTRAINT PK_core_departamentos PRIMARY KEY (id);
 
+    -- Agregar PRIMARY KEY a activos si no existe
+IF NOT EXISTS (SELECT * FROM sys.key_constraints WHERE name = 'PK_activos' AND parent_object_id = OBJECT_ID('adm.activos'))
+BEGIN
+    ALTER TABLE adm.activos ADD CONSTRAINT PK_activos PRIMARY KEY (id);
+    PRINT '✓ Primary Key agregada a adm.activos';
+END
+GO
+-- Agregar PRIMARY KEY a empleado_activo si no existe
+IF NOT EXISTS (SELECT * FROM sys.key_constraints WHERE name = 'PK_empleado_activo' AND parent_object_id = OBJECT_ID('adm.empleado_activo'))
+BEGIN
+    ALTER TABLE adm.empleado_activo ADD CONSTRAINT PK_empleado_activo PRIMARY KEY (id);
+    PRINT '✓ Primary Key agregada a adm.empleado_activo';
+END
+GO
 IF NOT EXISTS (SELECT * FROM sys.key_constraints WHERE name = 'PK_provincias')
     ALTER TABLE core.provincias ADD CONSTRAINT PK_provincias PRIMARY KEY (id);
 
@@ -160,6 +174,7 @@ IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_distritos_provinc
 PRINT '✓ Foreign Keys core agregadas';
 GO
 
+
 -- =====================================================
 -- 6. FOREIGN KEYS - SCHEMA ADM
 -- =====================================================
@@ -219,6 +234,26 @@ IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_empleado_activo_a
 
 PRINT '✓ Foreign Keys adm agregadas';
 GO
+
+IF NOT EXISTS (SELECT * FROM sys.key_constraints WHERE name = 'PK_activo_historial')
+    ALTER TABLE adm.activo_historial ADD CONSTRAINT PK_activo_historial PRIMARY KEY (id);
+
+IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_historial_activo')
+    ALTER TABLE adm.activo_historial ADD CONSTRAINT FK_historial_activo 
+    FOREIGN KEY (activo_id) REFERENCES adm.activos(id);
+
+IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_historial_empleado_activo')
+    ALTER TABLE adm.activo_historial ADD CONSTRAINT FK_historial_empleado_activo 
+    FOREIGN KEY (empleado_activo_id) REFERENCES adm.empleado_activo(id);
+
+IF NOT EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_historial_usuario')
+    ALTER TABLE adm.activo_historial ADD CONSTRAINT FK_historial_usuario 
+    FOREIGN KEY (registrado_por) REFERENCES seg.usuarios(id);
+
+PRINT '✓ Constraints (PK/FK) adm.activo_historial agregados';
+GO
+
+
 
 -- =====================================================
 -- 7. FOREIGN KEYS - SCHEMA SEG
