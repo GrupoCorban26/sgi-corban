@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
 from app.database.db_connection import get_db
-from app.core.security import get_current_user_id
+from app.core.security import get_current_user_id, get_current_active_auth
 from app.services.usuarios import UsuarioService
 from app.schemas.usuario import (
     UsuarioCreate,
@@ -20,17 +20,33 @@ router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
 # ===========================================
 
 @router.get("/roles/dropdown")
-async def get_roles_dropdown(db: AsyncSession = Depends(get_db)):
+async def get_roles_dropdown(
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
+):
     """Obtiene lista de roles para dropdown"""
     service = UsuarioService(db)
     return await service.get_roles()
 
 
 @router.get("/empleados/disponibles")
-async def get_empleados_disponibles(db: AsyncSession = Depends(get_db)):
+async def get_empleados_disponibles(
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
+):
     """Obtiene empleados que no tienen usuario asignado"""
     service = UsuarioService(db)
     return await service.get_empleados_sin_usuario()
+
+
+@router.get("/comerciales/dropdown")
+async def get_comerciales_dropdown(
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
+):
+    """Obtiene lista de comerciales para dropdown (usuarios con rol COMERCIAL o JEFE_COMERCIAL)"""
+    service = UsuarioService(db)
+    return await service.get_comerciales()
 
 
 # ===========================================
@@ -44,7 +60,8 @@ async def listar_usuarios(
     rol_id: Optional[int] = Query(None, description="Filtrar por rol"),
     page: int = Query(1, ge=1),
     page_size: int = Query(15, ge=1, le=100),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Lista usuarios con paginación y filtros"""
     service = UsuarioService(db)
@@ -60,7 +77,8 @@ async def listar_usuarios(
 @router.get("/{id}")
 async def obtener_usuario(
     id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Obtiene un usuario por ID con sus roles"""
     service = UsuarioService(db)

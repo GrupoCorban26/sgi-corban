@@ -2,12 +2,22 @@
 // Cambiamos 'next/form' por el form normal de HTML
 import Image from 'next/image';
 import InputLogin from '../../components/ui/input';
+import { useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useActionState } from 'react'
 import { handleLoginAction } from './process'
 
 export default function Page() {
   // Inicializamos con un objeto que coincida con ActionState
   const [state, formAction, isPending] = useActionState(handleLoginAction, { error: null });
+
+  const queryClient = useQueryClient();
+
+  // Limpiar caché al montar el login (cuando se cierra sesión y se redirige aquí)
+  useEffect(() => {
+    queryClient.removeQueries();
+    console.log('Caché de aplicación limpiada al ingresar a Login');
+  }, [queryClient]);
 
   return (
     <main className="min-h-screen flex flex-col md:flex-row bg-white">
@@ -23,7 +33,7 @@ export default function Page() {
         />
         <div className="absolute inset-0 flex items-center justify-center z-20 p-12">
           <h1 className="text-5xl lg:text-6xl font-black text-white text-center leading-tight drop-shadow-lg">
-            Sistema de Gestión <br /> 
+            Sistema de Gestión <br />
             <span className="text-naranja-500">Integral</span>
           </h1>
         </div>
@@ -33,11 +43,11 @@ export default function Page() {
       <section className="flex-1 flex flex-col items-center justify-center p-8 lg:p-16">
         <div className="w-full max-w-md space-y-12">
           <header className="flex flex-col items-center gap-6">
-            <Image 
-              src="/logo-corban.png" 
-              alt="Grupo Corban" 
-              width={320} 
-              height={100} 
+            <Image
+              src="/logo-corban.png"
+              alt="Grupo Corban"
+              width={320}
+              height={100}
               className="h-auto w-auto"
             />
             <div className="text-center">
@@ -47,29 +57,29 @@ export default function Page() {
 
           {/* CAMBIO: Usamos etiqueta form estándar para Server Actions */}
           <form action={formAction} className="space-y-6">
-            
+
             {state?.error && (
               <div className="bg-red-50 border-l-4 border-red-500 p-4 text-red-700 text-sm animate-in fade-in slide-in-from-top-2">
                 {state.error}
               </div>
             )}
 
-            <InputLogin 
-              label="Correo electrónico" 
-              name="correo" 
-              type="email" 
-              required 
+            <InputLogin
+              label="Correo electrónico"
+              name="correo"
+              type="email"
+              required
               autoComplete="email" // Mejora UX
             />
-            <InputLogin 
-              label="Contraseña" 
-              name="password" 
-              type="password" 
-              required 
+            <InputLogin
+              label="Contraseña"
+              name="password"
+              type="password"
+              required
               autoComplete="current-password" // Mejora UX
             />
-            
-            <button 
+
+            <button
               type="submit"
               disabled={isPending}
               className={`w-full bg-naranja-500 hover:bg-naranja-600 text-white font-bold uppercase py-4 rounded-xl transition-all transform shadow-lg shadow-naranja-500/20 

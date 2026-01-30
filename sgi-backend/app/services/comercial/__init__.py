@@ -1,0 +1,4 @@
+# Servicios comerciales refactorizados
+from app.services.comercial.contactos_excel_service import ContactosExcelService
+from app.services.comercial.contactos_crud_service import ContactosCrudService
+from app.services.comercial.contactos_asignacion_service import ContactosAsignacionService

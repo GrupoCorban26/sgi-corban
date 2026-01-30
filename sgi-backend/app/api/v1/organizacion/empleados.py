@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
 from app.database.db_connection import get_db
+from app.core.security import get_current_active_auth
 from app.services.organizacion.empleados import EmpleadoService
 from app.schemas.organizacion.empleados import (
     EmpleadoCreate, 
@@ -16,6 +17,16 @@ from app.schemas.organizacion.empleados import (
 router = APIRouter(prefix="/empleados", tags=["Organización - Empleados"])
 
 
+@router.get("/cumpleanos", response_model=List[dict])
+async def get_cumpleanos_todos(
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
+):
+    """Lista todos los cumpleaños de empleados activos"""
+    service = EmpleadoService(db)
+    return await service.get_cumpleanos_todos()
+
+
 @router.get("/", response_model=EmpleadoPaginationResponse)
 async def listar_empleados(
     busqueda: Optional[str] = Query(None, description="Buscar por nombre, apellido o documento"),
@@ -23,7 +34,8 @@ async def listar_empleados(
     page_size: int = Query(15, ge=1, le=100), 
     departamento_id: Optional[int] = Query(None, description="Filtrar por departamento organizacional"),
     area_id: Optional[int] = Query(None, description="Filtrar por área"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Lista todos los empleados con paginación y filtros"""
     service = EmpleadoService(db)
@@ -38,7 +50,8 @@ async def listar_empleados(
 
 @router.get("/dropdown", response_model=List[EmpleadoDropdown])
 async def get_empleados_dropdown(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Obtiene lista simple de empleados para dropdown"""
     service = EmpleadoService(db)
@@ -48,7 +61,8 @@ async def get_empleados_dropdown(
 @router.get("/dropdown/by-area/{area_id}", response_model=List[dict])
 async def get_empleados_dropdown_by_area(
     area_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Obtiene empleados filtrados por área para dropdown"""
     service = EmpleadoService(db)
@@ -58,7 +72,8 @@ async def get_empleados_dropdown_by_area(
 @router.get("/dropdown/by-departamento/{departamento_id}", response_model=List[dict])
 async def get_empleados_dropdown_by_departamento(
     departamento_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Obtiene empleados filtrados por departamento para dropdown"""
     service = EmpleadoService(db)
@@ -68,7 +83,8 @@ async def get_empleados_dropdown_by_departamento(
 @router.get("/{empleado_id}", response_model=dict)
 async def obtener_empleado(
     empleado_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Obtiene un empleado por su ID"""
     service = EmpleadoService(db)
@@ -81,7 +97,8 @@ async def obtener_empleado(
 @router.post("/", response_model=OperationResult, status_code=status.HTTP_201_CREATED)
 async def crear_empleado(
     empleado: EmpleadoCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Crea un nuevo empleado. Validaciones en Python."""
     service = EmpleadoService(db)
@@ -92,7 +109,8 @@ async def crear_empleado(
 async def actualizar_empleado(
     empleado_id: int,
     empleado: EmpleadoUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Actualiza un empleado existente. Validaciones en Python."""
     service = EmpleadoService(db)
@@ -102,7 +120,8 @@ async def actualizar_empleado(
 @router.delete("/{empleado_id}", response_model=OperationResult)
 async def desactivar_empleado(
     empleado_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """
     Desactiva un empleado (soft delete) - asigna fecha_cese automáticamente.
@@ -115,7 +134,8 @@ async def desactivar_empleado(
 @router.post("/{empleado_id}/reactivar", response_model=OperationResult)
 async def reactivar_empleado(
     empleado_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Reactiva un empleado desactivado - limpia fecha_cese"""
     service = EmpleadoService(db)

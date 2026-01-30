@@ -1,9 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import api from '@/lib/axios';
 import { Area, AreaPaginationResponse, AreaOperationResult, AreaOption } from '@/types/organizacion/area';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-const AREAS_URL = `${API_BASE_URL}/areas`;
+const AREAS_URL = '/areas';
 
 // ============================================
 // HOOK PRINCIPAL DE ÁREAS
@@ -19,7 +18,7 @@ export const useAreas = (busqueda = '', departamentoId: number | null = null, pa
             if (busqueda) params.busqueda = busqueda;
             if (departamentoId) params.departamento_id = departamentoId;
 
-            const { data } = await axios.get<AreaPaginationResponse>(`${AREAS_URL}/`, { params });
+            const { data } = await api.get<AreaPaginationResponse>(`${AREAS_URL}/`, { params });
             return data;
         },
     });
@@ -27,7 +26,7 @@ export const useAreas = (busqueda = '', departamentoId: number | null = null, pa
     // 2. Crear Área
     const createMutation = useMutation({
         mutationFn: async (newArea: Partial<Area>) => {
-            const { data } = await axios.post<AreaOperationResult>(`${AREAS_URL}/`, newArea);
+            const { data } = await api.post<AreaOperationResult>(`${AREAS_URL}/`, newArea);
             return data;
         },
         onSuccess: () => {
@@ -39,7 +38,7 @@ export const useAreas = (busqueda = '', departamentoId: number | null = null, pa
     // 3. Actualizar Área
     const updateMutation = useMutation({
         mutationFn: async ({ id, data: areaData }: { id: number; data: Partial<Area> }) => {
-            const response = await axios.put<AreaOperationResult>(`${AREAS_URL}/${id}`, areaData);
+            const response = await api.put<AreaOperationResult>(`${AREAS_URL}/${id}`, areaData);
             return response.data;
         },
         onSuccess: () => {
@@ -51,7 +50,7 @@ export const useAreas = (busqueda = '', departamentoId: number | null = null, pa
     // 4. Desactivar Área (Borrado lógico)
     const deleteMutation = useMutation({
         mutationFn: async (id: number) => {
-            const { data } = await axios.delete<AreaOperationResult>(`${AREAS_URL}/${id}`);
+            const { data } = await api.delete<AreaOperationResult>(`${AREAS_URL}/${id}`);
             return data;
         },
         onSuccess: () => {
@@ -84,7 +83,7 @@ export const useAreasByDepartamento = (deptoId: number | null) => {
         queryKey: ['areas', 'by-depto', deptoId],
         queryFn: async () => {
             if (!deptoId) return [];
-            const { data } = await axios.get<Area[]>(`${AREAS_URL}/by-departamento/${deptoId}`);
+            const { data } = await api.get<Area[]>(`${AREAS_URL}/by-departamento/${deptoId}`);
             return data;
         },
         enabled: !!deptoId, // Solo ejecuta si hay deptoId
@@ -97,7 +96,7 @@ export const useAreasParaSelect = () => {
     return useQuery({
         queryKey: ['areas-select'],
         queryFn: async () => {
-            const { data } = await axios.get<AreaOption[]>(`${AREAS_URL}/dropdown`);
+            const { data } = await api.get<AreaOption[]>(`${AREAS_URL}/dropdown`);
             return data;
         },
         staleTime: 0, // Siempre refetch para obtener datos actualizados

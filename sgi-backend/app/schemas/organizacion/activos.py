@@ -46,6 +46,7 @@ class ActivoResponse(BaseModel):
     estado_id: Optional[int] = None
     estado_nombre: Optional[str] = None  # Nombre del estado (BUENO, MALOGRADO, etc.)
     estado_nombre: Optional[str] = None  # Nombre del estado (BUENO, MALOGRADO, etc.)
+    estado_color: Optional[str] = None
     is_disponible: bool = True
     is_active: bool = True
     observaciones: Optional[str] = None
@@ -104,7 +105,7 @@ class ActivoDropdown(BaseModel):
 class AsignacionActivoRequest(BaseModel):
     """Request para asignar activo a empleado"""
     empleado_id: int
-    estado_entrega_id: int = Field(..., description="Estado del activo al entregar")
+    estado_entrega_id: Optional[int] = Field(None, description="Estado del activo al entregar (usa estado actual si no se especifica)")
     observaciones: Optional[str] = None
 
 

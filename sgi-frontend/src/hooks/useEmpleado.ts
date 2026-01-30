@@ -1,12 +1,13 @@
 "use client";
 import { useState, useEffect, useCallback } from 'react';
-import { empleadoService, Empleado, EmpleadoPagination } from '@/services/empleado';
+import { empleadoService } from '@/services/organizacion/empleado';
+import { EmpleadoPaginationResponse } from '@/types/organizacion/empleado';
 
 export function useEmpleados(initialPage = 1, initialPageSize = 10) {
-  const [data, setData] = useState<EmpleadoPagination | null>(null);
+  const [data, setData] = useState<EmpleadoPaginationResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
+
   // Parámetros de búsqueda y paginación
   const [page, setPage] = useState(initialPage);
   const [search, setSearch] = useState("");

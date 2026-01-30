@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react';
-import { contactosService } from '../services/contactos';
-import { Contacto, ContactosListResponse } from '../types/contactos';
+import { contactosService } from '../../services/comercial/contactos';
+import { Contacto, ContactosListResponse } from '../../types/contactos';
 
 export const useContactos = () => {
     const [contacts, setContacts] = useState<Contacto[]>([]);
@@ -79,7 +79,8 @@ export const useContactos = () => {
         update,
         remove,
         upload,
-        assignBatch
+        assignBatch,
+        getKpisGestion: contactosService.getKpisGestion
     };
 };
 

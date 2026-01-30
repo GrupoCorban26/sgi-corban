@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { ExcelUploader } from '@/components/common/ExcelUploader';
 import { ContactsModal } from '@/components/importaciones/ContactsModal';
 import { Search, AlertCircle, CheckCircle, Loader2, ArrowDownWideNarrow } from 'lucide-react';
-import { useImportaciones } from '@/hooks/useImportaciones';
+import { useImportaciones } from '@/hooks/comercial/useImportaciones';
 
 export default function TransaccionesPage() {
     const {

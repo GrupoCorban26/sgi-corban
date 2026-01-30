@@ -89,15 +89,15 @@ export const useClientes = (
     };
 };
 
-// ============================================
-// HOOK PARA ESTADÍSTICAS
-// ============================================
 export const useClientesStats = (comercialId: number | null = null) => {
     return useQuery({
         queryKey: ['clientes-stats', comercialId],
         queryFn: async () => {
             const params: Record<string, unknown> = {};
-            if (comercialId) params.comercial_id = comercialId;
+            // Fix: Check for null/undefined explicitly so 0 is sent if needed
+            if (comercialId !== null && comercialId !== undefined) {
+                params.comercial_id = comercialId;
+            }
             const { data } = await api.get<ClienteStats>(`${CLIENTES_URL}/stats`, { params });
             return data;
         },

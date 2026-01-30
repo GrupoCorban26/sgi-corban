@@ -48,6 +48,7 @@ export async function handleLoginAction(prevState: any, formData: FormData) {
 
     // 2. Guardar datos del usuario en cookie legible por JS (para el menú)
     cookieStore.set('user_data', JSON.stringify({
+      id: data.user.id,
       nombre: data.user.nombre,
       roles: data.user.roles,
       area: data.user.area,

@@ -6,7 +6,7 @@
 
 import { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Save, Phone, Mail, Briefcase } from 'lucide-react';
-import { useContactos } from '@/hooks/useContactos';
+import { useContactos } from '@/hooks/comercial/useContactos';
 import { Contacto } from '@/types/contactos';
 
 interface ContactsModalProps {

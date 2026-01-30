@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.db_connection import get_db
-from app.services.importaciones_service import ImportacionesService
-from app.schemas.importaciones import ImportacionPagination
+from app.core.security import get_current_active_auth
+from app.services.comercial.importaciones_service import ImportacionesService
+from app.schemas.comercial.importaciones import ImportacionPagination
 
 router = APIRouter(
     prefix="/importaciones",
@@ -12,7 +13,8 @@ router = APIRouter(
 @router.post("/upload")
 async def upload_importaciones(
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     if not file.filename.endswith(('.xls', '.xlsx')):
         raise HTTPException(status_code=400, detail="File must be an Excel file")
@@ -26,7 +28,8 @@ async def list_importaciones(
     search: str = Query(None),
     sin_telefono: bool = Query(False),
     sort_by_ruc: str = Query(None, description="Ordenar por RUC: 'asc' o 'desc'"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     return await ImportacionesService.get_importaciones(db, page, page_size, search, sin_telefono, sort_by_ruc)
 

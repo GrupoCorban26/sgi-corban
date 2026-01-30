@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import api from '@/lib/axios';
 import {
   Departamento,
   DepartamentoPaginationResponse,
@@ -8,9 +8,8 @@ import {
   DepartamentoOption
 } from '@/types/organizacion/departamento';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-const DEPTOS_URL = `${API_BASE_URL}/departamentos`;
-const EMPLEADOS_URL = `${API_BASE_URL}/empleados`; // Plural - correcto
+const DEPTOS_URL = '/departamentos';
+const EMPLEADOS_URL = '/empleados';
 
 // ============================================
 // HOOK PRINCIPAL DE DEPARTAMENTOS
@@ -22,7 +21,7 @@ export const useDepartamentos = (busqueda = '', page = 1, pageSize = 15) => {
   const listQuery = useQuery({
     queryKey: ['departamentos', busqueda, page, pageSize],
     queryFn: async () => {
-      const { data } = await axios.get<DepartamentoPaginationResponse>(`${DEPTOS_URL}/`, {
+      const { data } = await api.get<DepartamentoPaginationResponse>(`${DEPTOS_URL}/`, {
         params: { busqueda, page, page_size: pageSize },
       });
       return data;
@@ -32,7 +31,7 @@ export const useDepartamentos = (busqueda = '', page = 1, pageSize = 15) => {
   // 2. Crear Departamento
   const createMutation = useMutation({
     mutationFn: async (newDepto: Partial<Departamento>) => {
-      const { data } = await axios.post<OperationResult>(`${DEPTOS_URL}/`, newDepto);
+      const { data } = await api.post<OperationResult>(`${DEPTOS_URL}/`, newDepto);
       return data;
     },
     onSuccess: () => {
@@ -44,7 +43,7 @@ export const useDepartamentos = (busqueda = '', page = 1, pageSize = 15) => {
   // 3. Actualizar Departamento
   const updateMutation = useMutation({
     mutationFn: async ({ id, data: deptoData }: { id: number; data: Partial<Departamento> }) => {
-      const response = await axios.put<OperationResult>(`${DEPTOS_URL}/${id}`, deptoData);
+      const response = await api.put<OperationResult>(`${DEPTOS_URL}/${id}`, deptoData);
       return response.data;
     },
     onSuccess: () => {
@@ -56,7 +55,7 @@ export const useDepartamentos = (busqueda = '', page = 1, pageSize = 15) => {
   // 4. Desactivar Departamento (Borrado lógico)
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const { data } = await axios.delete<OperationResult>(`${DEPTOS_URL}/${id}`);
+      const { data } = await api.delete<OperationResult>(`${DEPTOS_URL}/${id}`);
       return data;
     },
     onSuccess: () => {
@@ -91,7 +90,7 @@ export const useEmpleadosParaSelect = () => {
     queryKey: ['empleados-select'],
     queryFn: async () => {
       // Usamos el endpoint dropdown que devuelve formato simple
-      const { data } = await axios.get<EmpleadoOption[]>(`${EMPLEADOS_URL}/dropdown`);
+      const { data } = await api.get<EmpleadoOption[]>(`${EMPLEADOS_URL}/dropdown`);
       return data;
     },
     staleTime: 0, // Siempre refetch para obtener datos actualizados
@@ -106,7 +105,7 @@ export const useDepartamentosParaSelect = () => {
   return useQuery({
     queryKey: ['departamentos-select'],
     queryFn: async () => {
-      const { data } = await axios.get<DepartamentoOption[]>(`${DEPTOS_URL}/dropdown`);
+      const { data } = await api.get<DepartamentoOption[]>(`${DEPTOS_URL}/dropdown`);
       return data;
     },
     staleTime: 0, // Siempre refetch para obtener datos actualizados

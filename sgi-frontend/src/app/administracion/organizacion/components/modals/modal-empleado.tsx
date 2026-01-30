@@ -418,7 +418,9 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
       }
       handleClose();
     } catch (error: unknown) {
-      toast.error((error as Error).message || 'Error al guardar empleado');
+      const axiosError = error as { response?: { data?: { detail?: string } }; message?: string };
+      const errorMessage = axiosError.response?.data?.detail || axiosError.message || 'Error al guardar empleado';
+      toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
     }

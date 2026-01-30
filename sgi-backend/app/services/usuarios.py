@@ -223,6 +223,28 @@ class UsuarioService:
             for e in empleados
         ]
 
+    async def get_comerciales(self) -> list:
+        """Obtiene usuarios con rol COMERCIAL o JEFE_COMERCIAL para dropdown"""
+        # Obtener usuarios que tengan rol COMERCIAL o JEFE_COMERCIAL
+        stmt = select(Usuario).options(
+            selectinload(Usuario.roles),
+            selectinload(Usuario.empleado)
+        ).join(Usuario.roles).where(
+            Usuario.is_active == True,
+            Rol.nombre == 'COMERCIAL'
+        ).distinct()
+        
+        result = await self.db.execute(stmt)
+        usuarios = result.scalars().all()
+        
+        return [
+            {
+                "id": u.id,
+                "nombre": f"{u.empleado.nombres} {u.empleado.apellido_paterno}" if u.empleado else u.correo_corp
+            }
+            for u in usuarios
+        ]
+
     async def assign_roles(self, usuario_id: int, roles_ids: list, created_by: int = None) -> dict:
         """Asigna roles a un usuario (Reemplaza asignaciones previas)"""
         stmt = select(Usuario).options(selectinload(Usuario.roles)).where(Usuario.id == usuario_id)

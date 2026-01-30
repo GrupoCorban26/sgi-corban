@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
 from app.database.db_connection import get_db
+from app.core.security import get_current_active_auth
 from app.services.organizacion.cargos import CargoService
 from app.schemas.organizacion.cargo import (
     CargoCreate, 
@@ -22,7 +23,8 @@ async def listar_cargos(
     area_id: Optional[int] = Query(None, description="Filtrar por área"),
     page: int = Query(1, ge=1), 
     page_size: int = Query(15, ge=1, le=100), 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Lista todos los cargos con paginación y filtros"""
     service = CargoService(db)
@@ -31,7 +33,8 @@ async def listar_cargos(
 
 @router.get("/dropdown", response_model=List[CargoDropdown])
 async def get_cargos_dropdown(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Obtiene lista simple de cargos para dropdown"""
     service = CargoService(db)
@@ -41,7 +44,8 @@ async def get_cargos_dropdown(
 @router.get("/dropdown/by-area/{area_id}", response_model=List[dict])
 async def get_cargos_dropdown_by_area(
     area_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Obtiene cargos filtrados por área para dropdown"""
     service = CargoService(db)
@@ -51,7 +55,8 @@ async def get_cargos_dropdown_by_area(
 @router.get("/by-area/{area_id}", response_model=List[CargoResponse])
 async def listar_cargos_por_area(
     area_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Obtiene todos los cargos de un área específica (para expandir en árbol)"""
     service = CargoService(db)
@@ -61,7 +66,8 @@ async def listar_cargos_por_area(
 @router.get("/{cargo_id}", response_model=dict)
 async def obtener_cargo(
     cargo_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Obtiene un cargo por su ID"""
     service = CargoService(db)
@@ -74,7 +80,8 @@ async def obtener_cargo(
 @router.post("/", response_model=OperationResult, status_code=status.HTTP_201_CREATED)
 async def crear_cargo(
     cargo: CargoCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Crea un nuevo cargo. Validaciones en Python."""
     service = CargoService(db)
@@ -85,7 +92,8 @@ async def crear_cargo(
 async def actualizar_cargo(
     cargo_id: int,
     cargo: CargoUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Actualiza un cargo existente. Validaciones en Python."""
     service = CargoService(db)
@@ -95,7 +103,8 @@ async def actualizar_cargo(
 @router.delete("/{cargo_id}", response_model=OperationResult)
 async def desactivar_cargo(
     cargo_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Desactiva un cargo (soft delete). Valida que no tenga empleados activos."""
     service = CargoService(db)
@@ -105,7 +114,8 @@ async def desactivar_cargo(
 @router.post("/{cargo_id}/reactivar", response_model=OperationResult)
 async def reactivar_cargo(
     cargo_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Reactiva un cargo previamente desactivado"""
     service = CargoService(db)

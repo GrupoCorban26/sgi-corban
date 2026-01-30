@@ -9,6 +9,7 @@ export interface Activo {
     codigo_inventario: string | null;
     estado_id: number;
     estado_nombre: string | null;
+    estado_color: string | null;
     is_disponible: boolean;
     is_active: boolean;
     observaciones: string | null;
@@ -17,7 +18,11 @@ export interface Activo {
     // Datos de asignación
     empleado_asignado_id: number | null;
     empleado_asignado_nombre: string | null;
+    empleado_asignado_dni: string | null;
     fecha_asignacion: string | null;
+    // Carta de responsabilidad
+    tiene_carta: boolean | null;
+    fecha_carta: string | null;
 }
 
 export interface ActivoCreate {
@@ -83,7 +88,7 @@ export interface AsignacionActivoRequest {
 }
 
 export interface DevolucionActivoRequest {
-    estado_al_devolver: string;
+    estado_devolucion_id: number;
     motivo: string;
     observaciones?: string;
 }

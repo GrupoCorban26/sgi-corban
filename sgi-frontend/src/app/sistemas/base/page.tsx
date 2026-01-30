@@ -6,7 +6,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { baseService } from '@/services/base';
+import { baseService } from '@/services/comercial/base';
 import { BaseContacto, BaseStats } from '@/types/base';
 import {
     Search, Users, Phone, Building2, TrendingUp,

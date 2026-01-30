@@ -369,3 +369,23 @@ class EmpleadoService:
         """)
         result = await self.db.execute(query, {"departamento_id": departamento_id})
         return [dict(row) for row in result.mappings().all()]
+
+    async def get_cumpleanos_todos(self) -> list:
+        """Obtiene todos los empleados activos con fecha de nacimiento, para calendario anual"""
+        query = text("""
+            SELECT 
+                e.id, 
+                e.nombres, 
+                e.apellido_paterno, 
+                e.apellido_materno,
+                e.fecha_nacimiento,
+                c.nombre AS cargo_nombre,
+                a.nombre AS area_nombre
+            FROM adm.empleados e
+            LEFT JOIN adm.cargos c ON c.id = e.cargo_id
+            LEFT JOIN adm.areas a ON a.id = c.area_id
+            WHERE e.is_active = 1 AND e.fecha_nacimiento IS NOT NULL
+            ORDER BY MONTH(e.fecha_nacimiento), DAY(e.fecha_nacimiento)
+        """)
+        result = await self.db.execute(query)
+        return [dict(row) for row in result.mappings().all()]

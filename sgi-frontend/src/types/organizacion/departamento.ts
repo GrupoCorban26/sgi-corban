@@ -5,7 +5,7 @@ export interface Departamento {
   nombre: string;
   descripcion?: string | null;
   responsable_id?: number | null;
-  responsable_name?: string | null;
+  responsable_nombre?: string | null;
   is_active?: boolean;
   created_at?: string | null;
   updated_at?: string | null;

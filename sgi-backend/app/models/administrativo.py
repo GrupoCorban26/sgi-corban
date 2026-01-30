@@ -129,6 +129,10 @@ class EmpleadoActivo(Base):
     estado_devolucion_id = Column(Integer, ForeignKey("adm.estado_activo.id"))
     observaciones = Column(String)
     asignado_por = Column(Integer, ForeignKey("seg.usuarios.id"))
+    # Campos de carta de responsabilidad
+    tiene_carta = Column(Boolean, default=False)
+    fecha_carta = Column(DateTime(timezone=True))
+    archivo_carta = Column(String(200))
 
     # Relationships
     empleado = relationship("Empleado", backref="activos_asignados")
@@ -144,6 +148,7 @@ class EstadoActivo(Base):
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(50), nullable=False)
     descripcion = Column(String(300))
+    color = Column(String(20), default="#6B7280")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
@@ -170,4 +175,53 @@ class ActivoHistorial(Base):
     estado_anterior = relationship("EstadoActivo", foreign_keys=[estado_anterior_id])
     estado_nuevo = relationship("EstadoActivo", foreign_keys=[estado_nuevo_id])
     asignacion = relationship("EmpleadoActivo")
+    usuario = relationship("app.models.seguridad.Usuario")
+
+
+class LineaCorporativa(Base):
+    """Línea telefónica corporativa (chip + gmail) - independiente del dispositivo físico"""
+    __tablename__ = "lineas_corporativas"
+    __table_args__ = {"schema": "adm"}
+
+    id = Column(Integer, primary_key=True, index=True)
+    numero = Column(String(20), nullable=False, unique=True)  # 987654321
+    gmail = Column(String(100), nullable=False, unique=True)  # grupocorban01@gmail.com
+    operador = Column(String(30))  # Claro, Movistar, Entel, Bitel
+    plan = Column(String(50))  # Descripción del plan
+    proveedor = Column(String(50))  # CORBAN ADUANAS, CORBAN TRANS LOGISTIC, EBL
+    activo_id = Column(Integer, ForeignKey("adm.activos.id"), nullable=True)  # Celular donde está instalado
+    empleado_id = Column(Integer, ForeignKey("adm.empleados.id"), nullable=True)  # A quién está asignado
+    fecha_asignacion = Column(DateTime(timezone=True))  # Cuándo se asignó al empleado
+    is_active = Column(Boolean, default=True, nullable=False)
+    observaciones = Column(String(500))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    activo = relationship("Activo", backref="linea_instalada")
+    empleado = relationship("Empleado", backref="lineas_asignadas")
+
+
+class LineaHistorial(Base):
+    """Historial de cambios de línea (cambio de celular, cambio de empleado)"""
+    __tablename__ = "linea_historial"
+    __table_args__ = {"schema": "adm"}
+
+    id = Column(Integer, primary_key=True, index=True)
+    linea_id = Column(Integer, ForeignKey("adm.lineas_corporativas.id"), nullable=False)
+    tipo_cambio = Column(String(30), nullable=False)  # 'CREACION', 'CAMBIO_CELULAR', 'ASIGNACION', 'DESASIGNACION', 'BAJA'
+    activo_anterior_id = Column(Integer, ForeignKey("adm.activos.id"), nullable=True)
+    activo_nuevo_id = Column(Integer, ForeignKey("adm.activos.id"), nullable=True)
+    empleado_anterior_id = Column(Integer, ForeignKey("adm.empleados.id"), nullable=True)
+    empleado_nuevo_id = Column(Integer, ForeignKey("adm.empleados.id"), nullable=True)
+    observaciones = Column(String(500))
+    registrado_por = Column(Integer, ForeignKey("seg.usuarios.id"))
+    fecha_cambio = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Relationships
+    linea = relationship("LineaCorporativa", backref="historial")
+    activo_anterior = relationship("Activo", foreign_keys=[activo_anterior_id])
+    activo_nuevo = relationship("Activo", foreign_keys=[activo_nuevo_id])
+    empleado_anterior = relationship("Empleado", foreign_keys=[empleado_anterior_id])
+    empleado_nuevo = relationship("Empleado", foreign_keys=[empleado_nuevo_id])
     usuario = relationship("app.models.seguridad.Usuario")

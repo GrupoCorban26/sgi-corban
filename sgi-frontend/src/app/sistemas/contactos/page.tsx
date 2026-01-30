@@ -9,8 +9,8 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { ExcelUploader } from '@/components/common/ExcelUploader';
-import { contactosService } from '@/services/contactos';
-import { casosLlamadaService } from '@/services/casos-llamada';
+import { contactosService } from '@/services/comercial/contactos';
+import { casosLlamadaService } from '@/services/comercial/casos-llamada';
 import { Contacto, ContactoStats } from '@/types/contactos';
 import { CasoLlamada } from '@/types/casos-llamada';
 import {

@@ -112,3 +112,37 @@ class LeadFeedback(Base):
 
     comercial = relationship("app.models.seguridad.Usuario")
     cliente = relationship("Cliente")
+
+class Cita(Base):
+    __tablename__ = "citas"
+    __table_args__ = {"schema": "comercial"}
+
+    id = Column(Integer, primary_key=True, index=True)
+    cliente_id = Column(Integer, ForeignKey("comercial.clientes.id"), nullable=False)
+    comercial_id = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=False) # Quien solicita/va
+    
+    fecha = Column(DateTime, nullable=False) # Date part
+    hora = Column(String(10), nullable=False) # Time string or DateTime content
+    
+    tipo_cita = Column(String(50)) # VISITA_CLIENTE, VISITA_OFICINA
+    direccion = Column(String(255))
+    motivo = Column(String(500))
+    con_presente = Column(Boolean, default=False)
+    
+    # Workflow
+    estado = Column(String(30), default="PENDIENTE") # PENDIENTE, APROBADO, RECHAZADO
+    motivo_rechazo = Column(String(500))
+    
+    # Asignacion Recurso (Solo si aprobado)
+    acompanado_por_id = Column(Integer, ForeignKey("seg.usuarios.id"))
+    conductor_id = Column(Integer, ForeignKey("logistica.conductores.id"))
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    created_by = Column(Integer)
+    
+    # Relationships
+    cliente = relationship("Cliente")
+    comercial = relationship("app.models.seguridad.Usuario", foreign_keys=[comercial_id])
+    acompanante = relationship("app.models.seguridad.Usuario", foreign_keys=[acompanado_por_id])
+    conductor = relationship("app.models.logistica.Conductor")

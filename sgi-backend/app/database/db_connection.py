@@ -3,8 +3,9 @@ import urllib.parse
 import os
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+from sqlalchemy.pool import QueuePool
 
-# 1. Cargar variables
+# 1. Cargar variables desde el .env
 load_dotenv()
 
 DB_USER = os.getenv("DB_USER")
@@ -14,7 +15,7 @@ DB_NAME = os.getenv("DB_NAME")
 DB_DRIVER = os.getenv("DB_DRIVER")
 
 # 2. CODIFICAR contraseña y construir URL
-# ¡Importante!: Usamos password_encoded dentro del f-string
+
 password_encoded = urllib.parse.quote_plus(DB_PASS)
 
 # Para Driver 18+ es vital 'TrustServerCertificate=yes' en local
@@ -25,7 +26,15 @@ DB_URL = (
 
 # 3. Crear el motor asíncrono (echo=True solo si DB_ECHO=true)
 DB_ECHO = os.getenv("DB_ECHO", "false").lower() == "true"
-engine = create_async_engine(DB_URL, echo=DB_ECHO)
+engine = create_async_engine(
+    DB_URL, 
+    echo=DB_ECHO,
+    # --- MEJORAS SENIOR ---
+    pool_size=10,           # Conexiones que se mantienen abiertas siempre
+    max_overflow=20,        # Conexiones extra que puede crear en picos de tráfico
+    pool_recycle=1800,      # Reinicia las conexiones cada 30 min para evitar conexiones "muertas"
+    pool_pre_ping=True,     # Verifica si la conexión está viva antes de usarla (evita errores 500)
+)
 
 # Fábrica de sesiones
 AsyncSessionLocal = async_sessionmaker(

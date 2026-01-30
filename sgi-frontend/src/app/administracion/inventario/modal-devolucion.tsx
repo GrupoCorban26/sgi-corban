@@ -6,7 +6,16 @@ import { toast } from 'sonner';
 
 import { Activo, DevolucionActivoRequest } from '@/types/organizacion/activo';
 import { useActivos } from '@/hooks/organizacion/useActivo';
+import { useEstadosActivosDropdown } from '@/hooks/organizacion/useEstadoActivo';
 import { ModalBase, ModalHeader, ModalFooter, useModalContext } from '@/components/ui/modal';
+
+const MOTIVOS_DEVOLUCION = [
+    'RENUNCIA',
+    'DESPIDO',
+    'FIN_CONTRATO',
+    'CAMBIO_EQUIPO',
+    'OTRO'
+];
 
 interface ModalProps {
     isOpen: boolean;
@@ -14,31 +23,38 @@ interface ModalProps {
     activoData: Activo | null;
 }
 
-const ESTADOS_FISICOS = ['BUENO', 'REGULAR', 'DAÑADO', 'EN_REPARACION'];
-const MOTIVOS_DEVOLUCION = [
-    'RENUNCIA',
-    'FIN_CONTRATO',
-    'CAMBIO_EQUIPO',
-    'MANTENIMIENTO',
-    'SOLICITUD_GERENCIA',
-    'OTRO'
-];
-
-function ModalDevolucionContent({ activoData }: { activoData: Activo }) {
+const ModalDevolucionContent = ({ activoData }: { activoData: Activo }) => {
     const { handleClose } = useModalContext();
-    const [estadoDevolucion, setEstadoDevolucion] = useState(activoData.estado_fisico || 'BUENO');
+    const { data: estados = [] } = useEstadosActivosDropdown();
+
+    // Default to current state or first available
+    const [estadoDevolucionId, setEstadoDevolucionId] = useState<number>(
+        activoData.estado_id || (estados.length > 0 ? estados[0].id : 0)
+    );
     const [motivo, setMotivo] = useState('RENUNCIA');
     const [observaciones, setObservaciones] = useState('');
 
     const { devolverMutation } = useActivos();
     const isSubmitting = devolverMutation.isPending;
 
+    // Update default state when loaded
+    React.useEffect(() => {
+        if (!estadoDevolucionId && estados.length > 0) {
+            setEstadoDevolucionId(estados[0].id);
+        }
+    }, [estados, estadoDevolucionId]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
+        if (!estadoDevolucionId) {
+            toast.error("Seleccione un estado");
+            return;
+        }
+
         try {
             const data: DevolucionActivoRequest = {
-                estado_al_devolver: estadoDevolucion,
+                estado_devolucion_id: Number(estadoDevolucionId),
                 motivo: motivo,
                 observaciones: observaciones.trim() || undefined
             };
@@ -82,13 +98,13 @@ function ModalDevolucionContent({ activoData }: { activoData: Activo }) {
                     <div className="space-y-1">
                         <label className="text-xs font-semibold text-gray-600">Estado al Devolver</label>
                         <select
-                            value={estadoDevolucion}
-                            onChange={(e) => setEstadoDevolucion(e.target.value)}
+                            value={estadoDevolucionId}
+                            onChange={(e) => setEstadoDevolucionId(Number(e.target.value))}
                             className="w-full px-3 py-2.5 rounded-lg border border-gray-200 bg-white outline-none focus:ring-2 focus:ring-orange-500 text-sm transition-all"
                             disabled={isSubmitting}
                         >
-                            {ESTADOS_FISICOS.map(st => (
-                                <option key={st} value={st}>{st.replace('_', ' ')}</option>
+                            {estados.map(st => (
+                                <option key={st.id} value={st.id}>{st.nombre}</option>
                             ))}
                         </select>
                     </div>

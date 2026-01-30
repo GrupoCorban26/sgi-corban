@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import api from '@/lib/axios';
 import { EstadoActivoDropdown } from '@/types/organizacion/estado_activo';
 
 export interface EstadoActivo {
@@ -26,8 +26,17 @@ interface EstadoActivoResponse {
     data: EstadoActivo[];
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-const ESTADOS_URL = `${API_BASE_URL}/estados-activo`;
+const ESTADOS_URL = '/estados-activo';
+
+export const useEstadosActivosDropdown = () => {
+    return useQuery({
+        queryKey: ['estados-activo', 'dropdown'],
+        queryFn: async () => {
+            const { data } = await api.get<EstadoActivoDropdown[]>(`${ESTADOS_URL}/dropdown`);
+            return data;
+        },
+    });
+};
 
 export const useEstadosActivo = (
     busqueda = '',
@@ -43,24 +52,20 @@ export const useEstadosActivo = (
             const params: Record<string, unknown> = { page, page_size: pageSize };
             if (busqueda) params.busqueda = busqueda;
 
-            const { data } = await axios.get<EstadoActivoResponse>(`${ESTADOS_URL}/`, { params });
+            const { data } = await api.get<EstadoActivoResponse>(`${ESTADOS_URL}/`, { params });
             return data;
         },
     });
 
+
+
     // Dropdown de estados
-    const dropdownQuery = useQuery({
-        queryKey: ['estados-activo', 'dropdown'],
-        queryFn: async () => {
-            const { data } = await axios.get<EstadoActivoDropdown[]>(`${ESTADOS_URL}/dropdown`);
-            return data;
-        },
-    });
+    const dropdownQuery = useEstadosActivosDropdown();
 
     // Crear estado
     const createMutation = useMutation({
         mutationFn: async (data: EstadoActivoCreate) => {
-            const res = await axios.post(`${ESTADOS_URL}/`, data);
+            const res = await api.post(`${ESTADOS_URL}/`, data);
             return res.data;
         },
         onSuccess: () => {
@@ -71,7 +76,7 @@ export const useEstadosActivo = (
     // Actualizar estado
     const updateMutation = useMutation({
         mutationFn: async ({ id, data }: { id: number; data: EstadoActivoUpdate }) => {
-            const res = await axios.put(`${ESTADOS_URL}/${id}`, data);
+            const res = await api.put(`${ESTADOS_URL}/${id}`, data);
             return res.data;
         },
         onSuccess: () => {
@@ -82,7 +87,7 @@ export const useEstadosActivo = (
     // Eliminar estado
     const deleteMutation = useMutation({
         mutationFn: async (id: number) => {
-            const res = await axios.delete(`${ESTADOS_URL}/${id}`);
+            const res = await api.delete(`${ESTADOS_URL}/${id}`);
             return res.data;
         },
         onSuccess: () => {

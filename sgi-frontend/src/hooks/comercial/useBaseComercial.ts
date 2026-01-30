@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { baseComercialService } from '@/services/baseComercial';
+import { baseComercialService } from '@/services/comercial/baseComercial';
 import { ContactoAsignado } from '@/types/base-comercial';
 
 /**

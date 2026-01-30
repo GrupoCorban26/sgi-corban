@@ -32,3 +32,10 @@ export interface ContactosListResponse {
     data: Contacto[];
 }
 
+
+export interface KpisGestion {
+    total_repartido: number;
+    tasa_contactabilidad: number;
+    tasa_positivos: number;
+    casos_distribucion: { name: string; value: number }[];
+}

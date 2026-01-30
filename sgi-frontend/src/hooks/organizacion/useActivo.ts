@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import api from '@/lib/axios';
 import {
     Activo,
     ActivoCreate,
@@ -13,8 +13,7 @@ import {
     DevolucionActivoRequest,
 } from '@/types/organizacion/activo';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-const ACTIVOS_URL = `${API_BASE_URL}/activos`;
+const ACTIVOS_URL = '/activos';
 
 // ============================================
 // HOOK PRINCIPAL DE ACTIVOS
@@ -23,21 +22,25 @@ export const useActivos = (
     busqueda = '',
     estadoFisico: string | null = null,
     isDisponible: boolean | null = null,
+    empleadoId: number | null = null,
     page = 1,
-    pageSize = 15
+    pageSize = 15,
+    sinLinea: boolean = false
 ) => {
     const queryClient = useQueryClient();
 
-    // Listar activos
+    // Ensure busqueda is treated as a dependency for the query key
     const listQuery = useQuery({
-        queryKey: ['activos', busqueda, estadoFisico, isDisponible, page, pageSize],
+        queryKey: ['activos', busqueda, estadoFisico, isDisponible, empleadoId, sinLinea, page, pageSize],
         queryFn: async () => {
             const params: Record<string, unknown> = { page, page_size: pageSize };
             if (busqueda) params.busqueda = busqueda;
             if (estadoFisico) params.estado_fisico = estadoFisico;
             if (isDisponible !== null) params.is_disponible = isDisponible;
+            if (empleadoId !== null) params.empleado_id = empleadoId;
+            if (sinLinea) params.sin_linea = true;
 
-            const { data } = await axios.get<ActivoPaginationResponse>(`${ACTIVOS_URL}/`, { params });
+            const { data } = await api.get<ActivoPaginationResponse>(`${ACTIVOS_URL}/`, { params });
             return data;
         },
     });
@@ -45,7 +48,7 @@ export const useActivos = (
     // Crear activo
     const createMutation = useMutation({
         mutationFn: async (newActivo: ActivoCreate) => {
-            const { data } = await axios.post<ActivoOperationResult>(`${ACTIVOS_URL}/`, newActivo);
+            const { data } = await api.post<ActivoOperationResult>(`${ACTIVOS_URL}/`, newActivo);
             return data;
         },
         onSuccess: () => {
@@ -57,7 +60,7 @@ export const useActivos = (
     // Actualizar activo
     const updateMutation = useMutation({
         mutationFn: async ({ id, data: activoData }: { id: number; data: ActivoUpdate }) => {
-            const response = await axios.put<ActivoOperationResult>(`${ACTIVOS_URL}/${id}`, activoData);
+            const response = await api.put<ActivoOperationResult>(`${ACTIVOS_URL}/${id}`, activoData);
             return response.data;
         },
         onSuccess: () => {
@@ -69,7 +72,7 @@ export const useActivos = (
     // Cambiar estado
     const cambiarEstadoMutation = useMutation({
         mutationFn: async ({ id, data: cambioData }: { id: number; data: CambioEstadoRequest }) => {
-            const response = await axios.post<ActivoOperationResult>(`${ACTIVOS_URL}/${id}/cambiar-estado`, cambioData);
+            const response = await api.post<ActivoOperationResult>(`${ACTIVOS_URL}/${id}/cambiar-estado`, cambioData);
             return response.data;
         },
         onSuccess: () => {
@@ -80,7 +83,7 @@ export const useActivos = (
     // Dar de baja
     const deleteMutation = useMutation({
         mutationFn: async (id: number) => {
-            const { data } = await axios.delete<ActivoOperationResult>(`${ACTIVOS_URL}/${id}`);
+            const { data } = await api.delete<ActivoOperationResult>(`${ACTIVOS_URL}/${id}`);
             return data;
         },
         onSuccess: () => {
@@ -92,7 +95,7 @@ export const useActivos = (
     // Asignar activo
     const asignarMutation = useMutation({
         mutationFn: async ({ id, data: asignacionData }: { id: number; data: AsignacionActivoRequest }) => {
-            const response = await axios.post<ActivoOperationResult>(`${ACTIVOS_URL}/${id}/asignar`, asignacionData);
+            const response = await api.post<ActivoOperationResult>(`${ACTIVOS_URL}/${id}/asignar`, asignacionData);
             return response.data;
         },
         onSuccess: () => {
@@ -104,7 +107,7 @@ export const useActivos = (
     // Devolver activo
     const devolverMutation = useMutation({
         mutationFn: async ({ id, data: devolucionData }: { id: number; data: DevolucionActivoRequest }) => {
-            const response = await axios.post<ActivoOperationResult>(`${ACTIVOS_URL}/${id}/devolver`, devolucionData);
+            const response = await api.post<ActivoOperationResult>(`${ACTIVOS_URL}/${id}/devolver`, devolucionData);
             return response.data;
         },
         onSuccess: () => {
@@ -141,7 +144,7 @@ export const useActivoHistorial = (activoId: number | null) => {
         queryKey: ['activo-historial', activoId],
         queryFn: async () => {
             if (!activoId) return [];
-            const { data } = await axios.get<ActivoHistorial[]>(`${ACTIVOS_URL}/${activoId}/historial`);
+            const { data } = await api.get<ActivoHistorial[]>(`${ACTIVOS_URL}/${activoId}/historial`);
             return data;
         },
         enabled: !!activoId,
@@ -155,7 +158,7 @@ export const useActivosDisponiblesDropdown = () => {
     return useQuery({
         queryKey: ['activos-dropdown'],
         queryFn: async () => {
-            const { data } = await axios.get<ActivoDropdown[]>(`${ACTIVOS_URL}/dropdown`);
+            const { data } = await api.get<ActivoDropdown[]>(`${ACTIVOS_URL}/dropdown`);
             return data;
         },
         staleTime: 0,
@@ -170,9 +173,21 @@ export const useActivoById = (activoId: number | null) => {
         queryKey: ['activo', activoId],
         queryFn: async () => {
             if (!activoId) return null;
-            const { data } = await axios.get<Activo>(`${ACTIVOS_URL}/${activoId}`);
+            const { data } = await api.get<Activo>(`${ACTIVOS_URL}/${activoId}`);
             return data;
         },
         enabled: !!activoId,
+    });
+};
+// ============================================
+// HOOK PARA OBTENER PRODUCTOS DISTINTOS
+// ============================================
+export const useProductosActivos = () => {
+    return useQuery({
+        queryKey: ['productos-activos'],
+        queryFn: async () => {
+            const { data } = await api.get<string[]>(`${ACTIVOS_URL}/productos`);
+            return data;
+        },
     });
 };

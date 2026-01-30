@@ -11,12 +11,14 @@ from app.api.v1.organizacion.areas import router as areas_router
 from app.api.v1.organizacion.cargos import router as cargos_router
 from app.api.v1.organizacion.activos import router as activos_router
 from app.api.v1.organizacion.estado_activo import router as estado_activo_router
+from app.api.v1.organizacion.lineas import router as lineas_router
 from app.api.v1.core.ubigeo import router as ubigeo_router
 from app.api.v1.comercial.importaciones import router as importaciones_router
 from app.api.v1.comercial.contactos import router as contactos_router
 from app.api.v1.comercial.casos_llamada import router as casos_llamada_router
 from app.api.v1.comercial.base import router as base_router
 from app.api.v1.comercial.clientes import router as clientes_router
+from app.api.v1.comercial.citas import router as citas_router
 
 app = FastAPI(
     title="SGI Grupo Corban",
@@ -44,12 +46,14 @@ app.include_router(areas_router, prefix="/api/v1")
 app.include_router(cargos_router, prefix="/api/v1")
 app.include_router(activos_router, prefix="/api/v1")
 app.include_router(estado_activo_router, prefix="/api/v1")
+app.include_router(lineas_router, prefix="/api/v1")
 app.include_router(ubigeo_router, prefix="/api/v1")
 app.include_router(importaciones_router, prefix="/api/v1")
 app.include_router(contactos_router, prefix="/api/v1")
 app.include_router(casos_llamada_router, prefix="/api/v1")
 app.include_router(base_router, prefix="/api/v1")
 app.include_router(clientes_router, prefix="/api/v1")
+app.include_router(citas_router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():

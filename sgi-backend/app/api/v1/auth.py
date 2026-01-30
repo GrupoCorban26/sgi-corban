@@ -68,6 +68,7 @@ async def login(
         "access_token": access_token,
         "token_type": "bearer",
         "user": {
+            "id": user_data['usuario_id'],
             "nombre": user_data['nombre_corto'],
             "area": user_data['area_nombre'],
             "cargo": user_data['cargo_nombre'],

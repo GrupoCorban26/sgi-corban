@@ -1,0 +1,12 @@
+﻿src/app/administracion/inventario/modal-asignacion.tsx(68,87): error TS2339: Property 'estado_fisico' does not exist on type 'Activo'.
+src/app/administracion/inventario/modal-asignacion.tsx(69,45): error TS2339: Property 'estado_fisico' does not exist on type 'Activo'.
+src/app/administracion/inventario/modal-devolucion.tsx(29,73): error TS2339: Property 'estado_fisico' does not exist on type 'Activo'.
+src/app/administracion/lineas/modal-linea.tsx(4,25): error TS2307: Cannot find module 'react-hook-form' or its corresponding type declarations.
+src/app/comercial/layout.tsx(9,22): error TS2322: Type '{ children: ReactNode; role: string; }' is not assignable to type 'IntrinsicAttributes & DashboardLayoutProps'.
+  Property 'role' does not exist on type 'IntrinsicAttributes & DashboardLayoutProps'.
+src/app/sistemas/page.tsx(61,32): error TS2304: Cannot find name 'setDateRange'.
+src/app/sistemas/page.tsx(61,45): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+src/app/sistemas/page.tsx(67,32): error TS2304: Cannot find name 'setDateRange'.
+src/app/sistemas/page.tsx(67,45): error TS7006: Parameter 'prev' implicitly has an 'any' type.
+src/app/sistemas/usuarios/components/modal-usuario.tsx(249,25): error TS2322: Type '{ label: string; required: true; value: number | null; onChange: (val: string | number | null) => void; options: { value: number; label: string; description: string; }[]; placeholder: string; searchPlaceholder: string; disabled: boolean; error: string | undefined; }' is not assignable to type 'IntrinsicAttributes & SearchableSelectProps'.
+  Property 'searchPlaceholder' does not exist on type 'IntrinsicAttributes & SearchableSelectProps'.

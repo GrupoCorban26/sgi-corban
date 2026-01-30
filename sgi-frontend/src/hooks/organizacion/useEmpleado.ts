@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import api from '@/lib/axios';
 import {
     EmpleadoPaginationResponse,
     EmpleadoOperationResult,
@@ -7,9 +7,9 @@ import {
     EmpleadoCreate,
     EmpleadoUpdate
 } from '@/types/organizacion/empleado';
+import { EmpleadoCumpleanos } from '@/types/organizacion/empleado-cumpleanos';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-const EMPLEADOS_URL = `${API_BASE_URL}/empleados`;
+const EMPLEADOS_URL = '/empleados';
 
 // ============================================
 // HOOK PRINCIPAL DE EMPLEADOS
@@ -32,7 +32,7 @@ export const useEmpleados = (
             if (departamentoId) params.departamento_id = departamentoId;
             if (areaId) params.area_id = areaId;
 
-            const { data } = await axios.get<EmpleadoPaginationResponse>(`${EMPLEADOS_URL}/`, { params });
+            const { data } = await api.get<EmpleadoPaginationResponse>(`${EMPLEADOS_URL}/`, { params });
             return data;
         },
     });
@@ -40,7 +40,7 @@ export const useEmpleados = (
     // 2. Crear Empleado
     const createMutation = useMutation({
         mutationFn: async (newEmpleado: EmpleadoCreate) => {
-            const { data } = await axios.post<EmpleadoOperationResult>(`${EMPLEADOS_URL}/`, newEmpleado);
+            const { data } = await api.post<EmpleadoOperationResult>(`${EMPLEADOS_URL}/`, newEmpleado);
             return data;
         },
         onSuccess: () => {
@@ -52,7 +52,7 @@ export const useEmpleados = (
     // 3. Actualizar Empleado
     const updateMutation = useMutation({
         mutationFn: async ({ id, data: empleadoData }: { id: number; data: EmpleadoUpdate }) => {
-            const response = await axios.put<EmpleadoOperationResult>(`${EMPLEADOS_URL}/${id}`, empleadoData);
+            const response = await api.put<EmpleadoOperationResult>(`${EMPLEADOS_URL}/${id}`, empleadoData);
             return response.data;
         },
         onSuccess: () => {
@@ -64,7 +64,7 @@ export const useEmpleados = (
     // 4. Desactivar Empleado (Soft delete - asigna fecha_cese automáticamente)
     const deleteMutation = useMutation({
         mutationFn: async (id: number) => {
-            const { data } = await axios.delete<EmpleadoOperationResult>(`${EMPLEADOS_URL}/${id}`);
+            const { data } = await api.delete<EmpleadoOperationResult>(`${EMPLEADOS_URL}/${id}`);
             return data;
         },
         onSuccess: () => {
@@ -76,7 +76,7 @@ export const useEmpleados = (
     // 5. Reactivar Empleado (limpia fecha_cese)
     const reactivateMutation = useMutation({
         mutationFn: async (id: number) => {
-            const { data } = await axios.patch<EmpleadoOperationResult>(`${EMPLEADOS_URL}/${id}/reactivar`);
+            const { data } = await api.patch<EmpleadoOperationResult>(`${EMPLEADOS_URL}/${id}/reactivar`);
             return data;
         },
         onSuccess: () => {
@@ -109,9 +109,23 @@ export const useEmpleadosParaSelect = () => {
     return useQuery({
         queryKey: ['empleados-select'],
         queryFn: async () => {
-            const { data } = await axios.get<EmpleadoOption[]>(`${EMPLEADOS_URL}/dropdown`);
+            const { data } = await api.get<EmpleadoOption[]>(`${EMPLEADOS_URL}/dropdown`);
             return data;
         },
         staleTime: 1000 * 60 * 5, // 5 minutos de caché
+    });
+};
+
+// ============================================
+// HOOK PARA CUMPLEAÑOS
+// ============================================
+export const useCumpleanos = () => {
+    return useQuery({
+        queryKey: ['empleados-cumpleanos'],
+        queryFn: async () => {
+            const { data } = await api.get<EmpleadoCumpleanos[]>('/empleados/cumpleanos');
+            return data;
+        },
+        staleTime: 1000 * 60 * 60 * 24, // 24 horas de caché
     });
 };

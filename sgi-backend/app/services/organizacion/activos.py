@@ -11,7 +11,7 @@ from app.schemas.organizacion.activos import (
     DevolucionActivoRequest
 )
 from app.services.validators import CommonValidators
-from app.models.administrativo import Activo, EmpleadoActivo, Empleado, EstadoActivo, ActivoHistorial
+from app.models.administrativo import Activo, EmpleadoActivo, Empleado, EstadoActivo, ActivoHistorial, LineaCorporativa
 from datetime import datetime
 
 
@@ -104,6 +104,8 @@ class ActivoService:
         busqueda: str = None, 
         estado_id: int = None, 
         is_disponible: bool = None, 
+        empleado_id: int = None,
+        sin_linea: bool = None,
         page: int = 1, 
         page_size: int = 15
     ) -> dict:
@@ -112,6 +114,7 @@ class ActivoService:
         stmt = select(Activo).options(selectinload(Activo.estado)).where(Activo.is_active == True)
         
         if busqueda:
+            busqueda = busqueda.strip()
             stmt = stmt.where(or_(
                 Activo.producto.ilike(f"%{busqueda}%"),
                 Activo.marca.ilike(f"%{busqueda}%"),
@@ -125,6 +128,21 @@ class ActivoService:
             
         if is_disponible is not None:
             stmt = stmt.where(Activo.is_disponible == is_disponible)
+        
+        if sin_linea is True:
+            # Subquery to find assets with active lines
+            subquery = select(LineaCorporativa.activo_id).where(
+                LineaCorporativa.is_active == True,
+                LineaCorporativa.activo_id.isnot(None)
+            )
+            stmt = stmt.where(Activo.id.notin_(subquery))
+        
+        # Filter by assigned employee
+        if empleado_id is not None:
+            stmt = stmt.join(
+                EmpleadoActivo, 
+                (EmpleadoActivo.activo_id == Activo.id) & (EmpleadoActivo.fecha_devolucion.is_(None))
+            ).where(EmpleadoActivo.empleado_id == empleado_id)
             
         # Total count
         count_stmt = select(func.count()).select_from(stmt.subquery())
@@ -155,6 +173,7 @@ class ActivoService:
                 "codigo_inventario": a.codigo_inventario,
                 "estado_id": a.estado_id,
                 "estado_nombre": a.estado.nombre if a.estado else None,
+                "estado_color": a.estado.color if a.estado else None,
                 "is_disponible": a.is_disponible,
                 "is_active": a.is_active,
                 "observaciones": a.observaciones,
@@ -162,7 +181,10 @@ class ActivoService:
                 "updated_at": a.updated_at,
                 "empleado_asignado_id": asign.empleado_id if asign else None,
                 "empleado_asignado_nombre": f"{asign.empleado.nombres} {asign.empleado.apellido_paterno}" if asign and asign.empleado else None,
-                "fecha_asignacion": asign.fecha_entrega if asign else None
+                "empleado_asignado_dni": asign.empleado.nro_documento if asign and asign.empleado else None,
+                "fecha_asignacion": asign.fecha_entrega if asign else None,
+                "tiene_carta": asign.tiene_carta if asign else None,
+                "fecha_carta": asign.fecha_carta if asign else None
             })
             
         return {
@@ -197,6 +219,7 @@ class ActivoService:
             "codigo_inventario": activo.codigo_inventario,
             "estado_id": activo.estado_id,
             "estado_nombre": activo.estado.nombre if activo.estado else None,
+            "estado_color": activo.estado.color if activo.estado else None,
             "is_disponible": activo.is_disponible,
             "is_active": activo.is_active,
             "observaciones": activo.observaciones,
@@ -204,7 +227,10 @@ class ActivoService:
             "updated_at": activo.updated_at,
             "empleado_asignado_id": asign.empleado_id if asign else None,
             "empleado_asignado_nombre": f"{asign.empleado.nombres} {asign.empleado.apellido_paterno}" if asign and asign.empleado else None,
-            "fecha_asignacion": asign.fecha_entrega if asign else None
+            "empleado_asignado_dni": asign.empleado.nro_documento if asign and asign.empleado else None,
+            "fecha_asignacion": asign.fecha_entrega if asign else None,
+            "tiene_carta": asign.tiene_carta if asign else None,
+            "fecha_carta": asign.fecha_carta if asign else None
         }
 
     async def get_historial(self, activo_id: int) -> list:
@@ -266,10 +292,10 @@ class ActivoService:
         
         nuevo_activo = Activo(
             producto=activo.producto.strip(),
-            marca=activo.marca,
-            modelo=activo.modelo,
-            serie=activo.serie,
-            codigo_inventario=activo.codigo_inventario,
+            marca=activo.marca.strip() if activo.marca else None,
+            modelo=activo.modelo.strip() if activo.modelo else None,
+            serie=activo.serie.strip() if activo.serie else None,
+            codigo_inventario=activo.codigo_inventario.strip() if activo.codigo_inventario else None,
             estado_id=estado_id,
             is_disponible=True,
             is_active=True,
@@ -303,10 +329,10 @@ class ActivoService:
              raise HTTPException(400, f'Ya existe otro activo con el código de inventario "{activo.codigo_inventario}".')
              
         if activo.producto is not None: activo_db.producto = activo.producto.strip()
-        if activo.marca is not None: activo_db.marca = activo.marca
-        if activo.modelo is not None: activo_db.modelo = activo.modelo
-        if activo.serie is not None: activo_db.serie = activo.serie
-        if activo.codigo_inventario is not None: activo_db.codigo_inventario = activo.codigo_inventario
+        if activo.marca is not None: activo_db.marca = activo.marca.strip() if activo.marca else None
+        if activo.modelo is not None: activo_db.modelo = activo.modelo.strip() if activo.modelo else None
+        if activo.serie is not None: activo_db.serie = activo.serie.strip() if activo.serie else None
+        if activo.codigo_inventario is not None: activo_db.codigo_inventario = activo.codigo_inventario.strip() if activo.codigo_inventario else None
         if activo.observaciones is not None: activo_db.observaciones = activo.observaciones
         
         await self.db.commit()
@@ -433,8 +459,8 @@ class ActivoService:
         stmt_emp = select(func.count()).select_from(Empleado).where(Empleado.id == asignacion.empleado_id)
         if (await self.db.execute(stmt_emp)).scalar() == 0: raise HTTPException(404, "Empleado no encontrado")
         
-        # Validar estado_entrega_id si se proporciona
-        estado_entrega_id = asignacion.estado_entrega_id
+        # Usar estado actual del activo si no se especifica estado_entrega_id
+        estado_entrega_id = asignacion.estado_entrega_id or activo_db.estado_id
         if estado_entrega_id:
             stmt_estado = select(func.count()).select_from(EstadoActivo).where(EstadoActivo.id == estado_entrega_id)
             if (await self.db.execute(stmt_estado)).scalar() == 0:
@@ -446,7 +472,7 @@ class ActivoService:
             observaciones=asignacion.observaciones,
             asignado_por=usuario_id,
             fecha_entrega=func.now(),
-            estado_entrega_id=estado_entrega_id
+            estado_entrega_id=estado_entrega_id  # Usa estado actual del activo si no se especifica
         )
         self.db.add(nueva_asignacion)
         
@@ -454,6 +480,16 @@ class ActivoService:
         activo_db.updated_at = func.now()
         
         await self.db.flush()  # get id
+
+        # Actualizar línea asociada si existe (Sincronización automática)
+        stmt_linea = select(LineaCorporativa).where(
+            LineaCorporativa.activo_id == activo_id,
+            LineaCorporativa.is_active == True
+        )
+        linea = (await self.db.execute(stmt_linea)).scalars().first()
+        if linea:
+            linea.empleado_id = asignacion.empleado_id
+            linea.fecha_asignacion = func.now()
         
         # Obtener estado para historial
         estado_asignado = await self._get_estado_by_nombre("ASIGNADO")
@@ -512,9 +548,159 @@ class ActivoService:
             asignacion.id, 
             usuario_id
         )
+
+        # Actualizar línea asociada si existe (Sincronización automática)
+        stmt_linea = select(LineaCorporativa).where(
+            LineaCorporativa.activo_id == activo_id,
+            LineaCorporativa.is_active == True
+        )
+        linea = (await self.db.execute(stmt_linea)).scalars().first()
+        if linea:
+            linea.empleado_id = None
+            linea.fecha_asignacion = None
+
         await self.db.commit()
         
         return {"success": True, "message": "Devolución registrada correctamente"}
+
+    async def registrar_carta(
+        self,
+        asignacion_id: int,
+        fecha_carta: datetime = None,
+        archivo_carta: str = None
+    ) -> dict:
+        """Registra carta de responsabilidad para una asignación de activo"""
+        stmt = select(EmpleadoActivo).where(EmpleadoActivo.id == asignacion_id)
+        asignacion = (await self.db.execute(stmt)).scalars().first()
+        
+        if not asignacion:
+            raise HTTPException(404, "Asignación no encontrada")
+        
+        asignacion.tiene_carta = True
+        asignacion.fecha_carta = fecha_carta or datetime.now()
+        if archivo_carta:
+            asignacion.archivo_carta = archivo_carta
+        
+        await self.db.commit()
+        
+        return {"success": True, "message": "Carta de responsabilidad registrada correctamente"}
+
+    async def get_distinct_productos(self) -> list:
+        """Obtiene lista de productos distintos actuales"""
+        stmt = select(Activo.producto).distinct().where(Activo.is_active == True).order_by(Activo.producto)
+        result = await self.db.execute(stmt)
+        return result.scalars().all()
+
+    async def exportar_excel(self, productos: list[str] = None, con_linea: bool = None) -> bytes:
+        """Genera reporte Excel de activos con filtros opcionales"""
+        import openpyxl
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        from io import BytesIO
+        from app.models.administrativo import Cargo, Area
+
+        # Query base
+        stmt = select(Activo).options(selectinload(Activo.estado)).where(Activo.is_active == True)
+        
+        # Filtros
+        if productos:
+            stmt = stmt.where(Activo.producto.in_(productos))
+            
+        if con_linea is True:
+            # Subquery to find assets with active lines
+            subquery = select(LineaCorporativa.activo_id).where(
+                LineaCorporativa.is_active == True,
+                LineaCorporativa.activo_id.isnot(None)
+            )
+            stmt = stmt.where(Activo.id.in_(subquery))
+        
+        result = await self.db.execute(stmt)
+        activos = result.scalars().all()
+
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Inventario de Activos"
+
+        # Estilos
+        header_font = Font(bold=True, color="FFFFFF")
+        header_fill = PatternFill(start_color="4F46E5", end_color="4F46E5", fill_type="solid")
+        center_align = Alignment(horizontal="center", vertical="center")
+        border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+
+        headers = [
+            "Nro. Telefono", "Empresa", "Empleado", "Area", "Cargo", 
+            "Marca", "Modelo", "Estado", "IMEI/Serie", "Correo Configurado", 
+            "Producto", "Código Inventario"
+        ]
+
+        # Escribir cabeceras
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_num)
+            cell.value = header
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = center_align
+            cell.border = border
+
+        # Escribir datos
+        for row_num, activo in enumerate(activos, 2):
+            # Obtener asignación actual
+            stmt_asign = select(EmpleadoActivo).options(
+                selectinload(EmpleadoActivo.empleado).selectinload(Empleado.cargo).selectinload(Cargo.area)
+            ).where(
+                EmpleadoActivo.activo_id == activo.id,
+                EmpleadoActivo.fecha_devolucion.is_(None)
+            )
+            asign = (await self.db.execute(stmt_asign)).scalars().first()
+            
+            # Obtener línea asociada (si existe un celular activo_id = activo.id)
+            stmt_linea = select(LineaCorporativa).where(
+                LineaCorporativa.activo_id == activo.id,
+                LineaCorporativa.is_active == True
+            )
+            linea = (await self.db.execute(stmt_linea)).scalars().first()
+
+            # Datos
+            telefono = linea.numero if linea else ""
+            empresa = linea.proveedor if linea else ""
+            correo = linea.gmail if linea else ""
+            
+            empleado_nom = f"{asign.empleado.nombres} {asign.empleado.apellido_paterno}" if asign and asign.empleado else "Disponible"
+            area = asign.empleado.cargo.area.nombre if asign and asign.empleado and asign.empleado.cargo and asign.empleado.cargo.area else ""
+            cargo = asign.empleado.cargo.nombre if asign and asign.empleado and asign.empleado.cargo else ""
+            
+            estado = activo.estado.nombre if activo.estado else ""
+            imei = activo.serie or ""
+            
+            row = [
+                telefono, empresa, empleado_nom, area, cargo,
+                activo.marca or "", activo.modelo or "", estado, imei, correo,
+                activo.producto, activo.codigo_inventario or ""
+            ]
+            
+            for col_num, value in enumerate(row, 1):
+                cell = ws.cell(row=row_num, column=col_num)
+                cell.value = value
+                cell.border = border
+                if value == "Disponible" and col_num == 3: # Columna Empleado
+                     cell.font = Font(color="008000") # Green
+
+        # Ajustar ancho de columnas
+        for col in ws.columns:
+            max_length = 0
+            column = col[0].column_letter # Get the column name
+            for cell in col:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(cell.value)
+                except:
+                    pass
+            adjusted_width = (max_length + 2)
+            ws.column_dimensions[column].width = adjusted_width
+
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return output.read()
 
     async def get_activos_empleado(self, empleado_id: int) -> list:
         stmt = select(Activo, EmpleadoActivo).options(
@@ -540,3 +726,26 @@ class ActivoService:
                 "asignacion_id": asig.id
             })
         return data
+
+    async def registrar_carta(
+        self,
+        asignacion_id: int,
+        fecha_carta: datetime = None,
+        archivo_carta: str = None
+    ) -> dict:
+        """Registra carta de responsabilidad para una asignación de activo"""
+        stmt = select(EmpleadoActivo).where(EmpleadoActivo.id == asignacion_id)
+        asignacion = (await self.db.execute(stmt)).scalars().first()
+        
+        if not asignacion:
+            raise HTTPException(404, "Asignación no encontrada")
+        
+        asignacion.tiene_carta = True
+        asignacion.fecha_carta = fecha_carta or datetime.now()
+        if archivo_carta:
+            asignacion.archivo_carta = archivo_carta
+        
+        await self.db.commit()
+        
+        return {"success": True, "message": "Carta de responsabilidad registrada correctamente"}
+

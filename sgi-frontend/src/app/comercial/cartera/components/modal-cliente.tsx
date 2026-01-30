@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Save, Building2, Loader2, AlertCircle } from 'lucide-react';
-import { toast } from 'sonner';
-import { useClientes } from '@/hooks/useClientes';
-import { Cliente, ClienteCreate, ClienteUpdate } from '@/types/cliente';
+import React, { useMemo } from 'react';
+import { Save, Building2, Loader2, AlertCircle, Users } from 'lucide-react';
+import { Cliente } from '@/types/cliente';
 import { ModalBase, ModalHeader, ModalFooter, useModalContext } from '@/components/ui/modal';
 import { useClienteForm } from '@/hooks/comercial/useClienteForm';
+import { useAreas } from '@/hooks/organizacion/useAreas';
+import { useComerciales } from '@/hooks/organizacion/useComerciales';
 
 // ============================================
 // TIPOS
@@ -16,26 +16,20 @@ interface ModalProps {
     onClose: () => void;
     clienteToEdit?: Cliente | null;
     onClienteCreado?: (ruc: string, razonSocial: string) => void;
+    showAdminFields?: boolean;
 }
 
 interface ModalContentProps {
     clienteToEdit: Cliente | null;
     isOpen: boolean;
     onClienteCreado?: (ruc: string, razonSocial: string) => void;
-}
-
-interface FormErrors {
-    razon_social?: string;
-    ruc?: string;
-    ultimo_contacto?: string;
-    proxima_fecha_contacto?: string;
-    comentario?: string;
+    showAdminFields?: boolean;
 }
 
 // ============================================
 // COMPONENTE INTERNO
 // ============================================
-function ModalContent({ clienteToEdit, isOpen, onClienteCreado }: ModalContentProps) {
+function ModalContent({ clienteToEdit, isOpen, onClienteCreado, showAdminFields }: ModalContentProps) {
     const { handleClose } = useModalContext();
     const {
         formState,
@@ -51,6 +45,10 @@ function ModalContent({ clienteToEdit, isOpen, onClienteCreado }: ModalContentPr
         onClose: handleClose
     });
 
+    // Hooks para admin fields
+    const { data: areas = [], isLoading: loadingAreas } = useAreas();
+    const { data: comerciales = [], isLoading: loadingComerciales } = useComerciales();
+
     const config = useMemo(() => ({
         title: isEditMode ? 'Editar Cliente' : 'Nuevo Cliente',
         icon: <Building2 size={20} className="text-indigo-600" />,
@@ -63,6 +61,51 @@ function ModalContent({ clienteToEdit, isOpen, onClienteCreado }: ModalContentPr
             <ModalHeader icon={config.icon} title={config.title} />
 
             <form onSubmit={handleSubmit} className="p-5 space-y-4 overflow-y-auto flex-1 max-h-[60vh]">
+
+                {/* Si es admin/jefe: Asignación de Área y Comercial */}
+                {showAdminFields && (
+                    <div className="grid grid-cols-2 gap-4 p-4 bg-indigo-50/50 rounded-xl border border-indigo-100">
+                        <div className="col-span-2">
+                            <h3 className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <Users size={14} /> Asignación Administrativa
+                            </h3>
+                        </div>
+
+                        {/* Área Encargada */}
+                        <div className="space-y-1.5">
+                            <label htmlFor="area" className="text-xs font-bold text-gray-500 uppercase tracking-wider">Área Encargada</label>
+                            <select
+                                id="area"
+                                value={formState.areaEncargadaId || ''}
+                                onChange={(e) => formState.setAreaEncargadaId(e.target.value ? Number(e.target.value) : null)}
+                                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 outline-none bg-white text-sm cursor-pointer focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50"
+                                disabled={isLoading || loadingAreas}
+                            >
+                                <option value="">Sin asignar</option>
+                                {areas.map(area => (
+                                    <option key={area.id} value={area.id}>{area.nombre}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Comercial Asignado */}
+                        <div className="space-y-1.5">
+                            <label htmlFor="comercial" className="text-xs font-bold text-gray-500 uppercase tracking-wider">Comercial Asignado</label>
+                            <select
+                                id="comercial"
+                                value={formState.comercialEncargadoId || ''}
+                                onChange={(e) => formState.setComercialEncargadoId(e.target.value ? Number(e.target.value) : null)}
+                                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 outline-none bg-white text-sm cursor-pointer focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50"
+                                disabled={isLoading || loadingComerciales}
+                            >
+                                <option value="">Sin asignar</option>
+                                {comerciales.map(c => (
+                                    <option key={c.id} value={c.id}>{c.nombre}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                )}
 
                 {/* Error banner */}
                 {hasErrors && touched.size > 0 && (
@@ -272,10 +315,15 @@ function ModalContent({ clienteToEdit, isOpen, onClienteCreado }: ModalContentPr
 // ============================================
 // COMPONENTE PRINCIPAL
 // ============================================
-export default function ModalCliente({ isOpen, onClose, clienteToEdit = null, onClienteCreado }: ModalProps) {
+export default function ModalCliente({ isOpen, onClose, clienteToEdit = null, onClienteCreado, showAdminFields = false }: ModalProps) {
     return (
         <ModalBase isOpen={isOpen} onClose={onClose}>
-            <ModalContent clienteToEdit={clienteToEdit} isOpen={isOpen} onClienteCreado={onClienteCreado} />
+            <ModalContent
+                clienteToEdit={clienteToEdit}
+                isOpen={isOpen}
+                onClienteCreado={onClienteCreado}
+                showAdminFields={showAdminFields}
+            />
         </ModalBase>
     );
 }

@@ -2,9 +2,9 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from app.database.db_connection import get_db
-from app.core.security import get_current_user_id
+from app.core.security import get_current_user_id, get_current_active_auth
 from app.services.contactos_service import ContactosService
-from app.schemas.contactos import ContactoResponse, ContactoCreate, ContactoUpdate
+from app.schemas.comercial.contactos import ContactoResponse, ContactoCreate, ContactoUpdate
 
 router = APIRouter(
     prefix="/contactos",
@@ -15,7 +15,8 @@ router = APIRouter(
 @router.post("/upload")
 async def upload_contactos(
     file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Carga masiva de contactos desde Excel."""
     if not file.filename.endswith(('.xls', '.xlsx')):
@@ -28,7 +29,8 @@ async def upload_contactos(
 @router.get("/ruc/{ruc}", response_model=List[ContactoResponse])
 async def get_contactos(
     ruc: str,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Obtiene contactos por RUC."""
     service = ContactosService(db)
@@ -38,7 +40,8 @@ async def get_contactos(
 @router.post("/", response_model=bool)
 async def create_contacto(
     contacto: ContactoCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Crea un nuevo contacto."""
     service = ContactosService(db)
@@ -49,7 +52,8 @@ async def create_contacto(
 async def update_contacto(
     id: int,
     contacto: ContactoUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Actualiza un contacto existente."""
     service = ContactosService(db)
@@ -59,7 +63,8 @@ async def update_contacto(
 @router.delete("/{id}", response_model=bool)
 async def delete_contacto(
     id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Desactiva un contacto (soft delete)."""
     service = ContactosService(db)
@@ -72,7 +77,8 @@ async def get_contactos_paginados(
     page_size: int = Query(20, ge=1, le=100),
     search: str = Query(None),
     estado: str = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Lista contactos paginados con razon_social, caso, estado y estadísticas de disponibles."""
     service = ContactosService(db)
@@ -80,10 +86,25 @@ async def get_contactos_paginados(
 
 
 @router.get("/stats")
-async def get_estadisticas(db: AsyncSession = Depends(get_db)):
+async def get_estadisticas(
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
+):
     """Retorna estadísticas de contactos: total, disponibles, asignados, en_gestion."""
     service = ContactosService(db)
     return await service.get_estadisticas()
+
+
+@router.get("/kpis-gestion")
+async def get_kpis_gestion(
+    fecha_inicio: str = Query(None, description="Fecha inicio YYYY-MM-DD"),
+    fecha_fin: str = Query(None, description="Fecha fin YYYY-MM-DD"),
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
+):
+    """Retorna KPIs de gestión para dashboard (Total Repartido, Contactabilidad, Positivos)."""
+    service = ContactosService(db)
+    return await service.get_kpis_gestion(fecha_inicio, fecha_fin)
 
 
 @router.post("/assign-batch")
@@ -146,7 +167,10 @@ async def enviar_feedback_lote(
 
 
 @router.get("/filtros-base")
-async def get_filtros_base(db: AsyncSession = Depends(get_db)):
+async def get_filtros_base(
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
+):
     """Obtiene los países y partidas arancelarias disponibles para filtrar."""
     service = ContactosService(db)
     return await service.get_filtros_base()

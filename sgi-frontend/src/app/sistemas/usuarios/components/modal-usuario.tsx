@@ -37,7 +37,7 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
     const isEditMode = !!usuarioToEdit;
 
     // Hooks
-    const { createMutation, updateMutation } = useUsuarios();
+    const { createMutation, updateMutation, changePasswordMutation } = useUsuarios();
     const { data: roles = [], isLoading: loadingRoles } = useRoles();
     const { data: empleadosDisponibles = [], isLoading: loadingEmpleados } = useEmpleadosSinUsuario();
 
@@ -49,13 +49,14 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
     const [selectedRoles, setSelectedRoles] = useState<number[]>([]);
     const [debeCambiarPass, setDebeCambiarPass] = useState(false);
     const [isBloqueado, setIsBloqueado] = useState(false);
+    const [isChangePasswordMode, setIsChangePasswordMode] = useState(false);
 
     // Validation state
     const [errors, setErrors] = useState<FormErrors>({});
     const [touched, setTouched] = useState<Set<string>>(new Set());
 
     // Derivados
-    const isLoading = createMutation.isPending || updateMutation.isPending;
+    const isLoading = createMutation.isPending || updateMutation.isPending || changePasswordMutation.isPending;
     const config = useMemo(() => ({
         title: isEditMode ? 'Editar Usuario' : 'Nuevo Usuario',
         icon: <User size={20} className="text-indigo-600" />,
@@ -70,7 +71,7 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
             setCorreo(usuarioToEdit.correo_corp || '');
             setDebeCambiarPass(usuarioToEdit.debe_cambiar_pass || false);
             setIsBloqueado(usuarioToEdit.is_bloqueado || false);
-            setSelectedRoles([]);
+            setSelectedRoles([]); // Roles logic remains distinct as before
         } else {
             setEmpleadoId('');
             setCorreo('');
@@ -79,6 +80,7 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
             setDebeCambiarPass(false);
             setIsBloqueado(false);
         }
+        setIsChangePasswordMode(false);
         setErrors({});
         setTouched(new Set());
         setShowPassword(false);
@@ -95,8 +97,8 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
                 if (typeof value === 'string' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return 'Ingresa un correo válido';
                 break;
             case 'password':
-                if (!isEditMode && (!value || (typeof value === 'string' && !value.trim()))) return 'La contraseña es requerida';
-                if (!isEditMode && typeof value === 'string' && value.length < 6) return 'Mínimo 6 caracteres';
+                if ((!isEditMode || isChangePasswordMode) && (!value || (typeof value === 'string' && !value.trim()))) return 'La contraseña es requerida';
+                if ((!isEditMode || isChangePasswordMode) && typeof value === 'string' && value.length < 6) return 'Mínimo 6 caracteres';
                 break;
             case 'roles':
                 if (!Array.isArray(value) || value.length === 0) return 'Selecciona al menos un rol';
@@ -117,7 +119,7 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
         const correoError = validateField('correo', correo);
         if (correoError) newErrors.correo = correoError;
 
-        if (!isEditMode) {
+        if (!isEditMode || isChangePasswordMode) {
             const passwordError = validateField('password', password);
             if (passwordError) newErrors.password = passwordError;
         }
@@ -127,7 +129,7 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
-    }, [isEditMode, empleadoId, correo, password, selectedRoles]);
+    }, [isEditMode, empleadoId, correo, password, selectedRoles, isChangePasswordMode]);
 
     // Handle blur for validation
     const handleBlur = (field: string, value: unknown) => {
@@ -182,6 +184,11 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
                     roles: selectedRoles,
                 };
                 await updateMutation.mutateAsync({ id: usuarioToEdit.id, data: updateData });
+
+                // Cambiar contraseña si se solicitó
+                if (isChangePasswordMode && password) {
+                    await changePasswordMutation.mutateAsync({ id: usuarioToEdit.id, password: password });
+                }
             } else {
                 const createData: UsuarioCreate = {
                     empleado_id: empleadoId as number,
@@ -194,9 +201,12 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
             toast.success(config.successMessage);
             handleClose();
         } catch (error: unknown) {
-            toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Ocurrió un error');
+            const errMsg = (error as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+                || (error as { message?: string })?.message
+                || 'Ocurrió un error';
+            toast.error(errMsg);
         }
-    }, [validateForm, isEditMode, usuarioToEdit, correo, debeCambiarPass, isBloqueado, selectedRoles, empleadoId, password, updateMutation, createMutation, config.successMessage, handleClose]);
+    }, [validateForm, isEditMode, usuarioToEdit, correo, debeCambiarPass, isBloqueado, selectedRoles, empleadoId, password, updateMutation, createMutation, changePasswordMutation, isChangePasswordMode, config.successMessage, handleClose]);
 
     const hasErrors = Object.keys(errors).length > 0;
 
@@ -241,9 +251,9 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
                             }
                         }}
                         options={empleadosDisponibles.map(emp => ({
-                            value: emp.id,
+                            id: emp.id,
                             label: emp.nombre_completo,
-                            description: emp.cargo_nombre || 'Sin cargo'
+                            subLabel: emp.cargo_nombre || 'Sin cargo'
                         }))}
                         placeholder="Buscar empleado..."
                         searchPlaceholder="Buscar por nombre..."
@@ -289,8 +299,8 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
                     )}
                 </div>
 
-                {/* Contraseña (solo crear) */}
-                {!isEditMode && (
+                {/* Contraseña */}
+                {(!isEditMode || isChangePasswordMode) && (
                     <div className="space-y-1.5">
                         <label htmlFor="password" className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                             Contraseña <span className="text-red-500">*</span>
@@ -395,6 +405,31 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
                                 className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
                             />
                             <span className="text-sm text-gray-700">Usuario bloqueado</span>
+                        </label>
+                    </div>
+                )}
+
+                {/* Checkbox Cambiar Contraseña (solo editar) */}
+                {isEditMode && (
+                    <div className="pt-2">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                                type="checkbox"
+                                checked={isChangePasswordMode}
+                                onChange={(e) => {
+                                    setIsChangePasswordMode(e.target.checked);
+                                    if (!e.target.checked) {
+                                        setPassword('');
+                                        setErrors(prev => {
+                                            const newErrors = { ...prev };
+                                            delete newErrors.password;
+                                            return newErrors;
+                                        })
+                                    }
+                                }}
+                                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                            />
+                            <span className="text-sm font-medium text-indigo-600">Cambiar contraseña</span>
                         </label>
                     </div>
                 )}

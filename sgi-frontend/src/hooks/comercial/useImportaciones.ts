@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
-import { importacionesService } from '../services/importaciones';
-import { Importacion } from '../types/importaciones';
-import { useDebounce } from './useDebounce';
+import { importacionesService } from '../../services/comercial/importaciones';
+import { Importacion } from '../../types/importaciones';
+import { useDebounce } from '../useDebounce';
 
 export const useImportaciones = () => {
     const [data, setData] = useState<Importacion[]>([]);

@@ -1,9 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import axios from 'axios';
+import api from '@/lib/axios';
 import { Cargo, CargoPaginationResponse, CargoOperationResult, CargoOption } from '@/types/organizacion/cargo';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-const CARGOS_URL = `${API_BASE_URL}/cargos`;
+const CARGOS_URL = '/cargos';
 
 // ============================================
 // HOOK PRINCIPAL DE CARGOS
@@ -19,7 +18,7 @@ export const useCargos = (busqueda = '', areaId: number | null = null, page = 1,
             if (busqueda) params.busqueda = busqueda;
             if (areaId) params.area_id = areaId;
 
-            const { data } = await axios.get<CargoPaginationResponse>(`${CARGOS_URL}/`, { params });
+            const { data } = await api.get<CargoPaginationResponse>(`${CARGOS_URL}/`, { params });
             return data;
         },
     });
@@ -27,7 +26,7 @@ export const useCargos = (busqueda = '', areaId: number | null = null, page = 1,
     // 2. Crear Cargo
     const createMutation = useMutation({
         mutationFn: async (newCargo: Partial<Cargo>) => {
-            const { data } = await axios.post<CargoOperationResult>(`${CARGOS_URL}/`, newCargo);
+            const { data } = await api.post<CargoOperationResult>(`${CARGOS_URL}/`, newCargo);
             return data;
         },
         onSuccess: () => {
@@ -39,7 +38,7 @@ export const useCargos = (busqueda = '', areaId: number | null = null, page = 1,
     // 3. Actualizar Cargo
     const updateMutation = useMutation({
         mutationFn: async ({ id, data: cargoData }: { id: number; data: Partial<Cargo> }) => {
-            const response = await axios.put<CargoOperationResult>(`${CARGOS_URL}/${id}`, cargoData);
+            const response = await api.put<CargoOperationResult>(`${CARGOS_URL}/${id}`, cargoData);
             return response.data;
         },
         onSuccess: () => {
@@ -51,7 +50,7 @@ export const useCargos = (busqueda = '', areaId: number | null = null, page = 1,
     // 4. Desactivar Cargo (Borrado lógico)
     const deleteMutation = useMutation({
         mutationFn: async (id: number) => {
-            const { data } = await axios.delete<CargoOperationResult>(`${CARGOS_URL}/${id}`);
+            const { data } = await api.delete<CargoOperationResult>(`${CARGOS_URL}/${id}`);
             return data;
         },
         onSuccess: () => {
@@ -84,7 +83,7 @@ export const useCargosByArea = (areaId: number | null) => {
         queryKey: ['cargos', 'by-area', areaId],
         queryFn: async () => {
             if (!areaId) return [];
-            const { data } = await axios.get<Cargo[]>(`${CARGOS_URL}/by-area/${areaId}`);
+            const { data } = await api.get<Cargo[]>(`${CARGOS_URL}/by-area/${areaId}`);
             return data;
         },
         enabled: !!areaId,
@@ -99,7 +98,7 @@ export const useCargosParaSelect = () => {
     return useQuery({
         queryKey: ['cargos-select'],
         queryFn: async () => {
-            const { data } = await axios.get<CargoOption[]>(`${CARGOS_URL}/dropdown`);
+            const { data } = await api.get<CargoOption[]>(`${CARGOS_URL}/dropdown`);
             return data;
         },
         staleTime: 0, // Siempre refetch para obtener datos actualizados

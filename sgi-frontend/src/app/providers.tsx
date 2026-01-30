@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import ErrorBoundary from '@/components/common/ErrorBoundary';
 
+import { Toaster } from 'sonner';
+
 export default function Providers({ children }: { children: React.ReactNode }) {
   // QueryClient optimizado con configuración de caché y reintentos
   const [queryClient] = useState(() => new QueryClient({
@@ -19,6 +21,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
   return (
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
+        <Toaster richColors position="top-center" />
         {children}
       </QueryClientProvider>
     </ErrorBoundary>

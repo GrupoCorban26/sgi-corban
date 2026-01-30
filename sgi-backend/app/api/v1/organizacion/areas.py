@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
 from app.database.db_connection import get_db
+from app.core.security import get_current_active_auth
 from app.services.organizacion.areas import AreaService
 from app.schemas.organizacion.areas import (
     AreaCreate, 
@@ -21,7 +22,8 @@ async def listar_areas(
     departamento_id: Optional[int] = Query(None, description="Filtrar por departamento"),
     page: int = Query(1, ge=1), 
     page_size: int = Query(15, ge=1, le=100), 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Lista todas las áreas con paginación y filtros"""
     service = AreaService(db)
@@ -30,7 +32,8 @@ async def listar_areas(
 
 @router.get("/dropdown", response_model=List[dict])
 async def get_areas_dropdown(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Obtiene lista simple de áreas para dropdown"""
     service = AreaService(db)
@@ -40,7 +43,8 @@ async def get_areas_dropdown(
 @router.get("/dropdown/by-departamento/{departamento_id}", response_model=List[dict])
 async def get_areas_dropdown_by_departamento(
     departamento_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Obtiene áreas filtradas por departamento para dropdown"""
     service = AreaService(db)
@@ -50,7 +54,8 @@ async def get_areas_dropdown_by_departamento(
 @router.get("/by-departamento/{depto_id}", response_model=List[dict])
 async def listar_areas_por_departamento(
     depto_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Obtiene todas las áreas de un departamento específico"""
     service = AreaService(db)
@@ -60,7 +65,8 @@ async def listar_areas_por_departamento(
 @router.get("/{area_id}", response_model=dict)
 async def obtener_area(
     area_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Obtiene un área por su ID"""
     service = AreaService(db)
@@ -73,7 +79,8 @@ async def obtener_area(
 @router.post("/", response_model=OperationResult, status_code=status.HTTP_201_CREATED)
 async def crear_area(
     area: AreaCreate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Crea una nueva área. Validaciones en Python."""
     service = AreaService(db)
@@ -84,7 +91,8 @@ async def crear_area(
 async def actualizar_area(
     area_id: int,
     area: AreaUpdate,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Actualiza un área existente. Validaciones en Python."""
     service = AreaService(db)
@@ -94,7 +102,8 @@ async def actualizar_area(
 @router.delete("/{area_id}", response_model=OperationResult)
 async def desactivar_area(
     area_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Desactiva un área (soft delete). Valida que no tenga sub-áreas o empleados activos."""
     service = AreaService(db)
@@ -104,7 +113,8 @@ async def desactivar_area(
 @router.post("/{area_id}/reactivar", response_model=OperationResult)
 async def reactivar_area(
     area_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Reactiva un área previamente desactivada"""
     service = AreaService(db)

@@ -17,7 +17,7 @@ import {
   Filter
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useClientes, useClientesStats } from '@/hooks/useClientes';
+import { useClientes, useClientesStats } from '@/hooks/comercial/useClientes';
 import { Cliente } from '@/types/cliente';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import ModalCliente from './components/modal-cliente';
@@ -27,6 +27,20 @@ const ESTADO_COLORS = {
   'PROSPECTO': 'bg-yellow-100 text-yellow-700',
   'CLIENTE': 'bg-green-100 text-green-700',
   'INACTIVO': 'bg-gray-100 text-gray-500',
+};
+
+// Helper para formatear fechas evitando problemas de zona horaria
+const formatDate = (dateStr: string | null) => {
+  if (!dateStr) return '-';
+  if (dateStr.length === 10) {
+    const [year, month, day] = dateStr.split('-');
+    return `${day}/${month}/${year}`;
+  }
+  return new Date(dateStr).toLocaleDateString('es-PE', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
 };
 
 export default function CarteraPage() {
@@ -230,16 +244,12 @@ export default function CarteraPage() {
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-gray-600">
-                        {cliente.ultimo_contacto
-                          ? new Date(cliente.ultimo_contacto).toLocaleDateString('es-PE')
-                          : '-'}
+                        {formatDate(cliente.ultimo_contacto)}
                       </span>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-gray-600">
-                        {cliente.proxima_fecha_contacto
-                          ? new Date(cliente.proxima_fecha_contacto).toLocaleDateString('es-PE')
-                          : '-'}
+                        {formatDate(cliente.proxima_fecha_contacto)}
                       </span>
                     </td>
                     <td className="px-6 py-4">

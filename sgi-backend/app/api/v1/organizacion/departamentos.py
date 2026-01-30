@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 
 from app.database.db_connection import get_db
+from app.core.security import get_current_active_auth
 from app.services.organizacion.departamentos import DepartamentoService
 from app.schemas.organizacion.departamentos import (
     DepartamentoCreate, 
@@ -20,7 +21,8 @@ async def listar_departamentos(
     busqueda: Optional[str] = Query(None, description="Buscar por nombre de departamento"),
     page: int = Query(1, ge=1), 
     page_size: int = Query(15, ge=1, le=100), 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """
     Obtiene la lista paginada de departamentos. 
@@ -32,7 +34,8 @@ async def listar_departamentos(
 
 @router.get("/dropdown", response_model=List[DepartamentoDropDown])
 async def get_departamentos_dropdown(
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Lista simple de departamentos para dropdowns"""
     service = DepartamentoService(db)
@@ -42,7 +45,8 @@ async def get_departamentos_dropdown(
 @router.get("/{depto_id}", response_model=dict)
 async def obtener_departamento(
     depto_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Obtiene un departamento por su ID"""
     service = DepartamentoService(db)
@@ -58,14 +62,14 @@ async def obtener_departamento(
 @router.post("/", response_model=OperationResult, status_code=status.HTTP_201_CREATED)
 async def crear_departamento(
     depto: DepartamentoCreate, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """
     Crea un nuevo departamento.
     Las validaciones de negocio se realizan en el servicio (Python).
     """
     service = DepartamentoService(db)
-    # HTTPException se propaga automáticamente desde el servicio
     return await service.create(depto)
 
 
@@ -73,7 +77,8 @@ async def crear_departamento(
 async def actualizar_departamento(
     depto_id: int, 
     depto: DepartamentoUpdate, 
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """
     Actualiza un departamento existente.
@@ -86,7 +91,8 @@ async def actualizar_departamento(
 @router.delete("/{depto_id}", response_model=OperationResult)
 async def desactivar_departamento(
     depto_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """
     Realiza una desactivación lógica (soft delete) del departamento.
@@ -99,7 +105,8 @@ async def desactivar_departamento(
 @router.post("/{depto_id}/reactivar", response_model=OperationResult)
 async def reactivar_departamento(
     depto_id: int,
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """Reactiva un departamento previamente desactivado"""
     service = DepartamentoService(db)

@@ -1,19 +1,25 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Package, Plus, Pencil, Trash2, Search, Loader2, UserPlus, UserMinus, Settings } from 'lucide-react';
+import api from '@/lib/axios';
+import { Package, Plus, Pencil, Trash2, Search, Loader2, UserPlus, UserMinus, Settings, User } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useActivos } from '@/hooks/organizacion/useActivo';
+import { useEmpleadosParaSelect } from '@/hooks/organizacion/useEmpleado';
 import { Activo } from '@/types/organizacion/activo';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import ModalActivo from './modal-activo';
 import ModalAsignacion from './modal-asignacion';
 import ModalDevolucion from './modal-devolucion';
 import ModalGestionEstados from './modal-gestion-estados';
+import ModalDetalleActivo from './modal-detalle-activo';
+import ModalExportar from './modal-exportar';
 
 export default function InventarioPage() {
+    const [isDisponible, setIsDisponible] = useState<boolean | null>(null);
     const [busqueda, setBusqueda] = useState('');
+    const [empleadoId, setEmpleadoId] = useState<number | null>(null);
     const [page, setPage] = useState(1);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedActivo, setSelectedActivo] = useState<Activo | null>(null);
@@ -23,12 +29,30 @@ export default function InventarioPage() {
     const [isAsignarOpen, setIsAsignarOpen] = useState(false);
     const [isDevolverOpen, setIsDevolverOpen] = useState(false);
     const [isGestionEstadosOpen, setIsGestionEstadosOpen] = useState(false);
+    const [isDetalleOpen, setIsDetalleOpen] = useState(false);
+    const [isExportarOpen, setIsExportarOpen] = useState(false);
 
-    const { activos, totalPages, totalRegistros, isLoading, isFetching, deleteMutation } = useActivos(busqueda, null, null, page, 15);
+    const { data: empleados = [] } = useEmpleadosParaSelect();
+    const { activos, totalPages, totalRegistros, isLoading, isFetching, deleteMutation } = useActivos(busqueda, null, isDisponible, empleadoId, page, 15);
 
     const handleOpenCreate = () => {
         setSelectedActivo(null);
         setIsModalOpen(true);
+    };
+
+    const handleRowClick = (activo: Activo) => {
+        setSelectedActivo(activo);
+        setIsDetalleOpen(true);
+    };
+
+    const handleAsignar = (activo: Activo) => {
+        setSelectedActivo(activo);
+        setIsAsignarOpen(true);
+    };
+
+    const handleDevolver = (activo: Activo) => {
+        setSelectedActivo(activo);
+        setIsDevolverOpen(true);
     };
 
     const handleEdit = (activo: Activo) => {
@@ -42,36 +66,32 @@ export default function InventarioPage() {
     };
 
     const handleConfirmDelete = async () => {
-        if (!activoToDelete) return;
-        try {
-            await deleteMutation.mutateAsync(activoToDelete.id);
-            toast.success('Activo dado de baja correctamente');
-            setIsConfirmOpen(false);
-            setActivoToDelete(null);
-        } catch (error: unknown) {
-            toast.error((error as { response?: { data?: { detail?: string } } })?.response?.data?.detail || 'Error al dar de baja');
+        if (activoToDelete) {
+            try {
+                await deleteMutation.mutateAsync(activoToDelete.id);
+                toast.success('Activo dado de baja correctamente');
+                setIsConfirmOpen(false);
+                setActivoToDelete(null);
+            } catch (error) {
+                toast.error('Error al dar de baja el activo');
+                console.error(error);
+            }
         }
     };
 
-    const handleAsignar = (activo: Activo) => {
-        setSelectedActivo(activo);
-        setIsAsignarOpen(true);
-    };
-
-    const handleDevolver = (activo: Activo) => {
-        setSelectedActivo(activo);
-        setIsDevolverOpen(true);
-    };
-
-    const getEstadoBadge = (estado: string, disponible: boolean) => {
-        const estilos: Record<string, string> = {
-            'BUENO': 'bg-green-100 text-green-700',
-            'REGULAR': 'bg-yellow-100 text-yellow-700',
-            'DAÑADO': 'bg-red-100 text-red-700',
-            'EN_REPARACION': 'bg-blue-100 text-blue-700',
-            'BAJA': 'bg-gray-100 text-gray-700',
-        };
-        return <span className={`px-2 py-1 rounded-full text-xs font-medium ${estilos[estado] || 'bg-gray-100 text-gray-700'}`}>{estado.replace('_', ' ')}</span>;
+    const getEstadoBadge = (nombre: string, color: string) => {
+        return (
+            <span
+                className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border"
+                style={{
+                    backgroundColor: `${color}15`, // 15% opacity
+                    color: color,
+                    borderColor: `${color}30` // 30% opacity
+                }}
+            >
+                {nombre}
+            </span>
+        );
     };
 
     return (
@@ -84,14 +104,20 @@ export default function InventarioPage() {
                 </div>
                 <div className="flex gap-2">
                     <button
+                        onClick={() => setIsExportarOpen(true)}
+                        className="cursor-pointer flex items-center gap-2 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-md shadow-green-200 transition-colors"
+                    >
+                        <Package size={18} /> Exportar Excel
+                    </button>
+                    <button
                         onClick={() => setIsGestionEstadosOpen(true)}
-                        className="cursor-pointer flex items-center gap-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2.5 rounded-xl text-sm font-medium shadow-sm"
+                        className="cursor-pointer flex items-center gap-2 bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 px-4 py-2.5 rounded-xl text-sm font-medium shadow-sm transition-colors"
                     >
                         <Settings size={18} /> Gestionar Estados
                     </button>
                     <button
                         onClick={handleOpenCreate}
-                        className="cursor-pointer flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-md shadow-indigo-200"
+                        className="cursor-pointer flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-md shadow-indigo-200 transition-colors"
                     >
                         <Plus size={18} /> Nuevo Activo
                     </button>
@@ -100,8 +126,8 @@ export default function InventarioPage() {
 
             {/* Filtros */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-                <div className="flex flex-col md:flex-row gap-4">
-                    <div className="flex-1 relative">
+                <div className="flex flex-col md:flex-row gap-4 items-center">
+                    <div className="flex-1 relative w-full">
                         <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
                         <input
                             type="text"
@@ -111,9 +137,37 @@ export default function InventarioPage() {
                             className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm"
                         />
                     </div>
-                    <div className="text-sm text-gray-500 flex items-center gap-2">
+                    <div className="relative w-full md:w-64">
+                        <User size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 z-10" />
+                        <select
+                            value={empleadoId ?? ''}
+                            onChange={(e) => { setEmpleadoId(e.target.value ? Number(e.target.value) : null); setPage(1); }}
+                            className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm appearance-none bg-white relative"
+                        >
+                            <option value="">Todos los empleados</option>
+                            {empleados.map((emp) => (
+                                <option key={emp.id} value={emp.id}>{emp.nombre_completo}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div className="relative w-full md:w-48">
+                        <select
+                            value={isDisponible === null ? '' : isDisponible.toString()}
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setIsDisponible(val === '' ? null : val === 'true');
+                                setPage(1);
+                            }}
+                            className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm appearance-none bg-white"
+                        >
+                            <option value="">Todos los estados</option>
+                            <option value="true">Disponibles</option>
+                            <option value="false">Asignados</option>
+                        </select>
+                    </div>
+                    <div className="text-sm text-gray-500 flex items-center gap-2 whitespace-nowrap">
                         <Package size={16} />
-                        <span>{totalRegistros} activos registrados</span>
+                        <span>{totalRegistros} activos</span>
                     </div>
                 </div>
             </div>
@@ -149,7 +203,11 @@ export default function InventarioPage() {
                                 </tr>
                             ) : (
                                 activos.map((activo) => (
-                                    <tr key={activo.id} className="hover:bg-gray-50 transition-colors">
+                                    <tr
+                                        key={activo.id}
+                                        onClick={() => handleRowClick(activo)}
+                                        className="hover:bg-gray-50 transition-colors cursor-pointer"
+                                    >
                                         <td className="py-3 px-4">
                                             <div>
                                                 <p className="font-medium text-gray-800">{activo.producto}</p>
@@ -161,13 +219,26 @@ export default function InventarioPage() {
                                             <code className="text-xs bg-gray-100 px-2 py-1 rounded">{activo.codigo_inventario || activo.serie || '-'}</code>
                                         </td>
                                         <td className="py-3 px-4 text-sm text-gray-600">
-                                            {activo.empleado_asignado_nombre?.trim() || <span className="text-gray-400 italic">Sin asignar</span>}
+                                            {activo.empleado_asignado_nombre?.trim() ? (
+                                                <div className="flex items-center gap-2">
+                                                    <span>{activo.empleado_asignado_nombre}</span>
+                                                    {activo.tiene_carta ? (
+                                                        <span title={`Carta firmada: ${activo.fecha_carta ? new Date(activo.fecha_carta).toLocaleDateString('es-PE') : ''}`} className="text-green-600">✓</span>
+                                                    ) : (
+                                                        <span title="Carta pendiente" className="text-amber-500 text-xs">⚠️</span>
+                                                    )}
+                                                </div>
+                                            ) : (
+                                                <span className="inline-flex items-center px-2 py-1 bg-green-50 text-green-700 rounded-lg text-xs border border-green-200">
+                                                    Disponible
+                                                </span>
+                                            )}
                                         </td>
                                         <td className="py-3 px-4">
-                                            {getEstadoBadge(activo.estado_nombre || 'SIN ESTADO', activo.is_disponible)}
+                                            {getEstadoBadge(activo.estado_nombre || 'SIN ESTADO', activo.estado_color || '#6b7280')}
                                         </td>
                                         <td className="py-3 px-4">
-                                            <div className="flex justify-center gap-2">
+                                            <div className="flex justify-center gap-2" onClick={(e) => e.stopPropagation()}>
                                                 {activo.is_disponible ? (
                                                     <button
                                                         onClick={() => handleAsignar(activo)}
@@ -237,6 +308,12 @@ export default function InventarioPage() {
             </div>
 
             {/* Modales */}
+            <ModalDetalleActivo
+                isOpen={isDetalleOpen}
+                onClose={() => setIsDetalleOpen(false)}
+                activoData={selectedActivo}
+            />
+
             <ModalActivo
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
@@ -260,6 +337,11 @@ export default function InventarioPage() {
                 onClose={() => setIsGestionEstadosOpen(false)}
             />
 
+            <ModalExportar
+                isOpen={isExportarOpen}
+                onClose={() => setIsExportarOpen(false)}
+            />
+
             <ConfirmModal
                 isOpen={isConfirmOpen}
                 onClose={() => { setIsConfirmOpen(false); setActivoToDelete(null); }}
@@ -270,6 +352,6 @@ export default function InventarioPage() {
                 isLoading={deleteMutation.isPending}
                 variant="danger"
             />
-        </div>
+        </div >
     );
 }

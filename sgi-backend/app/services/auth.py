@@ -84,7 +84,8 @@ from app.models.seguridad import Sesion
 async def registrar_sesion(db: AsyncSession, usuario_id: int, token: str, ip: str = None, user_agent: str = None):
     """Registra una nueva sesión activa en la base de datos."""
     try:
-        # Calculamos expiración (30 min por defecto, sincronizar con config)
+        # Calculamos expiración por inactividad (30 min)
+        # El token JWT durará 24h, pero la sesión en BD manda la inactividad
         expira = datetime.now(timezone.utc) + timedelta(minutes=30) 
         
         nueva_sesion = Sesion(
@@ -132,7 +133,7 @@ async def verificar_sesion_activa(db: AsyncSession, token: str) -> bool:
         if sesion.es_revocado:
             return False # Sesión revocada explícitamente
             
-        # Opcional: Verificar expiración en BD también
+        # Verificar expiración en BD (Inactividad)
         if sesion.expira_en.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
              return False
              
@@ -140,4 +141,33 @@ async def verificar_sesion_activa(db: AsyncSession, token: str) -> bool:
     except Exception as e:
         logging.error(f"Error verificando sesión: {e}")
         return False # Ante la duda, denegar
+
+async def extender_sesion(db: AsyncSession, token: str):
+    """
+    Extiende la vida de la sesión si está próxima a vencer (Sliding Expiration).
+    Se llama en cada request autenticado.
+    """
+    try:
+        # 1. Buscar sesión (optimizado: podríamos cachearlo pero por ahora es directo a BD)
+        query = select(Sesion).where(Sesion.refresh_token == token)
+        result = await db.execute(query)
+        sesion = result.scalars().first()
+        
+        if not sesion or sesion.es_revocado:
+            return
+
+        now = datetime.now(timezone.utc)
+        
+        # 2. Verificar si necesita extensión
+        # Si le quedan menos de 25 minutos (de los 30), la extendemos.
+        # Esto evita escribir en BD en CADA request (solo cada 5 min aprox por usuario)
+        tiempo_restante = sesion.expira_en.replace(tzinfo=timezone.utc) - now
+        
+        if tiempo_restante.total_seconds() < (25 * 60): # Si le queda menos de 25 min
+            sesion.expira_en = now + timedelta(minutes=30)
+            await db.commit()
+            
+    except Exception as e:
+        # Fallar silenciosamente para no tumbar el request del usuario
+        logging.error(f"Error extendiendo sesión: {e}")
 

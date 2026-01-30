@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from app.database.db_connection import get_db
+from app.core.security import get_current_active_auth
 
 router = APIRouter(
     prefix="/base",
@@ -13,7 +14,8 @@ async def get_base_comercial(
     page: int = Query(1, gt=0),
     page_size: int = Query(20, gt=0, le=100),
     search: str = Query(None),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
 ):
     """
     Retorna el merge entre registro_importaciones y cliente_contactos.
@@ -43,22 +45,17 @@ async def get_base_comercial(
                 ri.ultima_importacion
             FROM comercial.cliente_contactos cc
             INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
-            WHERE ri.ruc >= '20400000000'
-              AND (ri.fob_max IS NULL OR ri.fob_max <= 300000)
-              AND cc.is_active = 1
+            WHERE cc.is_active = 1
               AND cc.estado = 'DISPONIBLE'
               AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)
               AND (:search IS NULL OR ri.ruc LIKE '%' + :search + '%' OR ri.razon_social LIKE '%' + :search + '%')
         ),
         stats AS (
             SELECT 
-                (SELECT COUNT(DISTINCT ruc) FROM comercial.registro_importaciones 
-                 WHERE ruc >= '20400000000' AND (fob_max IS NULL OR fob_max <= 300000)
-                   AND ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)) as empresas_transacciones,
+                (SELECT COUNT(DISTINCT ruc) FROM comercial.registro_importaciones) as empresas_transacciones,
                 (SELECT COUNT(DISTINCT cc2.ruc) FROM comercial.cliente_contactos cc2
                  INNER JOIN comercial.registro_importaciones ri2 ON cc2.ruc = ri2.ruc
-                 WHERE ri2.ruc >= '20400000000' AND (ri2.fob_max IS NULL OR ri2.fob_max <= 300000)
-                   AND cc2.is_active = 1
+                 WHERE cc2.is_active = 1
                    AND cc2.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)) as empresas_con_telefono,
                 (SELECT COUNT(*) FROM base_filter) as total_contactos
         )
@@ -89,9 +86,7 @@ async def get_base_comercial(
             ri.ultima_importacion
         FROM comercial.cliente_contactos cc
         INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
-        WHERE ri.ruc >= '20400000000'
-          AND (ri.fob_max IS NULL OR ri.fob_max <= 300000)
-          AND cc.is_active = 1
+        WHERE cc.is_active = 1
           AND cc.estado = 'DISPONIBLE'
           AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)
           AND (:search IS NULL OR ri.ruc LIKE '%' + :search + '%' OR ri.razon_social LIKE '%' + :search + '%')
@@ -115,20 +110,23 @@ async def get_base_comercial(
     }
 
 @router.get("/stats")
-async def get_base_stats(db: AsyncSession = Depends(get_db)):
+async def get_base_stats(
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
+):
     """Estadísticas de la base comercial."""
     query = text("""
         SELECT 
-            (SELECT COUNT(DISTINCT ruc) FROM comercial.registro_importaciones 
-             WHERE ruc >= '20400000000' AND (fob_max IS NULL OR fob_max <= 300000)) as empresas_filtradas,
+            (SELECT COUNT(DISTINCT ruc) FROM comercial.registro_importaciones) as empresas_filtradas,
             (SELECT COUNT(DISTINCT cc.ruc) FROM comercial.cliente_contactos cc
              INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
-             WHERE ri.ruc >= '20400000000' AND (ri.fob_max IS NULL OR ri.fob_max <= 300000)
-               AND cc.is_active = 1) as empresas_con_telefono,
+             WHERE cc.is_active = 1
+               AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)) as empresas_con_telefono,
             (SELECT COUNT(*) FROM comercial.cliente_contactos cc
              INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
-             WHERE ri.ruc >= '20400000000' AND (ri.fob_max IS NULL OR ri.fob_max <= 300000)
-               AND cc.is_active = 1 AND cc.estado = 'DISPONIBLE') as contactos_disponibles
+             WHERE cc.is_active = 1 
+               AND cc.estado = 'DISPONIBLE'
+               AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)) as contactos_disponibles
     """)
     result = await db.execute(query)
     row = result.fetchone()

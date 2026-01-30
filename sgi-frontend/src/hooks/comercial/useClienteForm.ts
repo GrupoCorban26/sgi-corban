@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Cliente, ClienteCreate, ClienteUpdate } from '@/types/cliente';
-import { useClientes } from '@/hooks/useClientes';
+import { useClientes } from '@/hooks/comercial/useClientes';
 import { toast } from 'sonner';
 
 export interface FormErrors {
@@ -30,6 +30,8 @@ export function useClienteForm({ clienteToEdit, onSuccess, onClose }: UseCliente
     const [ultimoContacto, setUltimoContacto] = useState('');
     const [comentario, setComentario] = useState('');
     const [proximaFecha, setProximaFecha] = useState('');
+    const [areaEncargadaId, setAreaEncargadaId] = useState<number | null>(null);
+    const [comercialEncargadoId, setComercialEncargadoId] = useState<number | null>(null);
 
     // Validation state
     const [errors, setErrors] = useState<FormErrors>({});
@@ -48,6 +50,8 @@ export function useClienteForm({ clienteToEdit, onSuccess, onClose }: UseCliente
             setUltimoContacto(clienteToEdit.ultimo_contacto || '');
             setComentario(clienteToEdit.comentario_ultima_llamada || '');
             setProximaFecha(clienteToEdit.proxima_fecha_contacto || '');
+            setAreaEncargadaId(clienteToEdit.area_encargada_id || null);
+            setComercialEncargadoId(clienteToEdit.comercial_encargado_id || null);
         } else {
             setRuc('');
             setRazonSocial('');
@@ -57,6 +61,8 @@ export function useClienteForm({ clienteToEdit, onSuccess, onClose }: UseCliente
             setUltimoContacto('');
             setComentario('');
             setProximaFecha('');
+            setAreaEncargadaId(null);
+            setComercialEncargadoId(null);
         }
         setErrors({});
         setTouched(new Set());
@@ -136,6 +142,8 @@ export function useClienteForm({ clienteToEdit, onSuccess, onClose }: UseCliente
                 ultimo_contacto: ultimoContacto,
                 comentario_ultima_llamada: comentario.trim(),
                 proxima_fecha_contacto: proximaFecha,
+                area_encargada_id: areaEncargadaId,
+                comercial_encargado_id: comercialEncargadoId
             };
 
             if (isEditMode && clienteToEdit) {
@@ -163,7 +171,9 @@ export function useClienteForm({ clienteToEdit, onSuccess, onClose }: UseCliente
             tipoEstado, setTipoEstado,
             ultimoContacto, setUltimoContacto,
             comentario, setComentario,
-            proximaFecha, setProximaFecha
+            proximaFecha, setProximaFecha,
+            areaEncargadaId, setAreaEncargadaId,
+            comercialEncargadoId, setComercialEncargadoId
         },
         errors,
         touched,

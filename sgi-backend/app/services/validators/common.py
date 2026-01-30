@@ -125,17 +125,17 @@ class CommonValidators:
         return result.scalar() > 0
 
     async def documento_duplicado_empleado(self, nro_documento: str, exclude_id: int = None) -> bool:
-        """Verifica si ya existe un empleado activo con ese número de documento"""
+        """Verifica si ya existe un empleado con ese número de documento (activo o inactivo)"""
         if exclude_id:
             query = text("""
                 SELECT COUNT(*) FROM adm.empleados 
-                WHERE nro_documento = :nro_documento AND is_active = 1 AND id <> :exclude_id
+                WHERE nro_documento = :nro_documento AND id <> :exclude_id
             """)
             result = await self.db.execute(query, {"nro_documento": nro_documento, "exclude_id": exclude_id})
         else:
             query = text("""
                 SELECT COUNT(*) FROM adm.empleados 
-                WHERE nro_documento = :nro_documento AND is_active = 1
+                WHERE nro_documento = :nro_documento
             """)
             result = await self.db.execute(query, {"nro_documento": nro_documento})
         return result.scalar() > 0

@@ -6,7 +6,7 @@ import {
   CheckCircle2, RefreshCw, Filter, Save
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { useBaseComercial } from '@/hooks/useBaseComercial';
+import { useBaseComercial } from '@/hooks/comercial/useBaseComercial';
 import { ContactoAsignado, CasoLlamada } from '@/types/base-comercial';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 
