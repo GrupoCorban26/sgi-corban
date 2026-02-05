@@ -25,7 +25,7 @@ async def listar_departamentos(
     _: dict = Depends(get_current_active_auth)
 ):
     """
-    Obtiene la lista paginada de departamentos. 
+    Obtiene la listax paginada de departamentos. 
     Permite filtrar por nombre para la búsqueda dinámica del frontend.
     """
     service = DepartamentoService(db)

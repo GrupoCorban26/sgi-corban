@@ -165,12 +165,8 @@ class ContactosAsignacionService:
         # Get Case
         stmt_caso = select(CasoLlamada).where(CasoLlamada.id == caso_id)
         caso = (await self.db.execute(stmt_caso)).scalars().first()
-        # Definir casos positivos que convierten a Cliente
-        CASOS_POSITIVOS = [
-            'Contestó - Interesado',
-            'Contestó - Solicita cotización'
-        ]
-        is_positive = (caso.nombre in CASOS_POSITIVOS) if caso else False
+        # Definir si es un caso positivo (gestionable)
+        is_positive = caso.gestionable if caso else False
         
         # Check if client exists
         stmt_cl = select(Cliente).where(Cliente.ruc == contact.ruc)
@@ -192,7 +188,7 @@ class ContactosAsignacionService:
             if cliente_existe:
                 mensaje = f"Nota: Este cliente ya está siendo gestionado (ID: {cliente_existe.id})"
             
-            # Logic: Positive AND Not Exists -> Create Client
+            # Logic: Positive (Gestionable) AND Not Exists -> Create Client
             if is_positive and not cliente_existe:
                 # Get additional info from RegistroImportacion
                 stmt_ri = select(RegistroImportacion).where(RegistroImportacion.ruc == contact.ruc)
@@ -224,12 +220,28 @@ class ContactosAsignacionService:
                     ClienteContacto.estado == 'EN_GESTION',
                     ClienteContacto.is_active == True
                 ).values(estado='GESTIONADO'))
-                 
-            # Logic: Negative -> Release others
+                
+                # Ensure others stay in EN_GESTION (Implicit, but clarify intent: they are NOT released)
+                # No action needed as they are already EN_GESTION or ASIGNADO
+
+            # Logic: Negative (Not Gestionable) -> Release others
             if not is_positive and not cliente_existe:
+                # Mark current as GESTIONADO (already done implicitly by flow, but state was updated above?) 
+                # Wait, contact state is updated where? Ah, explicitly set to GESTIONADO if created client. 
+                # If NOT created client, current contact should ALSO be GESTIONADO?
+                # The original code only updated contact state if client was created? 
+                # Line 222-226 logic marks 'EN_GESTION' -> 'GESTIONADO'.
+                
+                # Let's ensure current contact is marked GESTIONADO regardless of outcome, 
+                # provided it was the one being acted upon. 
+                # Actually, the requirement says: "los demás registros de ese mismo ruc pasan a disponible".
+                
+                contact.estado = 'GESTIONADO' # Always mark current one as handled
+                
                 await self.db.execute(update(ClienteContacto).where(
                     ClienteContacto.ruc == contact.ruc,
-                    ClienteContacto.estado == 'EN_GESTION',
+                    ClienteContacto.estado.in_(['EN_GESTION', 'ASIGNADO']), # Release all pending
+                    ClienteContacto.id != contact.id, # Except current
                     ClienteContacto.is_active == True
                 ).values(estado='DISPONIBLE'))
         
@@ -278,3 +290,65 @@ class ContactosAsignacionService:
         partidas = [{"partida": row[0], "cantidad": row[1]} for row in partidas_result.fetchall()]
         
         return {"paises": paises, "partidas": partidas}
+
+    async def create_contacto_manual(self, data, user_id: int):
+        """Crea un contacto manual y lo asigna inmediatamente al comercial."""
+        # 1. Validar duplicado (RUC + Telefono) para evitar conflictos obvios
+        stmt_dup = select(ClienteContacto).where(
+            ClienteContacto.ruc == data.ruc,
+            ClienteContacto.telefono == data.telefono,
+            ClienteContacto.is_active == True
+        )
+        if (await self.db.execute(stmt_dup)).scalars().first():
+            raise HTTPException(400, "Ya existe un contacto activo con este RUC y teléfono.")
+
+        # 2. Crear contacto asignado
+        nuevo_contacto = ClienteContacto(
+            ruc=data.ruc,
+            nombre=data.nombre,
+            cargo=data.cargo,
+            telefono=data.telefono,
+            correo=data.email,
+            origen='MANUAL',
+            is_client=False,
+            is_active=True,
+            estado='ASIGNADO',
+            asignado_a=user_id,
+            fecha_asignacion=func.now(),
+            lote_asignacion=0 # 0 para manuales
+        )
+        self.db.add(nuevo_contacto)
+        await self.db.commit()
+        await self.db.refresh(nuevo_contacto)
+        
+        # Devolver estructura similar a get_mis_contactos_asignados para facilitar frontend
+        # Recuperar Razón Social si existe
+        stmt_rs = select(
+            RegistroImportacion.razon_social,
+            Cliente.razon_social
+        ).outerjoin(Cliente, RegistroImportacion.ruc == Cliente.ruc).where(RegistroImportacion.ruc == data.ruc)
+        
+        # Intentar obtener razon social de alguna fuente
+        # Es mas seguro hacer una query aparte o reusar logica
+        rs_result = (await self.db.execute(select(RegistroImportacion.razon_social).where(RegistroImportacion.ruc == data.ruc))).scalar()
+        if not rs_result:
+             rs_result = (await self.db.execute(select(Cliente.razon_social).where(Cliente.ruc == data.ruc))).scalar()
+        
+        return {
+            "id": nuevo_contacto.id,
+            "ruc": nuevo_contacto.ruc,
+            "nombre": nuevo_contacto.nombre,
+            "razon_social": rs_result or "Sin razón social",
+            "telefono": nuevo_contacto.telefono,
+            "correo": nuevo_contacto.correo,
+            "cargo": nuevo_contacto.cargo,
+            "contesto": 0,
+            "caso_id": None,
+            "caso_nombre": None,
+            "comentario": None,
+            "estado": nuevo_contacto.estado,
+            "fecha_asignacion": nuevo_contacto.fecha_asignacion,
+            "fecha_llamada": None,
+            "is_client": False
+        }
+

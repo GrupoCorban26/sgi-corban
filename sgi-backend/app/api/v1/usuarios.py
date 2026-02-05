@@ -1,9 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import Optional
 
 from app.database.db_connection import get_db
 from app.core.security import get_current_user_id, get_current_active_auth
+from app.core.dependencies import require_permission
 from app.services.usuarios import UsuarioService
 from app.schemas.usuario import (
     UsuarioCreate,
@@ -13,6 +15,10 @@ from app.schemas.usuario import (
 )
 
 router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
+
+# ===========================================
+# DROPDOWNS
+# ===========================================
 
 
 # ===========================================
@@ -53,7 +59,7 @@ async def get_comerciales_dropdown(
 # CRUD USUARIOS
 # ===========================================
 
-@router.get("")
+@router.get("", dependencies=[Depends(require_permission("usuarios.listar"))])
 async def listar_usuarios(
     busqueda: Optional[str] = Query(None, description="Buscar por correo o nombre"),
     is_active: Optional[bool] = Query(None, description="Filtrar por estado"),
@@ -74,7 +80,7 @@ async def listar_usuarios(
     )
 
 
-@router.get("/{id}")
+@router.get("/{id}", dependencies=[Depends(require_permission("usuarios.ver"))])
 async def obtener_usuario(
     id: int,
     db: AsyncSession = Depends(get_db),
@@ -88,7 +94,7 @@ async def obtener_usuario(
     return usuario
 
 
-@router.post("")
+@router.post("", dependencies=[Depends(require_permission("usuarios.crear"))])
 async def crear_usuario(
     usuario: UsuarioCreate,
     db: AsyncSession = Depends(get_db),
@@ -102,7 +108,7 @@ async def crear_usuario(
     return result
 
 
-@router.put("/{id}")
+@router.put("/{id}", dependencies=[Depends(require_permission("usuarios.editar"))])
 async def actualizar_usuario(
     id: int,
     usuario: UsuarioUpdate,
@@ -117,7 +123,7 @@ async def actualizar_usuario(
     return result
 
 
-@router.delete("/{id}")
+@router.delete("/{id}", dependencies=[Depends(require_permission("usuarios.eliminar"))])
 async def desactivar_usuario(
     id: int,
     db: AsyncSession = Depends(get_db),
@@ -131,7 +137,7 @@ async def desactivar_usuario(
     return result
 
 
-@router.put("/{id}/reactivar")
+@router.put("/{id}/reactivar", dependencies=[Depends(require_permission("usuarios.reactivar"))])
 async def reactivar_usuario(
     id: int,
     db: AsyncSession = Depends(get_db),
@@ -145,7 +151,7 @@ async def reactivar_usuario(
     return result
 
 
-@router.put("/{id}/roles")
+@router.put("/{id}/roles", dependencies=[Depends(require_permission("usuarios.asignar_roles"))])
 async def asignar_roles(
     id: int,
     data: UsuarioAssignRoles,
@@ -160,7 +166,7 @@ async def asignar_roles(
     return result
 
 
-@router.put("/{id}/password")
+@router.put("/{id}/password", dependencies=[Depends(require_permission("usuarios.cambiar_password"))])
 async def cambiar_password(
     id: int,
     data: UsuarioChangePassword,

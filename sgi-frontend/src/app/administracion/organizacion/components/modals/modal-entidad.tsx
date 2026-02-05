@@ -3,10 +3,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Save, LayoutGrid, Loader2, GitGraph, Briefcase, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { useDepartamentos, useEmpleadosParaSelect, useDepartamentosParaSelect } from '@/hooks/organizacion/useDepartamento';
+import { useDepartamentos, useDepartamentosParaSelect } from '@/hooks/organizacion/useDepartamento';
+import { useEmpleadosParaSelect } from '@/hooks/organizacion/useEmpleado';
 import { useAreas, useAreasParaSelect } from '@/hooks/organizacion/useArea';
 import { useCargos } from '@/hooks/organizacion/useCargo';
 import { Departamento } from '@/types/organizacion/departamento';
+import { Area } from '@/types/organizacion/area';
+import { Cargo } from '@/types/organizacion/cargo';
 import { ModalBase, ModalHeader, ModalFooter, useModalContext } from '@/components/ui/modal';
 
 // ============================================
@@ -19,8 +22,8 @@ interface ModalProps {
     onClose: () => void;
     entityType: EntityType;
     departamentoToEdit?: Departamento | null;
-    areaToEdit?: any | null; // Usar 'any' temporal o importar los tipos
-    cargoToEdit?: any | null;
+    areaToEdit?: Area | null; // Usar 'any' temporal o importar los tipos
+    cargoToEdit?: Cargo | null;
     parentDepartamentoId?: number | null;
     parentAreaId?: number | null;
 }

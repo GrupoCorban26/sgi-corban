@@ -215,27 +215,11 @@ export default function LineasPage() {
                                                     <button
                                                         onClick={() => handleCambiarCelular(linea)}
                                                         className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                                        title="Cambiar celular"
+                                                        title="Cambiar dispositivo"
                                                     >
                                                         <Smartphone size={16} />
                                                     </button>
-                                                    {linea.empleado_id ? (
-                                                        <button
-                                                            onClick={() => handleDesasignar(linea)}
-                                                            className="p-1.5 text-gray-400 hover:text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
-                                                            title="Desasignar empleado"
-                                                        >
-                                                            <UserMinus size={16} />
-                                                        </button>
-                                                    ) : (
-                                                        <button
-                                                            onClick={() => handleAsignar(linea)}
-                                                            className="p-1.5 text-gray-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                                                            title="Asignar empleado"
-                                                        >
-                                                            <UserPlus size={16} />
-                                                        </button>
-                                                    )}
+                                                    {/* Botones de asignacion manual removidos por refactor Device-Centric */}
                                                     <button
                                                         onClick={() => handleEdit(linea)}
                                                         className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"

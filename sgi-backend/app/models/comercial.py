@@ -37,9 +37,14 @@ class CasoLlamada(Base):
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(100))
     contestado = Column(Boolean, default=False, nullable=False)
+    gestionable = Column(Boolean, default=False, nullable=False)
     # is_positive removido para no alterar BD
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Puedo acceder a CasoLlamada.casos_de_llamada
+    # Puedo acceder a ClienteContacto.caso
+    casos_de_llamada = relationship("ClienteContacto", back_populates="caso")
 
 class Cliente(Base):
     __tablename__ = "clientes"
@@ -94,7 +99,9 @@ class ClienteContacto(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     usuario_asignado = relationship("app.models.seguridad.Usuario")
-    caso = relationship("CasoLlamada")
+    # Puedo acceder a ClienteContacto.caso 
+    # Puedo acceder a CasoLlamada.casos_de_llamada
+    caso = relationship("CasoLlamada", back_populates="casos_de_llamada")
 
 class LeadFeedback(Base):
     __tablename__ = "lead_feedback"
@@ -118,24 +125,33 @@ class Cita(Base):
     __table_args__ = {"schema": "comercial"}
 
     id = Column(Integer, primary_key=True, index=True)
-    cliente_id = Column(Integer, ForeignKey("comercial.clientes.id"), nullable=False)
-    comercial_id = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=False) # Quien solicita/va
     
-    fecha = Column(DateTime, nullable=False) # Date part
-    hora = Column(String(10), nullable=False) # Time string or DateTime content
+    # Tipo de agenda: INDIVIDUAL (comercial con cliente) o SALIDA_CAMPO (jefe sin cliente específico)
+    tipo_agenda = Column(String(30), default="INDIVIDUAL", nullable=False)
     
-    tipo_cita = Column(String(50)) # VISITA_CLIENTE, VISITA_OFICINA
+    # Cliente (nullable para salidas a campo)
+    cliente_id = Column(Integer, ForeignKey("comercial.clientes.id"), nullable=True)
+    comercial_id = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=False)  # Quien solicita/crea
+    
+    fecha = Column(DateTime, nullable=False)
+    hora = Column(String(10), nullable=False)
+    
+    # Tipo de visita: VISITA_CLIENTE (ir a oficinas del cliente) o VISITA_OFICINA (cliente viene a nosotros)
+    tipo_cita = Column(String(50))
     direccion = Column(String(255))
     motivo = Column(String(500))
-    con_presente = Column(Boolean, default=False)
+    con_presente = Column(Boolean, default=False)  # Llevar regalo
+    
+    # Campo adicional para salida a campo (objetivo de la salida)
+    objetivo_campo = Column(String(500), nullable=True)
     
     # Workflow
-    estado = Column(String(30), default="PENDIENTE") # PENDIENTE, APROBADO, RECHAZADO
+    estado = Column(String(30), default="PENDIENTE")  # PENDIENTE, APROBADO, RECHAZADO, TERMINADO
     motivo_rechazo = Column(String(500))
     
-    # Asignacion Recurso (Solo si aprobado)
-    acompanado_por_id = Column(Integer, ForeignKey("seg.usuarios.id"))
-    conductor_id = Column(Integer, ForeignKey("logistica.conductores.id"))
+    # Asignación de recursos (opcional)
+    acompanado_por_id = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=True)
+    conductor_id = Column(Integer, ForeignKey("logistica.conductores.id"), nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -146,3 +162,20 @@ class Cita(Base):
     comercial = relationship("app.models.seguridad.Usuario", foreign_keys=[comercial_id])
     acompanante = relationship("app.models.seguridad.Usuario", foreign_keys=[acompanado_por_id])
     conductor = relationship("app.models.logistica.Conductor")
+    comerciales_asignados = relationship("CitaComercial", back_populates="cita", cascade="all, delete-orphan")
+
+
+class CitaComercial(Base):
+    """Tabla intermedia para asignar múltiples comerciales a una salida a campo"""
+    __tablename__ = "cita_comerciales"
+    __table_args__ = {"schema": "comercial"}
+
+    id = Column(Integer, primary_key=True, index=True)
+    cita_id = Column(Integer, ForeignKey("comercial.citas.id", ondelete="CASCADE"), nullable=False)
+    usuario_id = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=False)
+    confirmado = Column(Boolean, default=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    cita = relationship("Cita", back_populates="comerciales_asignados")
+    usuario = relationship("app.models.seguridad.Usuario")

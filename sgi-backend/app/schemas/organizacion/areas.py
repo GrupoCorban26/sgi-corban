@@ -50,7 +50,7 @@ class AreaPaginationResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
-    data: List[Any]  # Flexible para evitar errores de validación
+    data: List[AreaResponse]  # Flexible para evitar errores de validación
 
 
 class OperationResult(BaseModel):

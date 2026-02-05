@@ -14,13 +14,14 @@ from app.core.security import (
     get_current_token_payload, 
     get_current_active_auth
 )
+from app.core.dependencies import require_permission
 
 router = APIRouter(prefix="/clientes", tags=["Clientes"])
 
 # Lista de roles que pueden ver información de CUALQUIER comercial
 ALLOWED_ALL = ["JEFE_COMERCIAL", "ADMIN", "GERENCIA"]
 
-@router.get("/recordatorios")
+@router.get("/recordatorios", dependencies=[Depends(require_permission("clientes.listar"))])
 async def get_recordatorios(
     days: int = Query(5, ge=1, le=30, description="Días a futuro para buscar"),
     db: AsyncSession = Depends(get_db),
@@ -40,7 +41,7 @@ async def get_recordatorios(
     return await service.get_recordatorios(comercial_ids=comercial_ids, days=days)
 
 
-@router.get("/stats")
+@router.get("/stats", dependencies=[Depends(require_permission("clientes.listar"))])
 async def get_clientes_stats(
     comercial_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
@@ -62,7 +63,7 @@ async def get_clientes_stats(
     return await service.get_stats(comercial_ids=comercial_ids)
 
 
-@router.get("")
+@router.get("", dependencies=[Depends(require_permission("clientes.listar"))])
 async def listar_clientes(
     busqueda: Optional[str] = Query(None, description="Buscar por RUC o razón social"),
     tipo_estado: Optional[str] = Query(None, description="Filtrar por estado"),
@@ -96,7 +97,7 @@ async def listar_clientes(
     )
 
 
-@router.get("/{id}")
+@router.get("/{id}", dependencies=[Depends(require_permission("clientes.listar"))])
 async def obtener_cliente(
     id: int,
     db: AsyncSession = Depends(get_db),
@@ -115,7 +116,7 @@ async def obtener_cliente(
     return cliente
 
 
-@router.post("", status_code=status.HTTP_201_CREATED)
+@router.post("", status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("clientes.crear"))])
 async def crear_cliente(
     cliente: ClienteCreate,
     db: AsyncSession = Depends(get_db),
@@ -135,7 +136,7 @@ async def crear_cliente(
     return result
 
 
-@router.put("/{id}")
+@router.put("/{id}", dependencies=[Depends(require_permission("clientes.editar"))])
 async def actualizar_cliente(
     id: int,
     cliente: ClienteUpdate,
@@ -152,7 +153,7 @@ async def actualizar_cliente(
     return result
 
 
-@router.delete("/{id}")
+@router.delete("/{id}", dependencies=[Depends(require_permission("clientes.desactivar"))])
 async def desactivar_cliente(
     id: int,
     db: AsyncSession = Depends(get_db),

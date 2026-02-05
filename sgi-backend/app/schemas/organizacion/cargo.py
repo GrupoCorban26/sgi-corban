@@ -15,8 +15,9 @@ class CargoCreate(CargoBase):
 
 
 class CargoUpdate(CargoBase):
-    """Schema para actualizar un cargo"""
-    pass
+    nombre: Optional[str] = None,
+    descripcion: Optional[str] = None,
+    area_id: Optional[int] = None
 
 
 class CargoResponse(BaseModel):
@@ -39,7 +40,7 @@ class CargoPaginationResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
-    data: List[Any]  # Flexible para evitar errores de validación
+    data: List[CargoResponse]
 
 
 class OperationResult(BaseModel):

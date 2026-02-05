@@ -199,13 +199,27 @@ class ContactosCrudService:
         
         # Para las siguientes métricas, usamos FECHA DE LLAMADA (gestión realizada)
         
-        # 2. Total Gestionados (Denominador para tasas)
-        stmt_gestionados = select(func.count()).select_from(ClienteContacto).where(
-            ClienteContacto.estado == 'GESTIONADO',
+        # 2. Total Gestionados (Denominador estadístico general)
+        # El usuario cambió la lógica para filtrar por "contestado"
+        stmt_gestionados = select(func.count()).select_from(ClienteContacto).join(
+            CasoLlamada, ClienteContacto.caso_id == CasoLlamada.id
+        ).where(
+            CasoLlamada.contestado == True,
             ClienteContacto.is_active == True
         )
         stmt_gestionados = aplicar_filtro_fecha(stmt_gestionados, ClienteContacto.fecha_llamada)
         total_gestionados = (await self.db.execute(stmt_gestionados)).scalar() or 0
+
+        # [MODIFICADO] 2b. Total Gestionables (Denominador para Tasa de Contactabilidad)
+        # El usuario pidió: "todos los que tienen gestionable = 1"
+        stmt_gestionables = select(func.count()).select_from(ClienteContacto).join(
+            CasoLlamada, ClienteContacto.caso_id == CasoLlamada.id
+        ).where(
+            CasoLlamada.gestionable == True,
+            ClienteContacto.is_active == True
+        )
+        stmt_gestionables = aplicar_filtro_fecha(stmt_gestionables, ClienteContacto.fecha_llamada)
+        total_gestionables = (await self.db.execute(stmt_gestionables)).scalar() or 0
         
         # 3. Contestados (Numerador contactabilidad)
         stmt_contestados = select(func.count()).select_from(ClienteContacto).join(
@@ -248,7 +262,10 @@ class ContactosCrudService:
         casos_distribucion = [{"name": row[0], "value": row[1]} for row in casos_result.all()]
         
         # Calculos
-        tasa_contactabilidad = (total_contestados / total_gestionados * 100) if total_gestionados > 0 else 0
+        # Tasa Contactabilidad = Contestados / Gestionables (antes Gestionados)
+        tasa_contactabilidad = (total_contestados / total_gestionables * 100) if total_gestionables > 0 else 0
+        
+        # Tasa Éxito = Positivos / Contestados
         tasa_positivos = (total_positivos / total_contestados * 100) if total_contestados > 0 else 0
         
         return {

@@ -62,5 +62,13 @@ export const baseComercialService = {
     async getCasosLlamada(): Promise<CasoLlamada[]> {
         const { data } = await api.get('/casos-llamada');
         return data;
+    },
+
+    /**
+     * Crea un contacto manual asociado a un RUC
+     */
+    async crearContactoManual(data: { ruc: string; nombre: string; telefono: string; cargo?: string; email?: string }): Promise<ContactoAsignado> {
+        const { data: response } = await api.post('/contactos/manual', data);
+        return response;
     }
 };

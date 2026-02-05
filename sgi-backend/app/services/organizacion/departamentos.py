@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text
+from sqlalchemy import select, func
+from sqlalchemy.orm import joinedload
 from fastapi import HTTPException
 from app.schemas.organizacion.departamentos import (
     DepartamentoCreate, 
@@ -9,13 +10,10 @@ from app.schemas.organizacion.departamentos import (
     DepartamentoDropDown
 )
 from app.services.validators import CommonValidators
+from app.models.administrativo import Departamento, Empleado
 
 
 class DepartamentoService:
-    """
-    Servicio de Departamentos - Patrón Python-Native
-    Usa CommonValidators para validaciones compartidas.
-    """
     
     def __init__(self, db: AsyncSession):
         self.db = db
@@ -25,68 +23,88 @@ class DepartamentoService:
     # OPERACIONES CRUD
     # =========================================================================
 
+    # Obtener todos los departamentos
     async def get_all(self, busqueda: str = None, page: int = 1, page_size: int = 15) -> dict:
-        """Lista departamentos con paginación y búsqueda"""
+        """Obtiene todos los departamentos con paginación y búsqueda"""
         offset = (page - 1) * page_size
         
-        where_clauses = ["d.is_active = 1"]
-        params = {"offset": offset, "page_size": page_size}
+        # Query base con join al responsable
+        base_query = select(Departamento).options(
+            joinedload(Departamento.responsable)
+        ).where(Departamento.is_active == True)
         
+        # Aplicar filtro de búsqueda
         if busqueda:
-            where_clauses.append("d.nombre LIKE '%' + :busqueda + '%'")
-            params["busqueda"] = busqueda
-        
-        where_sql = " AND ".join(where_clauses)
+            base_query = base_query.where(Departamento.nombre.ilike(f"%{busqueda}%"))
         
         # Contar total
-        count_query = text(f"SELECT COUNT(*) FROM adm.departamentos d WHERE {where_sql}")
-        count_result = await self.db.execute(count_query, params)
+        count_query = select(func.count()).select_from(Departamento).where(Departamento.is_active == True)
+        if busqueda:
+            count_query = count_query.where(Departamento.nombre.ilike(f"%{busqueda}%"))
+        
+        count_result = await self.db.execute(count_query)
         total = count_result.scalar() or 0
         
-        # Obtener datos
-        data_query = text(f"""
-            SELECT 
-                d.id, 
-                d.nombre, 
-                d.descripcion, 
-                d.responsable_id,
-                ISNULL(e.nombres + ' ' + e.apellido_paterno, 'Sin asignar') AS responsable_nombre,
-                d.is_active, 
-                d.created_at,
-                d.updated_at
-            FROM adm.departamentos d
-            LEFT JOIN adm.empleados e ON e.id = d.responsable_id
-            WHERE {where_sql}
-            ORDER BY d.id
-            OFFSET :offset ROWS FETCH NEXT :page_size ROWS ONLY
-        """)
+        # Obtener datos paginados
+        data_query = base_query.order_by(Departamento.id).offset(offset).limit(page_size)
+        result = await self.db.execute(data_query)
+        departamentos = result.scalars().unique().all()
         
-        result = await self.db.execute(data_query, params)
-        data = result.mappings().all()
+        # Formatear respuesta
+        data = []
+        for depto in departamentos:
+            responsable_nombre = "Sin asignar"
+            if depto.responsable:
+                responsable_nombre = f"{depto.responsable.nombres} {depto.responsable.apellido_paterno}"
+            
+            data.append({
+                "id": depto.id,
+                "nombre": depto.nombre,
+                "descripcion": depto.descripcion,
+                "responsable_id": depto.responsable_id,
+                "responsable_nombre": responsable_nombre,
+                "is_active": depto.is_active,
+                "created_at": depto.created_at,
+                "updated_at": depto.updated_at
+            })
         
         return {
             "total": total,
             "page": page,
             "page_size": page_size,
             "total_pages": (total + page_size - 1) // page_size if total > 0 else 1,
-            "data": [dict(row) for row in data]
+            "data": data
         }
 
+    # Obtener un departamento por su ID
     async def get_by_id(self, depto_id: int) -> dict:
         """Obtiene un departamento por su ID"""
-        query = text("""
-            SELECT 
-                d.id, d.nombre, d.descripcion, d.responsable_id,
-                ISNULL(e.nombres + ' ' + e.apellido_paterno, 'Sin asignar') AS responsable_nombre,
-                d.is_active, d.created_at, d.updated_at
-            FROM adm.departamentos d
-            LEFT JOIN adm.empleados e ON e.id = d.responsable_id
-            WHERE d.id = :id
-        """)
-        result = await self.db.execute(query, {"id": depto_id})
-        row = result.mappings().first()
-        return dict(row) if row else None
+        query = select(Departamento).options(
+            joinedload(Departamento.responsable)
+        ).where(Departamento.id == depto_id)
+        
+        result = await self.db.execute(query)
+        depto = result.scalars().first()
+        
+        if not depto:
+            return None
+        
+        responsable_nombre = "Sin asignar"
+        if depto.responsable:
+            responsable_nombre = f"{depto.responsable.nombres} {depto.responsable.apellido_paterno}"
+        
+        return {
+            "id": depto.id,
+            "nombre": depto.nombre,
+            "descripcion": depto.descripcion,
+            "responsable_id": depto.responsable_id,
+            "responsable_nombre": responsable_nombre,
+            "is_active": depto.is_active,
+            "created_at": depto.created_at,
+            "updated_at": depto.updated_at
+        }
 
+    # Crear un nuevo departamento
     async def create(self, depto: DepartamentoCreate) -> dict:
         """Crea un nuevo departamento"""
         
@@ -98,22 +116,20 @@ class DepartamentoService:
         if depto.responsable_id and not await self.validators.empleado_existe(depto.responsable_id):
             raise HTTPException(400, "El empleado responsable especificado no existe o está inactivo.")
         
-        query = text("""
-            INSERT INTO adm.departamentos (nombre, descripcion, responsable_id)
-            OUTPUT INSERTED.id
-            VALUES (LTRIM(RTRIM(:nombre)), :descripcion, :responsable_id)
-        """)
+        # Crear instancia del modelo
+        nuevo_depto = Departamento(
+            nombre=depto.nombre.strip(),
+            descripcion=depto.descripcion,
+            responsable_id=depto.responsable_id
+        )
         
-        result = await self.db.execute(query, {
-            "nombre": depto.nombre,
-            "descripcion": depto.descripcion,
-            "responsable_id": depto.responsable_id
-        })
+        self.db.add(nuevo_depto)
         await self.db.commit()
+        await self.db.refresh(nuevo_depto)
         
-        row = result.first()
-        return {"success": True, "id": row[0], "message": "Departamento creado exitosamente"}
+        return {"success": True, "id": nuevo_depto.id, "message": "Departamento creado exitosamente"}
 
+    # Actualizar un departamento
     async def update(self, depto_id: int, depto: DepartamentoUpdate) -> dict:
         """Actualiza un departamento existente"""
         
@@ -129,25 +145,22 @@ class DepartamentoService:
         if depto.responsable_id and not await self.validators.empleado_existe(depto.responsable_id):
             raise HTTPException(400, "El empleado responsable especificado no existe o está inactivo.")
         
-        query = text("""
-            UPDATE adm.departamentos
-            SET nombre = LTRIM(RTRIM(:nombre)),
-                descripcion = :descripcion,
-                responsable_id = :responsable_id,
-                updated_at = GETDATE()
-            WHERE id = :id
-        """)
+        # Obtener y actualizar el departamento
+        result = await self.db.execute(
+            select(Departamento).where(Departamento.id == depto_id)
+        )
+        depto_db = result.scalars().first()
         
-        await self.db.execute(query, {
-            "id": depto_id,
-            "nombre": depto.nombre,
-            "descripcion": depto.descripcion,
-            "responsable_id": depto.responsable_id
-        })
+        depto_db.nombre = depto.nombre.strip()
+        depto_db.descripcion = depto.descripcion
+        depto_db.responsable_id = depto.responsable_id
+        depto_db.updated_at = func.now()
+        
         await self.db.commit()
         
         return {"success": True, "id": depto_id, "message": "Departamento actualizado correctamente"}
 
+    # Desactivar un departamento
     async def delete(self, depto_id: int) -> dict:
         """Desactiva un departamento (soft delete)"""
         
@@ -163,43 +176,47 @@ class DepartamentoService:
         if await self.validators.departamento_tiene_empleados_activos(depto_id):
             raise HTTPException(400, "No se puede desactivar un departamento que tiene empleados activos asignados.")
         
-        query = text("""
-            UPDATE adm.departamentos
-            SET is_active = 0, updated_at = GETDATE()
-            WHERE id = :id
-        """)
+        # Obtener y desactivar
+        result = await self.db.execute(
+            select(Departamento).where(Departamento.id == depto_id)
+        )
+        depto_db = result.scalars().first()
         
-        await self.db.execute(query, {"id": depto_id})
+        depto_db.is_active = False
+        depto_db.updated_at = func.now()
+        
         await self.db.commit()
         
         return {"success": True, "id": depto_id, "message": "Departamento desactivado correctamente"}
 
+    # Reactivar un departamento
     async def reactivate(self, depto_id: int) -> dict:
         """Reactiva un departamento"""
         
-        query = text("SELECT COUNT(*) FROM adm.departamentos WHERE id = :id")
-        result = await self.db.execute(query, {"id": depto_id})
-        if result.scalar() == 0:
+        # Verificar existencia
+        result = await self.db.execute(
+            select(Departamento).where(Departamento.id == depto_id)
+        )
+        depto_db = result.scalars().first()
+        
+        if not depto_db:
             raise HTTPException(404, "El departamento especificado no existe.")
         
-        query = text("""
-            UPDATE adm.departamentos
-            SET is_active = 1, updated_at = GETDATE()
-            WHERE id = :id
-        """)
+        depto_db.is_active = True
+        depto_db.updated_at = func.now()
         
-        await self.db.execute(query, {"id": depto_id})
         await self.db.commit()
         
         return {"success": True, "id": depto_id, "message": "Departamento reactivado correctamente"}
 
+    # Lista simple de departamentos activos para dropdowns
     async def get_dropdown(self) -> list:
         """Lista simple de departamentos activos para dropdowns"""
-        query = text("""
-            SELECT id, nombre
-            FROM adm.departamentos
-            WHERE is_active = 1
-            ORDER BY nombre ASC
-        """)
+        query = select(Departamento.id, Departamento.nombre).where(
+            Departamento.is_active == True
+        ).order_by(Departamento.nombre)
+        
         result = await self.db.execute(query)
-        return [dict(row) for row in result.mappings().all()]
+        rows = result.all()
+        
+        return [{"id": row.id, "nombre": row.nombre} for row in rows]

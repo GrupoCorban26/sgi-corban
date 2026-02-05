@@ -43,8 +43,20 @@ export function useActualizarFeedback() {
     });
 }
 
+/**
+ * Hook para crear contacto manual
+ */
+export function useCrearContactoManual() {
+    const queryClient = useQueryClient();
 
-
+    return useMutation({
+        mutationFn: (data: { ruc: string; nombre: string; telefono: string; cargo?: string; email?: string }) =>
+            baseComercialService.crearContactoManual(data),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['mis-contactos'] });
+        }
+    });
+}
 /**
  * Hook para obtener filtros (países y partidas)
  */
@@ -76,6 +88,7 @@ export function useBaseComercial() {
     const casos = useCasosLlamada();
     const cargarBaseMutation = useCargarBase();
     const actualizarFeedbackMutation = useActualizarFeedback();
+    const crearContactoManualMutation = useCrearContactoManual();
 
     const contactos = misContactos.data || [];
 
@@ -111,6 +124,9 @@ export function useBaseComercial() {
 
         actualizarFeedback: actualizarFeedbackMutation.mutateAsync,
         isActualizandoFeedback: actualizarFeedbackMutation.isPending,
+
+        crearContactoManual: crearContactoManualMutation.mutateAsync,
+        isCreandoContactoManual: crearContactoManualMutation.isPending,
 
         // Refetch
         refetch: misContactos.refetch

@@ -39,6 +39,7 @@ export interface LineaCreate {
     plan?: string | null;
     proveedor?: string | null;
     activo_id?: number | null;
+    /** @deprecated Empleado is now derived from activo assignment */
     empleado_id?: number | null;
     observaciones?: string | null;
 }

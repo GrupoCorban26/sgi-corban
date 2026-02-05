@@ -14,7 +14,6 @@ class LineaCreate(BaseModel):
     plan: Optional[str] = Field(None, max_length=50)
     proveedor: Optional[str] = Field(None, max_length=50, description="Razón social (CORBAN ADUANAS, etc)")
     activo_id: Optional[int] = Field(None, description="Celular donde instalar")
-    empleado_id: Optional[int] = Field(None, description="Empleado a asignar")
     observaciones: Optional[str] = Field(None, max_length=500)
 
 
@@ -32,11 +31,6 @@ class CambiarCelularRequest(BaseModel):
     observaciones: Optional[str] = Field(None, max_length=500)
 
 
-class AsignarEmpleadoRequest(BaseModel):
-    empleado_id: int = Field(..., description="ID del empleado")
-    observaciones: Optional[str] = Field(None, max_length=500)
-
-
 # ============================================
 # RESPONSE SCHEMAS
 # ============================================
@@ -50,8 +44,6 @@ class LineaResponse(BaseModel):
     proveedor: Optional[str]
     activo_id: Optional[int]
     activo_nombre: Optional[str]  # Ej: "Samsung A54"
-    empleado_id: Optional[int]
-    empleado_nombre: Optional[str]  # Ej: "Juan Pérez"
     fecha_asignacion: Optional[datetime]
     is_active: bool
     observaciones: Optional[str]

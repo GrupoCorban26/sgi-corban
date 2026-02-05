@@ -1,11 +1,11 @@
-// types/organizacion/departamento.ts
+import { EmpleadoOption } from "./empleado";
 
 export interface Departamento {
   id: number;
   nombre: string;
   descripcion?: string | null;
   responsable_id?: number | null;
-  responsable_nombre?: string | null;
+  responsable_nombre?: EmpleadoOption;
   is_active?: boolean;
   created_at?: string | null;
   updated_at?: string | null;
@@ -26,13 +26,19 @@ export interface OperationResult {
   id?: number;
 }
 
-// Para el dropdown de responsables
-export interface EmpleadoOption {
-  id: number;
-  nombre_completo: string;
-}
-
 export interface DepartamentoOption {
   id: number;
   nombre: string;
+}
+
+export interface DepartamentoCreate {
+  nombre: string;
+  descripcion?: string | null;
+  responsable_id?: number | null;
+}
+
+export interface DepartamentoUpdate {
+  nombre?: string;
+  descripcion?: string | null;
+  responsable_id?: number | null;
 }

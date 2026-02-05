@@ -40,7 +40,7 @@ class DepartamentoResponse(BaseModel):
     is_active: Optional[bool] = True
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
-    
+    # Me permite usar los nombres de las columnas de la tabla como nombres de los atributos del objeto
     model_config = ConfigDict(from_attributes=True)
 
 
@@ -49,7 +49,7 @@ class DepartamentoPaginationResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
-    data: List[Any]  # Flexible para evitar errores de validación
+    data: List[DepartamentoResponse]  # Flexible para evitar errores de validación
 
 
 class OperationResult(BaseModel):

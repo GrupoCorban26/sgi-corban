@@ -3,6 +3,8 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .base import Base
 
+# Tabla de departamentos (departamentos organizacionales)
+
 class Departamento(Base):
     __tablename__ = "departamentos"
     __table_args__ = {"schema": "adm"}
@@ -16,7 +18,9 @@ class Departamento(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
+    # De la clase Departamento puedo usar el atributo "responsable" para obtener un objeto completo de la tabla Empleado.
     responsable = relationship("Empleado", foreign_keys=[responsable_id], back_populates="departamentos_a_cargo")
+    # Aqui podemos crear un objeto mi_departamento.areas que buscará en la tabla Area todas las áreas que tengan el id del departamento en departamento_id.
     areas = relationship("Area", back_populates="departamento")
 
 class Area(Base):
@@ -34,9 +38,13 @@ class Area(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
+    # De la clase Area puedo crear un objeto mi_area.departamento.nombre que buscará en la tabla Departamento el nombre del departamento cuyo id esté en departamento_id.
     departamento = relationship("Departamento", back_populates="areas")
+    # De la clase Area puedo crear un objeto mi_area.responsable.nombre que buscará en la tabla Empleado el nombre del responsable cuyo id esté en responsable_id.
     responsable = relationship("Empleado", foreign_keys=[responsable_id], back_populates="areas_a_cargo")
+    # De la clase Area puedo crear un objeto mi_area.area_padre.nombre que buscará en la tabla Area el nombre del área padre cuyo id esté en area_padre_id.
     area_padre = relationship("Area", remote_side=[id], backref="subareas")
+    # De la clase Area puedo crear un objeto mi_area.cargos.nombre que buscará en la tabla Cargo todos los cargos que tengan el id del área en area_id.
     cargos = relationship("Cargo", back_populates="area")
 
 class Cargo(Base):
@@ -190,7 +198,6 @@ class LineaCorporativa(Base):
     plan = Column(String(50))  # Descripción del plan
     proveedor = Column(String(50))  # CORBAN ADUANAS, CORBAN TRANS LOGISTIC, EBL
     activo_id = Column(Integer, ForeignKey("adm.activos.id"), nullable=True)  # Celular donde está instalado
-    empleado_id = Column(Integer, ForeignKey("adm.empleados.id"), nullable=True)  # A quién está asignado
     fecha_asignacion = Column(DateTime(timezone=True))  # Cuándo se asignó al empleado
     is_active = Column(Boolean, default=True, nullable=False)
     observaciones = Column(String(500))
@@ -199,7 +206,20 @@ class LineaCorporativa(Base):
 
     # Relationships
     activo = relationship("Activo", backref="linea_instalada")
-    empleado = relationship("Empleado", backref="lineas_asignadas")
+    
+    @property
+    def responsable(self):
+        """
+        Retorna el empleado que tiene asignado el activo donde está instalada la línea.
+        Si la línea no tiene activo, retorna None.
+        """
+        if self.activo and self.activo.asignaciones:
+            # Buscar asignación activa (fecha_devolucion IS NULL)
+            # Nota: Esto asume que 'asignaciones' está cargado o es Lazy
+            for asignacion in self.activo.asignaciones:
+                if asignacion.fecha_devolucion is None:
+                    return asignacion.empleado
+        return None
 
 
 class LineaHistorial(Base):

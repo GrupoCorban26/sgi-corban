@@ -59,7 +59,7 @@ export function DepartamentoRow({
                         <User size={14} />
                     </div>
                     <span className="text-sm text-slate-700 font-semibold">
-                        {depto.responsable_nombre || 'Sin asignar'}
+                        {depto.responsable_nombre?.nombre_completo || 'Sin asignar'}
                     </span>
                 </div>
             </td>

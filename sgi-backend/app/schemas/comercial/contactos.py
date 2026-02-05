@@ -13,6 +13,13 @@ class ContactoBase(BaseModel):
 class ContactoCreate(ContactoBase):
     pass
 
+class ContactoManualCreate(BaseModel):
+    ruc: str = Field(..., max_length=11)
+    nombre: str = Field(..., max_length=150)
+    cargo: Optional[str] = Field(None, max_length=100)
+    telefono: str = Field(..., max_length=20)
+    email: Optional[str] = Field(None, max_length=100)
+
 class ContactoUpdate(BaseModel):
     cargo: Optional[str] = None
     telefono: Optional[str] = None

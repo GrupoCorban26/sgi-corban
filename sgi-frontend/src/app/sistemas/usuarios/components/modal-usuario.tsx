@@ -299,9 +299,37 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
                     )}
                 </div>
 
+                {/* Opción Cambiar Contraseña (solo editar) */}
+                {isEditMode && (
+                    <div className="pt-2 pb-1">
+                        <label className="flex items-center gap-2 cursor-pointer bg-amber-50 p-2.5 rounded-xl border border-amber-100 hover:border-amber-200 transition-colors">
+                            <input
+                                type="checkbox"
+                                checked={isChangePasswordMode}
+                                onChange={(e) => {
+                                    setIsChangePasswordMode(e.target.checked);
+                                    if (!e.target.checked) {
+                                        setPassword('');
+                                        setErrors(prev => {
+                                            const newErrors = { ...prev };
+                                            delete newErrors.password;
+                                            return newErrors;
+                                        })
+                                    }
+                                }}
+                                className="w-4 h-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500"
+                            />
+                            <div>
+                                <span className="block text-sm font-semibold text-amber-700">Cambiar Contraseña</span>
+                                <span className="block text-xs text-amber-600/80">Habilita el campo para establecer una nueva clave</span>
+                            </div>
+                        </label>
+                    </div>
+                )}
+
                 {/* Contraseña */}
                 {(!isEditMode || isChangePasswordMode) && (
-                    <div className="space-y-1.5">
+                    <div className="space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
                         <label htmlFor="password" className="text-xs font-bold text-gray-500 uppercase tracking-wider">
                             Contraseña <span className="text-red-500">*</span>
                         </label>
@@ -346,7 +374,6 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
                         )}
                     </div>
                 )}
-
                 {/* Roles */}
                 <div className="space-y-1.5">
                     <label className="text-xs font-bold text-gray-500 uppercase tracking-wider">
@@ -405,31 +432,6 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
                                 className="w-4 h-4 text-red-600 border-gray-300 rounded focus:ring-red-500"
                             />
                             <span className="text-sm text-gray-700">Usuario bloqueado</span>
-                        </label>
-                    </div>
-                )}
-
-                {/* Checkbox Cambiar Contraseña (solo editar) */}
-                {isEditMode && (
-                    <div className="pt-2">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={isChangePasswordMode}
-                                onChange={(e) => {
-                                    setIsChangePasswordMode(e.target.checked);
-                                    if (!e.target.checked) {
-                                        setPassword('');
-                                        setErrors(prev => {
-                                            const newErrors = { ...prev };
-                                            delete newErrors.password;
-                                            return newErrors;
-                                        })
-                                    }
-                                }}
-                                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                            />
-                            <span className="text-sm font-medium text-indigo-600">Cambiar contraseña</span>
                         </label>
                     </div>
                 )}

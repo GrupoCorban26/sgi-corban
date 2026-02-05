@@ -6,7 +6,7 @@ import { X, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useLineas } from '@/hooks/organizacion/useLineas';
-import { useEmpleadosParaSelect } from '@/hooks/organizacion/useEmpleado';
+// import { useEmpleadosParaSelect } from '@/hooks/organizacion/useEmpleado'; // Removed unused
 import { Linea, LineaCreate, LineaUpdate } from '@/types/organizacion/linea';
 
 interface ModalLineaProps {
@@ -17,7 +17,6 @@ interface ModalLineaProps {
 
 export default function ModalLinea({ isOpen, onClose, linea }: ModalLineaProps) {
     const { createMutation, updateMutation } = useLineas();
-    const { data: empleados = [] } = useEmpleadosParaSelect();
     const isEditing = !!linea;
 
     const { register, handleSubmit, reset, formState: { errors } } = useForm<LineaCreate>();
@@ -142,6 +141,17 @@ export default function ModalLinea({ isOpen, onClose, linea }: ModalLineaProps) 
                             <option value="EBL Grupo Logistico S.A.C.">EBL Grupo Logistico S.A.C.</option>
                         </select>
                     </div>
+
+                    {!isEditing && (
+                        <div className="p-3 bg-blue-50 border border-blue-100 rounded-xl">
+                            <h4 className="text-sm font-medium text-blue-900 mb-1">Asignación de Dispositivo</h4>
+                            <p className="text-xs text-blue-700">
+                                Para instalar esta línea en un equipo, créela primero y luego use la opción "Cambiar Dispositivo".
+                                <br />
+                                <strong>Nota:</strong> Al instalarla en un equipo, tomará automáticamente el empleado responsable de dicho equipo.
+                            </p>
+                        </div>
+                    )}
 
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>

@@ -17,6 +17,8 @@ import {
     FileSpreadsheet, CheckCircle2, Users, Phone, Clock,
     ChevronLeft, ChevronRight, Search, Plus, Pencil, Trash2, X
 } from 'lucide-react';
+import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { toast } from 'sonner';
 
 export default function ContactosPage() {
     // Estado upload
@@ -36,7 +38,11 @@ export default function ContactosPage() {
     const [casos, setCasos] = useState<CasoLlamada[]>([]);
     const [showCasosModal, setShowCasosModal] = useState(false);
     const [editingCaso, setEditingCaso] = useState<CasoLlamada | null>(null);
-    const [casoForm, setCasoForm] = useState({ nombre: '', contestado: false });
+    const [casoForm, setCasoForm] = useState({ nombre: '', contestado: false, gestionable: false });
+
+    // Estado eliminación
+    const [confirmDelete, setConfirmDelete] = useState<{ isOpen: boolean; id: number | null }>({ isOpen: false, id: null });
+    const [isDeleting, setIsDeleting] = useState(false);
 
     // Cargar contactos paginados
     const loadContactos = useCallback(async () => {
@@ -109,26 +115,36 @@ export default function ContactosPage() {
             }
             loadCasos();
             setShowCasosModal(false);
-            setCasoForm({ nombre: '', contestado: false });
+            setCasoForm({ nombre: '', contestado: false, gestionable: false });
             setEditingCaso(null);
         } catch (error) {
             console.error('Error saving caso:', error);
         }
     };
 
-    const handleDeleteCaso = async (id: number) => {
-        if (!confirm('¿Seguro que deseas eliminar este caso?')) return;
+    const handleDeleteCaso = (id: number) => {
+        setConfirmDelete({ isOpen: true, id });
+    };
+
+    const confirmDeleteAction = async () => {
+        if (!confirmDelete.id) return;
+        setIsDeleting(true);
         try {
-            await casosLlamadaService.delete(id);
+            await casosLlamadaService.delete(confirmDelete.id);
+            toast.success('Caso eliminado correctamente');
             loadCasos();
+            setConfirmDelete({ isOpen: false, id: null });
         } catch (error: any) {
-            alert(error.response?.data?.detail || 'Error al eliminar');
+            const msg = error.response?.data?.detail || 'Error al eliminar';
+            toast.error(msg);
+        } finally {
+            setIsDeleting(false);
         }
     };
 
     const openEditCaso = (caso: CasoLlamada) => {
         setEditingCaso(caso);
-        setCasoForm({ nombre: caso.nombre, contestado: caso.contestado });
+        setCasoForm({ nombre: caso.nombre, contestado: caso.contestado, gestionable: caso.gestionable || false });
         setShowCasosModal(true);
     };
 
@@ -223,7 +239,7 @@ export default function ContactosPage() {
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-lg font-medium">Casos de Llamada</h2>
                     <button
-                        onClick={() => { setEditingCaso(null); setCasoForm({ nombre: '', contestado: false }); setShowCasosModal(true); }}
+                        onClick={() => { setEditingCaso(null); setCasoForm({ nombre: '', contestado: false, gestionable: false }); setShowCasosModal(true); }}
                         className="flex items-center gap-1 px-3 py-1.5 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700"
                     >
                         <Plus className="w-4 h-4" /> Nuevo
@@ -245,7 +261,12 @@ export default function ContactosPage() {
                                     </button>
                                 </div>
                             </div>
-                            <span className="text-xs text-gray-500">{caso.contestado ? 'Contestado' : 'No contestado'}</span>
+                            <div className="flex gap-2 text-xs text-gray-500 mt-1">
+                                <span>{caso.contestado ? 'Contestado' : 'No contestado'}</span>
+                                {caso.gestionable && (
+                                    <span className="bg-blue-100 text-blue-700 px-1.5 rounded">Gestionable</span>
+                                )}
+                            </div>
                         </div>
                     ))}
                 </div>
@@ -348,55 +369,78 @@ export default function ContactosPage() {
             </div>
 
             {/* Modal Casos */}
-            {showCasosModal && (
-                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-lg font-medium">{editingCaso ? 'Editar Caso' : 'Nuevo Caso'}</h3>
-                            <button onClick={() => setShowCasosModal(false)} className="p-1 hover:bg-gray-100 rounded">
-                                <X className="w-5 h-5" />
-                            </button>
-                        </div>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
-                                <input
-                                    type="text"
-                                    value={casoForm.nombre}
-                                    onChange={(e) => setCasoForm(f => ({ ...f, nombre: e.target.value }))}
-                                    className="w-full border rounded-md px-3 py-2"
-                                    placeholder="Ej: Contestó - Interesado"
-                                />
+            {
+                showCasosModal && (
+                    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="text-lg font-medium">{editingCaso ? 'Editar Caso' : 'Nuevo Caso'}</h3>
+                                <button onClick={() => setShowCasosModal(false)} className="p-1 hover:bg-gray-100 rounded">
+                                    <X className="w-5 h-5" />
+                                </button>
                             </div>
-                            <div className="flex items-center gap-2">
-                                <input
-                                    type="checkbox"
-                                    id="contestado"
-                                    checked={casoForm.contestado}
-                                    onChange={(e) => setCasoForm(f => ({ ...f, contestado: e.target.checked }))}
-                                    className="w-4 h-4"
-                                />
-                                <label htmlFor="contestado" className="text-sm text-gray-700">¿Contestó la llamada?</label>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
+                                    <input
+                                        type="text"
+                                        value={casoForm.nombre}
+                                        onChange={(e) => setCasoForm(f => ({ ...f, nombre: e.target.value }))}
+                                        className="w-full border rounded-md px-3 py-2"
+                                        placeholder="Ej: Contestó - Interesado"
+                                    />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="contestado"
+                                        checked={casoForm.contestado}
+                                        onChange={(e) => setCasoForm(f => ({ ...f, contestado: e.target.checked }))}
+                                        className="w-4 h-4"
+                                    />
+                                    <label htmlFor="contestado" className="text-sm text-gray-700">¿Contestó la llamada?</label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <input
+                                        type="checkbox"
+                                        id="gestionable"
+                                        checked={casoForm.gestionable}
+                                        onChange={(e) => setCasoForm(f => ({ ...f, gestionable: e.target.checked }))}
+                                        className="w-4 h-4"
+                                    />
+                                    <label htmlFor="gestionable" className="text-sm text-gray-700">¿Es gestionable?</label>
+                                    <span className="text-xs text-gray-400">(Permite continuar el flujo de gestión)</span>
+                                </div>
                             </div>
-                        </div>
-                        <div className="flex justify-end gap-2 mt-6">
-                            <button
-                                onClick={() => setShowCasosModal(false)}
-                                className="px-4 py-2 border rounded-md text-sm hover:bg-gray-50"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={handleSaveCaso}
-                                disabled={!casoForm.nombre.trim()}
-                                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
-                            >
-                                Guardar
-                            </button>
+                            <div className="flex justify-end gap-2 mt-6">
+                                <button
+                                    onClick={() => setShowCasosModal(false)}
+                                    className="px-4 py-2 border rounded-md text-sm hover:bg-gray-50"
+                                >
+                                    Cancelar
+                                </button>
+                                <button
+                                    onClick={handleSaveCaso}
+                                    disabled={!casoForm.nombre.trim()}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:opacity-50"
+                                >
+                                    Guardar
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+            {/* Modal Confirmación Eliminación */}
+            <ConfirmModal
+                isOpen={confirmDelete.isOpen}
+                onClose={() => setConfirmDelete({ isOpen: false, id: null })}
+                onConfirm={confirmDeleteAction}
+                title="Eliminar Caso"
+                message="¿Estás seguro de que deseas eliminar este caso de llamada? Esta acción no se puede deshacer."
+                confirmText="Eliminar"
+                isLoading={isDeleting}
+            />
+        </div >
     );
 }

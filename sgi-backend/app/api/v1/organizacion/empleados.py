@@ -4,6 +4,7 @@ from typing import List, Optional
 
 from app.database.db_connection import get_db
 from app.core.security import get_current_active_auth
+from app.core.dependencies import require_permission
 from app.services.organizacion.empleados import EmpleadoService
 from app.schemas.organizacion.empleados import (
     EmpleadoCreate, 
@@ -17,7 +18,7 @@ from app.schemas.organizacion.empleados import (
 router = APIRouter(prefix="/empleados", tags=["Organización - Empleados"])
 
 
-@router.get("/cumpleanos", response_model=List[dict])
+@router.get("/cumpleanos", response_model=List[dict], dependencies=[Depends(require_permission("empleados.listar"))])
 async def get_cumpleanos_todos(
     db: AsyncSession = Depends(get_db),
     _: dict = Depends(get_current_active_auth)
@@ -27,7 +28,7 @@ async def get_cumpleanos_todos(
     return await service.get_cumpleanos_todos()
 
 
-@router.get("/", response_model=EmpleadoPaginationResponse)
+@router.get("/", response_model=EmpleadoPaginationResponse, dependencies=[Depends(require_permission("empleados.listar"))])
 async def listar_empleados(
     busqueda: Optional[str] = Query(None, description="Buscar por nombre, apellido o documento"),
     page: int = Query(1, ge=1), 
@@ -48,7 +49,7 @@ async def listar_empleados(
     )
 
 
-@router.get("/dropdown", response_model=List[EmpleadoDropdown])
+@router.get("/dropdown", response_model=List[EmpleadoDropdown], dependencies=[Depends(require_permission("empleados.listar"))])
 async def get_empleados_dropdown(
     db: AsyncSession = Depends(get_db),
     _: dict = Depends(get_current_active_auth)
@@ -58,7 +59,7 @@ async def get_empleados_dropdown(
     return await service.get_dropdown()
 
 
-@router.get("/dropdown/by-area/{area_id}", response_model=List[dict])
+@router.get("/dropdown/by-area/{area_id}", response_model=List[dict], dependencies=[Depends(require_permission("empleados.listar"))])
 async def get_empleados_dropdown_by_area(
     area_id: int,
     db: AsyncSession = Depends(get_db),
@@ -69,7 +70,7 @@ async def get_empleados_dropdown_by_area(
     return await service.get_dropdown_by_area(area_id)
 
 
-@router.get("/dropdown/by-departamento/{departamento_id}", response_model=List[dict])
+@router.get("/dropdown/by-departamento/{departamento_id}", response_model=List[dict], dependencies=[Depends(require_permission("empleados.listar"))])
 async def get_empleados_dropdown_by_departamento(
     departamento_id: int,
     db: AsyncSession = Depends(get_db),
@@ -80,7 +81,7 @@ async def get_empleados_dropdown_by_departamento(
     return await service.get_dropdown_by_departamento(departamento_id)
 
 
-@router.get("/{empleado_id}", response_model=dict)
+@router.get("/{empleado_id}", response_model=dict, dependencies=[Depends(require_permission("empleados.ver"))])
 async def obtener_empleado(
     empleado_id: int,
     db: AsyncSession = Depends(get_db),
@@ -94,7 +95,7 @@ async def obtener_empleado(
     return result
 
 
-@router.post("/", response_model=OperationResult, status_code=status.HTTP_201_CREATED)
+@router.post("/", response_model=OperationResult, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_permission("empleados.crear"))])
 async def crear_empleado(
     empleado: EmpleadoCreate,
     db: AsyncSession = Depends(get_db),
@@ -105,7 +106,7 @@ async def crear_empleado(
     return await service.create(empleado)
 
 
-@router.put("/{empleado_id}", response_model=OperationResult)
+@router.put("/{empleado_id}", response_model=OperationResult, dependencies=[Depends(require_permission("empleados.editar"))])
 async def actualizar_empleado(
     empleado_id: int,
     empleado: EmpleadoUpdate,
@@ -117,7 +118,7 @@ async def actualizar_empleado(
     return await service.update(empleado_id, empleado)
 
 
-@router.delete("/{empleado_id}", response_model=OperationResult)
+@router.delete("/{empleado_id}", response_model=OperationResult, dependencies=[Depends(require_permission("empleados.eliminar"))])
 async def desactivar_empleado(
     empleado_id: int,
     db: AsyncSession = Depends(get_db),
@@ -131,7 +132,7 @@ async def desactivar_empleado(
     return await service.delete(empleado_id)
 
 
-@router.post("/{empleado_id}/reactivar", response_model=OperationResult)
+@router.post("/{empleado_id}/reactivar", response_model=OperationResult, dependencies=[Depends(require_permission("empleados.editar"))])
 async def reactivar_empleado(
     empleado_id: int,
     db: AsyncSession = Depends(get_db),

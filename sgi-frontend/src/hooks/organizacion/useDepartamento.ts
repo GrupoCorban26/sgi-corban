@@ -1,39 +1,34 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import api from '@/lib/axios';
+
+import { departamentoService } from '@/services/organizacion/departamento';
+import { empleadoService } from '@/services/organizacion';
+import { Departamento } from '@/types/organizacion/departamento';
+
+// Importamos los tipos específicos
 import {
-  Departamento,
   DepartamentoPaginationResponse,
   OperationResult,
-  EmpleadoOption,
-  DepartamentoOption
+  DepartamentoOption,
+  DepartamentoCreate, // <-- Añadido
+  DepartamentoUpdate  // <-- Añadido
 } from '@/types/organizacion/departamento';
-
-const DEPTOS_URL = '/departamentos';
-const EMPLEADOS_URL = '/empleados';
 
 // ============================================
 // HOOK PRINCIPAL DE DEPARTAMENTOS
 // ============================================
+
 export const useDepartamentos = (busqueda = '', page = 1, pageSize = 15) => {
   const queryClient = useQueryClient();
 
   // 1. Obtener Departamentos (Paginado y con Búsqueda)
-  const listQuery = useQuery({
+  const listQuery = useQuery<DepartamentoPaginationResponse>({
     queryKey: ['departamentos', busqueda, page, pageSize],
-    queryFn: async () => {
-      const { data } = await api.get<DepartamentoPaginationResponse>(`${DEPTOS_URL}/`, {
-        params: { busqueda, page, page_size: pageSize },
-      });
-      return data;
-    },
+    queryFn: async () => departamentoService.listar(page, pageSize, busqueda)
   });
 
   // 2. Crear Departamento
   const createMutation = useMutation({
-    mutationFn: async (newDepto: Partial<Departamento>) => {
-      const { data } = await api.post<OperationResult>(`${DEPTOS_URL}/`, newDepto);
-      return data;
-    },
+    mutationFn: async (newDepto: DepartamentoCreate) => departamentoService.crear(newDepto),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['departamentos'] });
       queryClient.invalidateQueries({ queryKey: ['departamentos-select'] });
@@ -42,9 +37,8 @@ export const useDepartamentos = (busqueda = '', page = 1, pageSize = 15) => {
 
   // 3. Actualizar Departamento
   const updateMutation = useMutation({
-    mutationFn: async ({ id, data: deptoData }: { id: number; data: Partial<Departamento> }) => {
-      const response = await api.put<OperationResult>(`${DEPTOS_URL}/${id}`, deptoData);
-      return response.data;
+    mutationFn: async ({ id, data: deptoData }: { id: number; data: DepartamentoUpdate }) => {
+      return departamentoService.actualizar(id, deptoData);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['departamentos'] });
@@ -55,8 +49,7 @@ export const useDepartamentos = (busqueda = '', page = 1, pageSize = 15) => {
   // 4. Desactivar Departamento (Borrado lógico)
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const { data } = await api.delete<OperationResult>(`${DEPTOS_URL}/${id}`);
-      return data;
+      return departamentoService.desactivar(id);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['departamentos'] });
@@ -83,21 +76,6 @@ export const useDepartamentos = (busqueda = '', page = 1, pageSize = 15) => {
 };
 
 // ============================================
-// HOOK PARA CARGAR EMPLEADOS (DROPDOWN)
-// ============================================
-export const useEmpleadosParaSelect = () => {
-  return useQuery({
-    queryKey: ['empleados-select'],
-    queryFn: async () => {
-      // Usamos el endpoint dropdown que devuelve formato simple
-      const { data } = await api.get<EmpleadoOption[]>(`${EMPLEADOS_URL}/dropdown`);
-      return data;
-    },
-    staleTime: 0, // Siempre refetch para obtener datos actualizados
-  });
-};
-
-// ============================================
 // HOOK PARA CARGAR DEPARTAMENTOS (DROPDOWN)
 // ============================================
 
@@ -105,8 +83,7 @@ export const useDepartamentosParaSelect = () => {
   return useQuery({
     queryKey: ['departamentos-select'],
     queryFn: async () => {
-      const { data } = await api.get<DepartamentoOption[]>(`${DEPTOS_URL}/dropdown`);
-      return data;
+      return departamentoService.obtenerDropdown();
     },
     staleTime: 0, // Siempre refetch para obtener datos actualizados
   });

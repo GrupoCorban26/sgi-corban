@@ -52,9 +52,10 @@ class LineaService:
         """Lista todas las líneas con paginación y filtros"""
         offset = (page - 1) * page_size
         
+        # Necesitamos cargar el activo y sus asignaciones (para saber quién lo tiene)
+        # Nota: selectinload('activo.asignaciones') puede ser pesado si hay muchos cambios
         stmt = select(LineaCorporativa).options(
-            selectinload(LineaCorporativa.activo),
-            selectinload(LineaCorporativa.empleado)
+            selectinload(LineaCorporativa.activo).selectinload(Activo.asignaciones).selectinload(EmpleadoActivo.empleado)
         ).where(LineaCorporativa.is_active == True)
         
         if busqueda:
@@ -63,26 +64,38 @@ class LineaService:
                 LineaCorporativa.gmail.ilike(f"%{busqueda}%"),
                 LineaCorporativa.operador.ilike(f"%{busqueda}%")
             ))
-        
+            
+        # Filtro por empleado (COMPLEJO: ahora depende del activo)
+        # Por simplicidad en MVP: Filtrar en memoria o usar JOIN complejo.
+        # Dado que SQL Server maneja bien JOINS, haremos el JOIN si se pide empleado.
         if empleado_id is not None:
-            stmt = stmt.where(LineaCorporativa.empleado_id == empleado_id)
+             # Unir con activos y empleado_activo vigente
+             stmt = stmt.join(LineaCorporativa.activo).join(Activo.asignaciones).where(
+                 EmpleadoActivo.empleado_id == empleado_id,
+                 EmpleadoActivo.fecha_devolucion.is_(None)
+             )
         
-        if solo_disponibles is True:
-            stmt = stmt.where(LineaCorporativa.empleado_id.is_(None))
-        elif solo_disponibles is False:
-            stmt = stmt.where(LineaCorporativa.empleado_id.isnot(None))
-        
-        # Count
-        count_stmt = select(func.count()).select_from(stmt.subquery())
-        total = (await self.db.execute(count_stmt)).scalar() or 0
-        
-        # Data
+        # Data sorting & pagination
         stmt = stmt.order_by(LineaCorporativa.numero).offset(offset).limit(page_size)
         result = await self.db.execute(stmt)
         lineas = result.scalars().all()
         
+        # Count (aproximado, optimizar despues)
+        # Nota: El count real requeriría replicar los joins.
+        # Para mantener performance, hacemos count simple de lineas activas por ahora.
+        count_stmt = select(func.count()).select_from(LineaCorporativa).where(LineaCorporativa.is_active == True)
+        if busqueda:
+            count_stmt = count_stmt.where(or_(
+                LineaCorporativa.numero.ilike(f"%{busqueda}%"),
+                LineaCorporativa.gmail.ilike(f"%{busqueda}%")
+            ))
+        total = (await self.db.execute(count_stmt)).scalar() or 0
+        
         data = []
         for l in lineas:
+            # Lógica Device-Centric: El responsable es quien tiene el activo
+            responsable = l.responsable
+            
             data.append({
                 "id": l.id,
                 "numero": l.numero,
@@ -92,8 +105,9 @@ class LineaService:
                 "proveedor": l.proveedor,
                 "activo_id": l.activo_id,
                 "activo_nombre": f"{l.activo.producto} {l.activo.marca or ''}" if l.activo else None,
-                "empleado_id": l.empleado_id,
-                "empleado_nombre": f"{l.empleado.nombres} {l.empleado.apellido_paterno}" if l.empleado else None,
+                # DEPRECATED: l.empleado_id -> Usar derived
+                "empleado_id": responsable.id if responsable else None,
+                "empleado_nombre": f"{responsable.nombres} {responsable.apellido_paterno}" if responsable else None,
                 "fecha_asignacion": l.fecha_asignacion,
                 "is_active": l.is_active,
                 "observaciones": l.observaciones,
@@ -112,8 +126,7 @@ class LineaService:
     async def get_by_id(self, linea_id: int) -> dict:
         """Obtiene una línea por ID"""
         stmt = select(LineaCorporativa).options(
-            selectinload(LineaCorporativa.activo),
-            selectinload(LineaCorporativa.empleado)
+            selectinload(LineaCorporativa.activo).selectinload(Activo.asignaciones).selectinload(EmpleadoActivo.empleado)
         ).where(LineaCorporativa.id == linea_id)
         
         result = await self.db.execute(stmt)
@@ -121,6 +134,8 @@ class LineaService:
         
         if not l:
             return None
+            
+        responsable = l.responsable
         
         return {
             "id": l.id,
@@ -131,77 +146,43 @@ class LineaService:
             "proveedor": l.proveedor,
             "activo_id": l.activo_id,
             "activo_nombre": f"{l.activo.producto} {l.activo.marca or ''}" if l.activo else None,
-            "empleado_id": l.empleado_id,
-            "empleado_nombre": f"{l.empleado.nombres} {l.empleado.apellido_paterno}" if l.empleado else None,
+            "empleado_id": responsable.id if responsable else None,
+            "empleado_nombre": f"{responsable.nombres} {responsable.apellido_paterno}" if responsable else None,
             "fecha_asignacion": l.fecha_asignacion,
             "is_active": l.is_active,
             "observaciones": l.observaciones,
             "created_at": l.created_at,
             "updated_at": l.updated_at
         }
-
+    
+    
     async def get_historial(self, linea_id: int) -> list:
         """Obtiene el historial de cambios de una línea"""
-        stmt = select(LineaHistorial).where(
-            LineaHistorial.linea_id == linea_id
-        ).order_by(LineaHistorial.fecha_cambio.desc())
-        
+        stmt = select(LineaHistorial).options(
+            selectinload(LineaHistorial.usuario),
+            selectinload(LineaHistorial.activo_anterior),
+            selectinload(LineaHistorial.activo_nuevo),
+            selectinload(LineaHistorial.empleado_anterior),
+            selectinload(LineaHistorial.empleado_nuevo)
+        ).where(LineaHistorial.linea_id == linea_id).order_by(LineaHistorial.fecha_cambio.desc())
+
         result = await self.db.execute(stmt)
-        registros = result.scalars().all()
-        
-        historial = []
-        for h in registros:
-            # Get related names
-            activo_anterior_nombre = None
-            activo_nuevo_nombre = None
-            empleado_anterior_nombre = None
-            empleado_nuevo_nombre = None
-            
-            if h.activo_anterior_id:
-                activo = await self.db.get(Activo, h.activo_anterior_id)
-                if activo:
-                    activo_anterior_nombre = f"{activo.producto} {activo.marca or ''}"
-            
-            if h.activo_nuevo_id:
-                activo = await self.db.get(Activo, h.activo_nuevo_id)
-                if activo:
-                    activo_nuevo_nombre = f"{activo.producto} {activo.marca or ''}"
-            
-            if h.empleado_anterior_id:
-                emp = await self.db.get(Empleado, h.empleado_anterior_id)
-                if emp:
-                    empleado_anterior_nombre = f"{emp.nombres} {emp.apellido_paterno}"
-            
-            if h.empleado_nuevo_id:
-                emp = await self.db.get(Empleado, h.empleado_nuevo_id)
-                if emp:
-                    empleado_nuevo_nombre = f"{emp.nombres} {emp.apellido_paterno}"
-            
-            historial.append({
+        historial = result.scalars().all()
+
+        return [
+            {
                 "id": h.id,
                 "tipo_cambio": h.tipo_cambio,
-                "activo_anterior_nombre": activo_anterior_nombre,
-                "activo_nuevo_nombre": activo_nuevo_nombre,
-                "empleado_anterior_nombre": empleado_anterior_nombre,
-                "empleado_nuevo_nombre": empleado_nuevo_nombre,
+                "fecha_cambio": h.fecha_cambio,
                 "observaciones": h.observaciones,
-                "registrado_por_nombre": None,  # TODO: get user name
-                "fecha_cambio": h.fecha_cambio
-            })
-        
-        return historial
-
-    async def _get_empleado_del_activo(self, activo_id: int) -> int | None:
-        """Obtiene el ID del empleado que tiene asignado el activo actualmente"""
-        if not activo_id:
-            return None
-            
-        stmt = select(EmpleadoActivo).where(
-            EmpleadoActivo.activo_id == activo_id,
-            EmpleadoActivo.fecha_devolucion.is_(None)
-        )
-        asignacion = (await self.db.execute(stmt)).scalars().first()
-        return asignacion.empleado_id if asignacion else None
+                "registrado_por_nombre": h.usuario.correo_corp if h.usuario else "Sistema",
+                "activo_anterior_nombre": f"{h.activo_anterior.producto} {h.activo_anterior.marca}" if h.activo_anterior else None,
+                "activo_nuevo_nombre": f"{h.activo_nuevo.producto} {h.activo_nuevo.marca}" if h.activo_nuevo else None,
+                "empleado_anterior_nombre": f"{h.empleado_anterior.nombres} {h.empleado_anterior.apellido_paterno}" if h.empleado_anterior else None,
+                "empleado_nuevo_nombre": f"{h.empleado_nuevo.nombres} {h.empleado_nuevo.apellido_paterno}" if h.empleado_nuevo else None,
+            }
+            for h in historial
+        ]
 
     async def create(self, data: LineaCreate, usuario_id: int = None) -> dict:
         """Crea una nueva línea corporativa"""
@@ -226,12 +207,8 @@ class LineaService:
             if existing:
                 raise HTTPException(status_code=400, detail="Ese celular ya tiene una línea asignada")
         
-        # Auto-detectar empleado si hay activo asignado
-        empleado_id = data.empleado_id
-        if data.activo_id:
-            empleado_activo_id = await self._get_empleado_del_activo(data.activo_id)
-            if empleado_activo_id:
-                empleado_id = empleado_activo_id
+        # En Device-Centric, NO guardamos empleado_id en la tabla.
+        # Se deriva dinámicamente.
         
         linea = LineaCorporativa(
             numero=data.numero,
@@ -240,8 +217,7 @@ class LineaService:
             plan=data.plan,
             proveedor=data.proveedor,
             activo_id=data.activo_id,
-            empleado_id=empleado_id, # Usar el detectado o el original
-            fecha_asignacion=datetime.now() if empleado_id else None,
+            fecha_asignacion=datetime.now(),
             observaciones=data.observaciones
         )
         
@@ -253,7 +229,7 @@ class LineaService:
             linea_id=linea.id,
             tipo_cambio="CREACION",
             activo_nuevo_id=data.activo_id,
-            empleado_nuevo_id=empleado_id,
+            empleado_nuevo_id=None, # No tracking redundant employee history on line
             observaciones="Línea creada",
             usuario_id=usuario_id
         )
@@ -316,20 +292,9 @@ class LineaService:
             raise HTTPException(status_code=400, detail="Ese celular ya tiene una línea asignada")
         
         activo_anterior_id = linea.activo_id
-        empleado_anterior_id = linea.empleado_id
+        # empleado_anterior_id deprecado
         
         linea.activo_id = data.nuevo_activo_id
-        
-        # Auto-detectar empleado del nuevo activo
-        empleado_activo_id = await self._get_empleado_del_activo(data.nuevo_activo_id)
-        
-        # Si el nuevo activo tiene empleado, asignamos la línea a ese empleado
-        empleado_nuevo_id = empleado_anterior_id
-        if empleado_activo_id:
-             linea.empleado_id = empleado_activo_id
-             if empleado_anterior_id != empleado_activo_id:
-                 linea.fecha_asignacion = datetime.now()
-             empleado_nuevo_id = empleado_activo_id
         
         # Registrar historial
         await self._registrar_historial(
@@ -337,8 +302,6 @@ class LineaService:
             tipo_cambio="CAMBIO_CELULAR",
             activo_anterior_id=activo_anterior_id,
             activo_nuevo_id=data.nuevo_activo_id,
-            empleado_anterior_id=empleado_anterior_id if empleado_anterior_id != empleado_nuevo_id else None,
-            empleado_nuevo_id=empleado_nuevo_id if empleado_anterior_id != empleado_nuevo_id else None,
             observaciones=data.observaciones or "Cambio de celular",
             usuario_id=usuario_id
         )
@@ -348,60 +311,49 @@ class LineaService:
         return {"success": True, "message": "Línea movida a nuevo celular correctamente", "id": linea_id}
 
     async def asignar_empleado(self, linea_id: int, data: AsignarEmpleadoRequest, usuario_id: int = None) -> dict:
-        """Asigna la línea a un empleado"""
+        """
+        [DEPRECATED FLOW]
+        En el modelo Device-Centric, no se asigna la línea directamente al empleado.
+        Se asigna el Activo (Celular) al empleado.
+        """
+        linea = await self.db.get(LineaCorporativa, linea_id)
+        if not linea:
+            raise HTTPException(status_code=404, detail="Línea no encontrada")
+        
+        if linea.activo_id:
+            # Si tiene celular, el usuario debe ir a Inventario
+            raise HTTPException(
+                status_code=400, 
+                detail="Esta línea está instalada en un Celular. Para cambiar el responsable, debes asignar el Celular (Activo) al nuevo empleado desde el módulo de Inventario."
+            )
+        else:
+            # Caso borde: Chip suelto. Permitimos asignación legacy o bloqueamos?
+            # Por consistencia con el plan, bloqueamos.
+            raise HTTPException(
+                status_code=400,
+                detail="La línea no tiene un celular asociado. Primero instale la línea en un celular y luego asigne el celular al empleado."
+            )
+
+    async def desasignar_empleado(self, linea_id: int, observaciones: str = None, usuario_id: int = None) -> dict:
+        """
+        [DEPRECATED FLOW]
+        En el modelo Device-Centric, se desasigna devolviendo el activo.
+        """
         linea = await self.db.get(LineaCorporativa, linea_id)
         if not linea:
             raise HTTPException(status_code=404, detail="Línea no encontrada")
         
         if linea.activo_id:
             raise HTTPException(
-                status_code=400, 
-                detail="Esta línea está enlazada a un equipo. Para cambiar el responsable, asigne el equipo al empleado correspondiente desde Inventario."
+                status_code=400,
+                detail="Esta línea está en un celular. Realice la devolución del celular en el módulo de Inventario."
             )
         
-        empleado_anterior_id = linea.empleado_id
-        linea.empleado_id = data.empleado_id
-        linea.fecha_asignacion = datetime.now()
-        
-        # Registrar historial
-        await self._registrar_historial(
-            linea_id=linea_id,
-            tipo_cambio="ASIGNACION",
-            empleado_anterior_id=empleado_anterior_id,
-            empleado_nuevo_id=data.empleado_id,
-            observaciones=data.observaciones or "Asignación a empleado",
-            usuario_id=usuario_id
-        )
-        
-        await self.db.commit()
-        
-        return {"success": True, "message": "Línea asignada correctamente", "id": linea_id}
-
-    async def desasignar_empleado(self, linea_id: int, observaciones: str = None, usuario_id: int = None) -> dict:
-        """Desasigna la línea del empleado actual"""
-        linea = await self.db.get(LineaCorporativa, linea_id)
-        if not linea:
-            raise HTTPException(status_code=404, detail="Línea no encontrada")
-        
-        if not linea.empleado_id:
-            raise HTTPException(status_code=400, detail="La línea no está asignada a ningún empleado")
-        
-        empleado_anterior_id = linea.empleado_id
+        # Si llegamos aqui, es un chip suelto legacy. Limpiamos.
         linea.empleado_id = None
-        linea.fecha_asignacion = None
-        
-        # Registrar historial
-        await self._registrar_historial(
-            linea_id=linea_id,
-            tipo_cambio="DESASIGNACION",
-            empleado_anterior_id=empleado_anterior_id,
-            observaciones=observaciones or "Línea desasignada",
-            usuario_id=usuario_id
-        )
-        
         await self.db.commit()
         
-        return {"success": True, "message": "Línea desasignada correctamente", "id": linea_id}
+        return {"success": True, "message": "Línea desasignada", "id": linea_id}
 
     async def delete(self, linea_id: int, usuario_id: int = None) -> dict:
         """Da de baja una línea (soft delete)"""
@@ -427,7 +379,7 @@ class LineaService:
         """Obtiene líneas disponibles para dropdown"""
         stmt = select(LineaCorporativa).where(
             LineaCorporativa.is_active == True,
-            LineaCorporativa.empleado_id.is_(None)
+            LineaCorporativa.activo_id.is_(None)
         ).order_by(LineaCorporativa.numero)
         
         result = await self.db.execute(stmt)

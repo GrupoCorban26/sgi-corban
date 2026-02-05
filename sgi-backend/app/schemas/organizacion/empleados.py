@@ -67,7 +67,7 @@ class EmpleadoPaginationResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
-    data: List[Any]  # Flexible para evitar errores de validación
+    data: List[EmpleadoResponse]  # Flexible para evitar errores de validación
 
 
 class OperationResult(BaseModel):

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   Database, Upload, Loader2, AlertCircle, Phone, Mail,
-  CheckCircle2, RefreshCw, Filter, Save
+  CheckCircle2, RefreshCw, Filter, Save, UserPlus, X, Plus
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBaseComercial } from '@/hooks/comercial/useBaseComercial';
@@ -31,7 +31,9 @@ export default function BaseComercialPage() {
     isCargarBaseLoading,
     actualizarFeedback,
     isActualizandoFeedback,
-    refetch
+    refetch,
+    crearContactoManual,
+    isCreandoContactoManual
   } = useBaseComercial();
 
 
@@ -45,6 +47,10 @@ export default function BaseComercialPage() {
 
   // Estado de feedback local para todos los contactos
   const [feedbackLocal, setFeedbackLocal] = useState<{ [key: number]: { contesto: boolean | null; caso_id: number; comentario: string } }>({});
+
+  // Estado para modal de contacto manual
+  const [manualModal, setManualModal] = useState<{ isOpen: boolean; ruc: string; razonSocial: string }>({ isOpen: false, ruc: '', razonSocial: '' });
+  const [manualForm, setManualForm] = useState({ nombre: '', cargo: '', telefono: '', email: '' });
 
   // Estado para rastrear filas guardadas (sin cambios pendientes)
   const [savedRows, setSavedRows] = useState<Set<number>>(new Set());
@@ -100,6 +106,28 @@ export default function BaseComercialPage() {
     }
   };
 
+  const handleCreateManual = async () => {
+    if (!manualForm.nombre || !manualForm.telefono) {
+      toast.error('Nombre y teléfono son obligatorios');
+      return;
+    }
+
+    try {
+      await crearContactoManual({
+        ruc: manualModal.ruc,
+        nombre: manualForm.nombre,
+        telefono: manualForm.telefono,
+        cargo: manualForm.cargo,
+        email: manualForm.email
+      });
+      toast.success('Contacto creado y asignado');
+      setManualModal({ isOpen: false, ruc: '', razonSocial: '' });
+      setManualForm({ nombre: '', cargo: '', telefono: '', email: '' });
+      refetch(); // Recargar la lista para ver el nuevo contacto (aunque la query se invalida, esto asegura)
+    } catch (error: any) {
+      toast.error(error.response?.data?.detail || 'Error al crear contacto');
+    }
+  };
 
 
   const getEstadoContacto = (contacto: ContactoAsignado): string => {
@@ -250,6 +278,16 @@ export default function BaseComercialPage() {
                         <span className="font-medium text-gray-800 truncate block" title={contacto.razon_social}>
                           {contacto.razon_social}
                         </span>
+                        <button
+                          onClick={() => {
+                            setManualModal({ isOpen: true, ruc: contacto.ruc, razonSocial: contacto.razon_social });
+                            setManualForm({ nombre: '', cargo: '', telefono: '', email: '' });
+                          }}
+                          className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 mt-1"
+                          title="Agregar otro contacto a esta empresa"
+                        >
+                          <UserPlus size={12} /> Agregar contacto
+                        </button>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 text-gray-600">
@@ -428,6 +466,84 @@ export default function BaseComercialPage() {
             <RefreshCw size={14} />
             Actualizar
           </button>
+        </div>
+      )}
+      {/* Modal Contacto Manual */}
+      {manualModal.isOpen && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Nuevo Contacto</h3>
+                <p className="text-xs text-gray-500">{manualModal.razonSocial} ({manualModal.ruc})</p>
+              </div>
+              <button onClick={() => setManualModal({ ...manualModal, isOpen: false })} className="p-1 hover:bg-gray-100 rounded-lg">
+                <X className="w-5 h-5 text-gray-500" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo *</label>
+                <input
+                  type="text"
+                  value={manualForm.nombre}
+                  onChange={e => setManualForm({ ...manualForm, nombre: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                  placeholder="Ej: Juan Perez"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono/Celular *</label>
+                  <input
+                    type="text"
+                    value={manualForm.telefono}
+                    onChange={e => setManualForm({ ...manualForm, telefono: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="999..."
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Cargo</label>
+                  <input
+                    type="text"
+                    value={manualForm.cargo}
+                    onChange={e => setManualForm({ ...manualForm, cargo: e.target.value })}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                    placeholder="Ej: Gerente"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
+                <input
+                  type="email"
+                  value={manualForm.email}
+                  onChange={e => setManualForm({ ...manualForm, email: e.target.value })}
+                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                  placeholder="correo@ejemplo.com"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-8">
+              <button
+                onClick={() => setManualModal({ ...manualModal, isOpen: false })}
+                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCreateManual}
+                disabled={isCreandoContactoManual || !manualForm.nombre || !manualForm.telefono}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 flex items-center gap-2"
+              >
+                {isCreandoContactoManual ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                Guardar Contacto
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

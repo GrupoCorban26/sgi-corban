@@ -66,7 +66,7 @@ class ActivoPaginationResponse(BaseModel):
     page: int
     page_size: int
     total_pages: int
-    data: List[Any]
+    data: List[ActivoResponse]
 
 
 class ActivoHistorialResponse(BaseModel):

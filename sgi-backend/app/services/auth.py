@@ -79,7 +79,12 @@ async def obtener_usuario_por_correo(db: AsyncSession, correo: str):
         return None
 
 from datetime import datetime, timedelta, timezone
+import hashlib
 from app.models.seguridad import Sesion
+
+def _hash_token(token: str) -> str:
+    """Genera un hash SHA256 del token para almacenamiento seguro y eficiente."""
+    return hashlib.sha256(token.encode()).hexdigest()
 
 async def registrar_sesion(db: AsyncSession, usuario_id: int, token: str, ip: str = None, user_agent: str = None):
     """Registra una nueva sesión activa en la base de datos."""
@@ -88,9 +93,11 @@ async def registrar_sesion(db: AsyncSession, usuario_id: int, token: str, ip: st
         # El token JWT durará 24h, pero la sesión en BD manda la inactividad
         expira = datetime.now(timezone.utc) + timedelta(minutes=30) 
         
+        token_hash = _hash_token(token)
+
         nueva_sesion = Sesion(
             usuario_id=usuario_id,
-            refresh_token=token, # Por simplicidad guardamos el access_token aquí para validarlo/revocarlo
+            refresh_token=token_hash, # Guardamos el HASH, no el token completo (fix truncation issue)
             ip_address=ip,
             user_agent=user_agent,
             expira_en=expira,
@@ -106,8 +113,9 @@ async def registrar_sesion(db: AsyncSession, usuario_id: int, token: str, ip: st
 async def revocar_sesion(db: AsyncSession, token: str):
     """Revoca (marca como inválida) una sesión basada en el token."""
     try:
-        # Buscar la sesión con este token
-        query = select(Sesion).where(Sesion.refresh_token == token)
+        token_hash = _hash_token(token)
+        # Buscar la sesión con este token hash
+        query = select(Sesion).where(Sesion.refresh_token == token_hash)
         result = await db.execute(query)
         sesion = result.scalars().first()
         
@@ -123,7 +131,8 @@ async def revocar_sesion(db: AsyncSession, token: str):
 async def verificar_sesion_activa(db: AsyncSession, token: str) -> bool:
     """Verifica si existe una sesión activa y no revocada para este token."""
     try:
-        query = select(Sesion).where(Sesion.refresh_token == token)
+        token_hash = _hash_token(token)
+        query = select(Sesion).where(Sesion.refresh_token == token_hash)
         result = await db.execute(query)
         sesion = result.scalars().first()
         
@@ -148,8 +157,9 @@ async def extender_sesion(db: AsyncSession, token: str):
     Se llama en cada request autenticado.
     """
     try:
+        token_hash = _hash_token(token)
         # 1. Buscar sesión (optimizado: podríamos cachearlo pero por ahora es directo a BD)
-        query = select(Sesion).where(Sesion.refresh_token == token)
+        query = select(Sesion).where(Sesion.refresh_token == token_hash)
         result = await db.execute(query)
         sesion = result.scalars().first()
         
