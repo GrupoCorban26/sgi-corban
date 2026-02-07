@@ -11,8 +11,7 @@ from app.schemas.organizacion.lineas import (
     LineaHistorialResponse,
     OperationResult,
     LineaDropdown,
-    CambiarCelularRequest,
-    AsignarEmpleadoRequest
+    CambiarCelularRequest
 )
 from app.core.security import get_current_user_id, get_current_active_auth
 
@@ -109,18 +108,6 @@ async def cambiar_celular_linea(
     """Mueve la línea a otro celular (cuando el anterior se daña)"""
     service = LineaService(db)
     return await service.cambiar_celular(linea_id, request, usuario_id=usuario_id)
-
-
-@router.post("/{linea_id}/asignar", response_model=OperationResult)
-async def asignar_linea_empleado(
-    linea_id: int,
-    request: AsignarEmpleadoRequest,
-    db: AsyncSession = Depends(get_db),
-    usuario_id: int = Depends(get_current_user_id)
-):
-    """Asigna una línea a un empleado"""
-    service = LineaService(db)
-    return await service.asignar_empleado(linea_id, request, usuario_id=usuario_id)
 
 
 @router.post("/{linea_id}/desasignar", response_model=OperationResult)

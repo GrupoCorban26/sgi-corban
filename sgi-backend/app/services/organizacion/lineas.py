@@ -7,7 +7,7 @@ from datetime import datetime
 
 from app.models.administrativo import LineaCorporativa, LineaHistorial, Activo, Empleado, EmpleadoActivo
 from app.schemas.organizacion.lineas import (
-    LineaCreate, LineaUpdate, CambiarCelularRequest, AsignarEmpleadoRequest
+    LineaCreate, LineaUpdate, CambiarCelularRequest
 )
 
 
@@ -309,30 +309,6 @@ class LineaService:
         await self.db.commit()
         
         return {"success": True, "message": "Línea movida a nuevo celular correctamente", "id": linea_id}
-
-    async def asignar_empleado(self, linea_id: int, data: AsignarEmpleadoRequest, usuario_id: int = None) -> dict:
-        """
-        [DEPRECATED FLOW]
-        En el modelo Device-Centric, no se asigna la línea directamente al empleado.
-        Se asigna el Activo (Celular) al empleado.
-        """
-        linea = await self.db.get(LineaCorporativa, linea_id)
-        if not linea:
-            raise HTTPException(status_code=404, detail="Línea no encontrada")
-        
-        if linea.activo_id:
-            # Si tiene celular, el usuario debe ir a Inventario
-            raise HTTPException(
-                status_code=400, 
-                detail="Esta línea está instalada en un Celular. Para cambiar el responsable, debes asignar el Celular (Activo) al nuevo empleado desde el módulo de Inventario."
-            )
-        else:
-            # Caso borde: Chip suelto. Permitimos asignación legacy o bloqueamos?
-            # Por consistencia con el plan, bloqueamos.
-            raise HTTPException(
-                status_code=400,
-                detail="La línea no tiene un celular asociado. Primero instale la línea en un celular y luego asigne el celular al empleado."
-            )
 
     async def desasignar_empleado(self, linea_id: int, observaciones: str = None, usuario_id: int = None) -> dict:
         """

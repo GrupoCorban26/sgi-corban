@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 
@@ -50,8 +50,7 @@ class LineaResponse(BaseModel):
     created_at: Optional[datetime]
     updated_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class LineaPaginationResponse(BaseModel):
@@ -60,7 +59,6 @@ class LineaPaginationResponse(BaseModel):
     page_size: int
     total_pages: int
     data: List[LineaResponse]
-
 
 class LineaHistorialResponse(BaseModel):
     id: int
@@ -73,8 +71,7 @@ class LineaHistorialResponse(BaseModel):
     registrado_por_nombre: Optional[str]
     fecha_cambio: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class OperationResult(BaseModel):
