@@ -1,23 +1,37 @@
+import asyncio
 import sys
 import os
 
-# Agregar el directorio actual al path para importar módulos
+# Agregar path
 sys.path.append(os.getcwd())
 
-from app.core.database import engine, Base
-# Importar todos los modelos para que SQLAlchemy los reconozca al crear las tablas
-from app.models.usuario import Usuario
-from app.models.organizacion import Empleado, Departamento, Area, Cargo, Activo, EstadoActivo, Linea, Ubigeo
-from app.models.comercial import Contacto, CasoLlamada, BaseComercial, Cliente, Cita, Inbox, ConversationSession
-from app.models.importacion import Importacion, DetalleImportacion
+from app.database.db_connection import engine
+from app.models.base import Base
 
-def init_db():
-    print("Creando tablas en la base de datos...")
+# Importar TODOS los modelos para que Base.metadata los reconozca
+# Es necesario importar los módulos donde se definen las clases
+from app.models import (
+    administrativo,
+    logistica,
+    seguridad,
+    core,
+    comercial,
+    comercial_inbox,
+    comercial_session
+)
+
+async def init_db():
+    print("⏳ Conectando a la base de datos para crear tablas...")
     try:
-        Base.metadata.create_all(bind=engine)
-        print("✅ Tablas creadas exitosamente.")
+        # Como el motor es asíncrono (mssql+aioodbc), usamos run_sync
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        print("✅ Tablas creadas exitosamente en SQL Server.")
     except Exception as e:
-        print(f"❌ Error al crear tablas: {e}")
+        print(f"❌ Error fatal al crear tablas: {e}")
 
 if __name__ == "__main__":
-    init_db()
+    try:
+        asyncio.run(init_db())
+    except KeyboardInterrupt:
+        print("Cancelado por el usuario.")
