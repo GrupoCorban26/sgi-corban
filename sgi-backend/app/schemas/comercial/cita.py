@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime, date
 
@@ -84,8 +84,7 @@ class ComercialAsignado(BaseModel):
     nombre: Optional[str] = None
     confirmado: bool = False
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class CitaResponse(BaseModel):
@@ -127,5 +126,4 @@ class CitaResponse(BaseModel):
     created_at: Optional[datetime] = None
     created_by: Optional[int] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

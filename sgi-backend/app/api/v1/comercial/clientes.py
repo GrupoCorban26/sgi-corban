@@ -4,7 +4,12 @@ from typing import Optional, List
 
 # Importaciones de base de datos y esquemas
 from app.database.db_connection import get_db
-from app.schemas.comercial.cliente import ClienteCreate, ClienteUpdate
+from app.schemas.comercial.cliente import (
+    ClienteCreate, 
+    ClienteUpdate, 
+    ClienteMarcarPerdido, 
+    ClienteCambiarEstado
+)
 from app.services.comercial.clientes_service import ClientesService
 
 # Importaciones de seguridad refinada
@@ -162,6 +167,77 @@ async def desactivar_cliente(
     """Desactivación lógica (Soft Delete) del cliente."""
     service = ClientesService(db)
     result = await service.delete(id, updated_by=current_user_id)
+    
+    if result.get("success") == 0:
+        raise HTTPException(status_code=400, detail=result.get("message"))
+        
+    return result
+
+
+@router.post("/{id}/cambiar-estado", dependencies=[Depends(require_permission("clientes.editar"))])
+async def cambiar_estado(
+    id: int,
+    estado_data: ClienteCambiarEstado,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id)
+):
+    """Cambia el estado del cliente (PROSPECTO <-> EN_NEGOCIACION <-> CLIENTE)."""
+    service = ClientesService(db)
+    result = await service.cambiar_estado(id, estado_data.nuevo_estado, updated_by=current_user_id)
+    
+    if result.get("success") == 0:
+        raise HTTPException(status_code=400, detail=result.get("message"))
+        
+    return result
+
+
+@router.post("/{id}/marcar-perdido", dependencies=[Depends(require_permission("clientes.editar"))])
+async def marcar_perdido(
+    id: int,
+    data: ClienteMarcarPerdido,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id)
+):
+    """Marca como PERDIDO. Si tiene fecha reactivación es temporal, sino se archiva."""
+    service = ClientesService(db)
+    result = await service.marcar_perdido(
+        id, 
+        motivo=data.motivo_perdida, 
+        fecha_reactivacion=data.fecha_reactivacion, 
+        updated_by=current_user_id
+    )
+    
+    if result.get("success") == 0:
+        raise HTTPException(status_code=400, detail=result.get("message"))
+        
+    return result
+
+
+@router.post("/{id}/reactivar", dependencies=[Depends(require_permission("clientes.editar"))])
+async def reactivar_cliente(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id)
+):
+    """Reactiva un cliente PERDIDO o INACTIVO a PROSPECTO."""
+    service = ClientesService(db)
+    result = await service.reactivar(id, updated_by=current_user_id)
+    
+    if result.get("success") == 0:
+        raise HTTPException(status_code=400, detail=result.get("message"))
+        
+    return result
+
+
+@router.post("/{id}/archivar", dependencies=[Depends(require_permission("clientes.desactivar"))])
+async def archivar_cliente(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id)
+):
+    """Archiva un cliente a INACTIVO y desactiva sus contactos."""
+    service = ClientesService(db)
+    result = await service.archivar(id, updated_by=current_user_id)
     
     if result.get("success") == 0:
         raise HTTPException(status_code=400, detail=result.get("message"))

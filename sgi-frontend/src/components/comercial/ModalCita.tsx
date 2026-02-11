@@ -34,7 +34,7 @@ export default function ModalCita({ isOpen, onClose, citaToEdit }: ModalCitaProp
 
     useEffect(() => {
         if (citaToEdit) {
-            setClienteId(citaToEdit.cliente_id);
+            setClienteId(citaToEdit.cliente_id ?? 0);
             // Format fecha to YYYY-MM-DD
             setFecha(citaToEdit.fecha.split('T')[0]);
             setHora(citaToEdit.hora);

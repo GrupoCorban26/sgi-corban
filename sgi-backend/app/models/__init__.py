@@ -1,6 +1,7 @@
 from .base import Base
 from .administrativo import Departamento, Area, Cargo, Empleado, Activo, EmpleadoActivo
+from .logistica import Vehiculo, AsignacionVehiculo
 from .seguridad import Usuario, Rol, Permiso, Sesion
 from .core import DepartamentoGeo, Provincia, Distrito, Configuracion, Notificacion
-from .comercial import Cliente, ClienteContacto, CasoLlamada, RegistroImportacion, LeadFeedback
+from .comercial import Cliente, ClienteContacto, CasoLlamada, RegistroImportacion
 

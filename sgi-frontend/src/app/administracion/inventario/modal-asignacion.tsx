@@ -65,8 +65,8 @@ function ModalAsignacionContent({ activoData }: { activoData: Activo }) {
                         <div className="flex flex-wrap gap-x-4 gap-y-1 mt-1 text-xs text-gray-500">
                             <span>{activoData.marca} {activoData.modelo}</span>
                             {activoData.serie && <span className="bg-gray-200 px-1.5 rounded text-gray-700 font-mono">{activoData.serie}</span>}
-                            <span className={`px-1.5 rounded font-medium ${activoData.estado_fisico === 'BUENO' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                                {activoData.estado_fisico}
+                            <span className={`px-1.5 rounded font-medium ${activoData.estado_nombre === 'BUENO' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
+                                {activoData.estado_nombre}
                             </span>
                         </div>
                     </div>

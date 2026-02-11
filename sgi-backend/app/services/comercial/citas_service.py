@@ -5,7 +5,7 @@ from sqlalchemy.orm import joinedload
 from app.models.comercial import Cita, CitaComercial, Cliente
 from app.models.seguridad import Usuario
 from app.models.administrativo import Empleado
-from app.models.logistica import Conductor, Vehiculo
+from app.models.logistica import AsignacionVehiculo, Vehiculo
 from app.schemas.comercial.cita import CitaCreate, CitaUpdate, SalidaCampoCreate, SalidaCampoUpdate, CitaAprobar
 from fastapi import HTTPException
 from datetime import datetime
@@ -153,9 +153,9 @@ class CitasService:
             Empleado.nombres,
             Vehiculo.tipo_vehiculo,
             Vehiculo.placa
-        ).join(Conductor, Conductor.empleado_id == Empleado.id)\
-         .join(Vehiculo, Conductor.vehiculo_id == Vehiculo.id)\
-         .where(Conductor.id == conductor_id)
+        ).join(AsignacionVehiculo, AsignacionVehiculo.empleado_id == Empleado.id)\
+         .join(Vehiculo, AsignacionVehiculo.vehiculo_id == Vehiculo.id)\
+         .where(AsignacionVehiculo.id == conductor_id)
         
         row = (await self.db.execute(stmt)).first()
         if row:

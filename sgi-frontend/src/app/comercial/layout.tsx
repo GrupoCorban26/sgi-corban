@@ -6,7 +6,7 @@ export default function ComercialLayout({
   children: React.ReactNode;
 }) {
   return (
-    <DashboardLayout role="comercial">
+    <DashboardLayout>
       {children}
     </DashboardLayout>
   );

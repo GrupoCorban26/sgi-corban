@@ -9,9 +9,12 @@ interface SidebarProps {
   role: Role; // Aquí pasas 'comercial', 'jefa_comercial' o 'pricing'
 }
 
+import { useInboxCount } from '@/hooks/comercial/useInboxCount';
+
 export default function Sidebar({ role }: SidebarProps) {
   const pathname = usePathname();
   const menuItems = MENU_ROLES[role];
+  const { data: inboxCount = 0 } = useInboxCount();
 
   return (
     <aside className="w-64 h-screen bg-azul-900 text-white flex flex-col border-r border-azul-800">
@@ -26,7 +29,7 @@ export default function Sidebar({ role }: SidebarProps) {
             key={item.href}
             href={item.href}
             className={cn(
-              "flex items-center gap-3 px-4 py-3 rounded-xl transition-all",
+              "flex items-center gap-3 px-4 py-3 rounded-xl transition-all relative",
               pathname === item.href
                 ? "bg-naranja-500 text-white shadow-lg shadow-naranja-500/20"
                 : "hover:bg-azul-800 text-azul-100"
@@ -34,6 +37,13 @@ export default function Sidebar({ role }: SidebarProps) {
           >
             {/* Aquí iría tu icono */}
             <span className="font-medium">{item.label}</span>
+
+            {/* Badge for Inbox */}
+            {item.href === '/comercial/buzon' && inboxCount > 0 && (
+              <span className="absolute right-3 bg-red-500 text-white text-xs font-bold px-2 py-0.5 rounded-full animate-pulse">
+                {inboxCount}
+              </span>
+            )}
           </Link>
         ))}
       </nav>

@@ -12,7 +12,10 @@ export interface Cliente {
     ultimo_contacto: string | null;
     comentario_ultima_llamada: string | null;
     proxima_fecha_contacto: string | null;
-    tipo_estado: 'PROSPECTO' | 'CLIENTE' | 'INACTIVO';
+    tipo_estado: 'PROSPECTO' | 'EN_NEGOCIACION' | 'CLIENTE' | 'PERDIDO' | 'INACTIVO';
+    motivo_perdida?: string | null;
+    fecha_perdida?: string | null;
+    fecha_reactivacion?: string | null;
     origen: string | null;
     is_active: boolean;
     created_at: string | null;
@@ -49,8 +52,19 @@ export interface ClienteUpdate {
 export interface ClienteStats {
     total: number;
     prospectos: number;
+    en_negociacion: number;
     clientes_activos: number;
+    perdidos: number;
     inactivos: number;
+}
+
+export interface ClienteMarcarPerdido {
+    motivo_perdida: string;
+    fecha_reactivacion?: string | null;
+}
+
+export interface ClienteCambiarEstado {
+    nuevo_estado: string;
 }
 
 export interface ClientePaginationResponse {

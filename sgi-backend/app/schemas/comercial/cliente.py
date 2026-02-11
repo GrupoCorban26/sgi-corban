@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional
 from datetime import datetime, date
 
@@ -14,6 +14,11 @@ class ClienteBase(BaseModel):
     comentario_ultima_llamada: Optional[str] = Field(None, max_length=500)
     ultimo_contacto: Optional[datetime] = None
     proxima_fecha_contacto: Optional[date] = None
+
+    # Pipeline fields
+    motivo_perdida: Optional[str] = Field(None, max_length=50)
+    fecha_perdida: Optional[date] = None
+    fecha_reactivacion: Optional[date] = None
 
 
 class ClienteCreate(ClienteBase):
@@ -38,11 +43,19 @@ class ClienteResponse(ClienteBase):
     is_active: bool = True
     created_at: Optional[datetime] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ClienteDropdown(BaseModel):
     id: int
     razon_social: str
     ruc: Optional[str] = None
+
+
+class ClienteMarcarPerdido(BaseModel):
+    motivo_perdida: str = Field(..., max_length=50)
+    fecha_reactivacion: Optional[date] = None
+
+
+class ClienteCambiarEstado(BaseModel):
+    nuevo_estado: str = Field(..., max_length=20)

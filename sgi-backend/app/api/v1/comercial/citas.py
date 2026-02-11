@@ -33,6 +33,50 @@ async def listar_citas(
     return await service.get_all(comercial_id, estado, tipo_agenda, page, page_size)
 
 
+# ============================================================
+# ENDPOINTS AUXILIARES (Deben ir antes de /{id} para evitar conflicto)
+# ============================================================
+
+@router.get("/dropdown/comerciales")
+async def listar_comerciales_dropdown(
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
+):
+    """Lista comerciales disponibles para selección en salidas a campo"""
+    from sqlalchemy import select
+    from app.models.seguridad import Usuario
+    from app.models.administrativo import Empleado
+    
+    stmt = select(
+        Usuario.id,
+        Empleado.nombres,
+        Empleado.apellido_paterno
+    ).join(Empleado, Usuario.empleado_id == Empleado.id)\
+     .where(Usuario.is_active == True)
+    
+    result = await db.execute(stmt)
+    rows = result.all()
+    
+    return [
+        {
+            "id": row.id,
+            "nombre": f"{row.nombres} {row.apellido_paterno}"
+        }
+        for row in rows
+    ]
+
+
+@router.get("/conductores")
+async def listar_conductores(
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
+):
+    """Lista conductores disponibles (opcional para citas)"""
+    service = LogisticaService(db)
+    return await service.get_conductores_activos()
+
+
+
 @router.get("/{id}")
 async def obtener_cita(
     id: int,
@@ -200,44 +244,4 @@ async def eliminar_cita(
     return await service.delete(id)
 
 
-# ============================================================
-# ENDPOINTS AUXILIARES
-# ============================================================
 
-@router.get("/dropdown/comerciales")
-async def listar_comerciales_dropdown(
-    db: AsyncSession = Depends(get_db),
-    _: dict = Depends(get_current_active_auth)
-):
-    """Lista comerciales disponibles para selección en salidas a campo"""
-    from sqlalchemy import select
-    from app.models.seguridad import Usuario
-    from app.models.administrativo import Empleado
-    
-    stmt = select(
-        Usuario.id,
-        Empleado.nombres,
-        Empleado.apellido_paterno
-    ).join(Empleado, Usuario.empleado_id == Empleado.id)\
-     .where(Usuario.is_active == True)
-    
-    result = await db.execute(stmt)
-    rows = result.all()
-    
-    return [
-        {
-            "id": row.id,
-            "nombre": f"{row.nombres} {row.apellido_paterno}"
-        }
-        for row in rows
-    ]
-
-
-@router.get("/conductores", tags=["Logistica"])
-async def listar_conductores(
-    db: AsyncSession = Depends(get_db),
-    _: dict = Depends(get_current_active_auth)
-):
-    """Lista conductores disponibles (opcional para citas)"""
-    service = LogisticaService(db)
-    return await service.get_conductores_activos()

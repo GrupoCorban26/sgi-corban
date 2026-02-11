@@ -35,5 +35,7 @@ build/
 # --- Editores y Sistema ---
 .vscode/
 .idea/
+.vs/
 .DS_Store
 Thumbs.db
+temp_migrations/

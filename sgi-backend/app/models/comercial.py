@@ -61,6 +61,12 @@ class Cliente(Base):
     ultimo_contacto = Column(DateTime(timezone=True))
     comentario_ultima_llamada = Column(String(500))
     proxima_fecha_contacto = Column(Date)
+    
+    # Pipeline de Ventas
+    motivo_perdida = Column(String(50), nullable=True)
+    fecha_perdida = Column(Date, nullable=True)
+    fecha_reactivacion = Column(Date, nullable=True)
+    
     tipo_estado = Column(String(20), default="PROSPECTO", nullable=False)
     origen = Column(String(50))
     is_active = Column(Boolean, default=True, nullable=False)
@@ -103,22 +109,6 @@ class ClienteContacto(Base):
     # Puedo acceder a CasoLlamada.casos_de_llamada
     caso = relationship("CasoLlamada", back_populates="casos_de_llamada")
 
-class LeadFeedback(Base):
-    __tablename__ = "lead_feedback"
-    __table_args__ = {"schema": "comercial"}
-
-    id = Column(Integer, primary_key=True, index=True)
-    lead_id = Column(Integer, nullable=False) # Or ForeignKey if table exists
-    comercial_id = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=False)
-    estado_llamada = Column(String(30), nullable=False)
-    fecha_contacto = Column(DateTime(timezone=True), nullable=False)
-    proxima_fecha_contacto = Column(Date)
-    comentario = Column(String(500))
-    cliente_id = Column(Integer, ForeignKey("comercial.clientes.id"))
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    comercial = relationship("app.models.seguridad.Usuario")
-    cliente = relationship("Cliente")
 
 class Cita(Base):
     __tablename__ = "citas"
@@ -151,7 +141,7 @@ class Cita(Base):
     
     # Asignación de recursos (opcional)
     acompanado_por_id = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=True)
-    conductor_id = Column(Integer, ForeignKey("logistica.conductores.id"), nullable=True)
+    conductor_id = Column(Integer, ForeignKey("logistica.asignacion_vehiculos.id"), nullable=True)
     
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -161,7 +151,7 @@ class Cita(Base):
     cliente = relationship("Cliente")
     comercial = relationship("app.models.seguridad.Usuario", foreign_keys=[comercial_id])
     acompanante = relationship("app.models.seguridad.Usuario", foreign_keys=[acompanado_por_id])
-    conductor = relationship("app.models.logistica.Conductor")
+    conductor = relationship("app.models.logistica.AsignacionVehiculo")
     comerciales_asignados = relationship("CitaComercial", back_populates="cita", cascade="all, delete-orphan")
 
 

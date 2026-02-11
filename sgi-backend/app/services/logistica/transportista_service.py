@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from app.models.logistica import Vehiculo, Conductor
+from app.models.logistica import Vehiculo, AsignacionVehiculo
 from app.models.administrativo import Empleado
 
 class LogisticaService:
@@ -13,14 +13,14 @@ class LogisticaService:
         para el dropdown de selección.
         """
         stmt = select(
-            Conductor.id,
+            AsignacionVehiculo.id,
             Empleado.nombres,
             Empleado.apellido_paterno,
             Vehiculo.placa,
             Vehiculo.tipo_vehiculo
-        ).join(Empleado, Conductor.empleado_id == Empleado.id)\
-         .join(Vehiculo, Conductor.vehiculo_id == Vehiculo.id)\
-         .where(Conductor.is_active == True, Vehiculo.is_active == True)
+        ).join(Empleado, AsignacionVehiculo.empleado_id == Empleado.id)\
+         .join(Vehiculo, AsignacionVehiculo.vehiculo_id == Vehiculo.id)\
+         .where(AsignacionVehiculo.is_active == True, Vehiculo.is_active == True, Empleado.cargo_id == 13)
          
         result = await self.db.execute(stmt)
         data = []

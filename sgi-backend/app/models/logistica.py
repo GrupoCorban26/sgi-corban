@@ -14,8 +14,8 @@ class Vehiculo(Base):
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
-class Conductor(Base):
-    __tablename__ = "conductores"
+class AsignacionVehiculo(Base):
+    __tablename__ = "asignacion_vehiculos"
     __table_args__ = {"schema": "logistica"}
 
     id = Column(Integer, primary_key=True, index=True)

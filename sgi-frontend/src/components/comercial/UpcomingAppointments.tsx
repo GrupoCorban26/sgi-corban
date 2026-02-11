@@ -25,7 +25,7 @@ export default function UpcomingAppointments() {
     // We only fetch if user is loaded
     const shouldFetch = !!user;
 
-    const { citas, isLoading, terminateMutation } = useCitas(shouldFetch ? comercialIdFilter : undefined, filterStatus, 1);
+    const { citas, isLoading, terminateMutation } = useCitas(shouldFetch ? comercialIdFilter : undefined, filterStatus, undefined, 1);
 
     // Sort by date asc (closest first)
     const sortedCitas = [...citas].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());

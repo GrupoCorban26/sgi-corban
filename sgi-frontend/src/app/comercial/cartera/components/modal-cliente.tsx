@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { Save, Building2, Loader2, AlertCircle, Users } from 'lucide-react';
-import { Cliente } from '@/types/cliente';
+import { Cliente, ClienteCreate, ClienteUpdate } from '@/types/cliente';
 import { ModalBase, ModalHeader, ModalFooter, useModalContext } from '@/components/ui/modal';
 import { useClienteForm } from '@/hooks/comercial/useClienteForm';
 import { useAreas } from '@/hooks/organizacion/useAreas';
@@ -11,25 +11,25 @@ import { useComerciales } from '@/hooks/organizacion/useComerciales';
 // ============================================
 // TIPOS
 // ============================================
+
 interface ModalProps {
     isOpen: boolean;
     onClose: () => void;
     clienteToEdit?: Cliente | null;
-    onClienteCreado?: (ruc: string, razonSocial: string) => void;
+    initialData?: Partial<ClienteUpdate>;
+    onClienteCreado?: (ruc: string, razonSocial: string, id?: number) => void;
     showAdminFields?: boolean;
 }
 
 interface ModalContentProps {
     clienteToEdit: Cliente | null;
+    initialData?: Partial<ClienteUpdate>;
     isOpen: boolean;
-    onClienteCreado?: (ruc: string, razonSocial: string) => void;
+    onClienteCreado?: (ruc: string, razonSocial: string, id?: number) => void;
     showAdminFields?: boolean;
 }
 
-// ============================================
-// COMPONENTE INTERNO
-// ============================================
-function ModalContent({ clienteToEdit, isOpen, onClienteCreado, showAdminFields }: ModalContentProps) {
+function ModalContent({ clienteToEdit, initialData, isOpen, onClienteCreado, showAdminFields }: ModalContentProps) {
     const { handleClose } = useModalContext();
     const {
         formState,
@@ -41,6 +41,7 @@ function ModalContent({ clienteToEdit, isOpen, onClienteCreado, showAdminFields 
         isEditMode
     } = useClienteForm({
         clienteToEdit,
+        initialData,
         onSuccess: onClienteCreado,
         onClose: handleClose
     });
@@ -315,11 +316,12 @@ function ModalContent({ clienteToEdit, isOpen, onClienteCreado, showAdminFields 
 // ============================================
 // COMPONENTE PRINCIPAL
 // ============================================
-export default function ModalCliente({ isOpen, onClose, clienteToEdit = null, onClienteCreado, showAdminFields = false }: ModalProps) {
+export default function ModalCliente({ isOpen, onClose, clienteToEdit = null, initialData, onClienteCreado, showAdminFields = false }: ModalProps) {
     return (
         <ModalBase isOpen={isOpen} onClose={onClose}>
             <ModalContent
                 clienteToEdit={clienteToEdit}
+                initialData={initialData}
                 isOpen={isOpen}
                 onClienteCreado={onClienteCreado}
                 showAdminFields={showAdminFields}

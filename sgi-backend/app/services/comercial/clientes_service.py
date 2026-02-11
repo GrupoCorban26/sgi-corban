@@ -3,10 +3,10 @@ from sqlalchemy.future import select
 from sqlalchemy import text, func, or_, case
 from sqlalchemy.orm import selectinload
 from app.schemas.comercial.cliente import ClienteCreate, ClienteUpdate
-from app.models.comercial import Cliente
+from app.models.comercial import Cliente, ClienteContacto
 from app.models.administrativo import Area, Empleado
 from app.models.seguridad import Usuario
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 
 
 class ClientesService:
@@ -75,6 +75,9 @@ class ClientesService:
                 "comentario_ultima_llamada": c.comentario_ultima_llamada,
                 "proxima_fecha_contacto": c.proxima_fecha_contacto,
                 "tipo_estado": c.tipo_estado,
+                "motivo_perdida": c.motivo_perdida,
+                "fecha_perdida": c.fecha_perdida,
+                "fecha_reactivacion": c.fecha_reactivacion,
                 "origen": c.origen,
                 "is_active": c.is_active,
                 "created_at": c.created_at
@@ -93,7 +96,9 @@ class ClientesService:
         stmt = select(
             func.count().label('total'),
             func.sum(case((Cliente.tipo_estado == 'PROSPECTO', 1), else_=0)).label('prospectos'),
+            func.sum(case((Cliente.tipo_estado == 'EN_NEGOCIACION', 1), else_=0)).label('en_negociacion'),
             func.sum(case((Cliente.tipo_estado == 'CLIENTE', 1), else_=0)).label('clientes_activos'),
+            func.sum(case((Cliente.tipo_estado == 'PERDIDO', 1), else_=0)).label('perdidos'),
             func.sum(case((Cliente.tipo_estado == 'INACTIVO', 1), else_=0)).label('inactivos')
         ).where(Cliente.is_active == True)
         
@@ -104,7 +109,9 @@ class ClientesService:
         return {
             "total": row.total or 0,
             "prospectos": row.prospectos or 0,
+            "en_negociacion": row.en_negociacion or 0,
             "clientes_activos": row.clientes_activos or 0,
+            "perdidos": row.perdidos or 0,
             "inactivos": row.inactivos or 0
         }
 
@@ -186,6 +193,9 @@ class ClientesService:
             "comentario_ultima_llamada": c.comentario_ultima_llamada,
             "proxima_fecha_contacto": c.proxima_fecha_contacto,
             "tipo_estado": c.tipo_estado,
+            "motivo_perdida": c.motivo_perdida,
+            "fecha_perdida": c.fecha_perdida,
+            "fecha_reactivacion": c.fecha_reactivacion,
             "origen": c.origen,
             "is_active": c.is_active,
             "created_at": c.created_at
@@ -256,22 +266,121 @@ class ClientesService:
 
     async def delete(self, id: int, updated_by: int) -> dict:
         """Soft delete de un cliente."""
+        return await self.archivar(id, updated_by)
+
+    # =========================================================================
+    # NUEVOS MÉTODOS PIPELINE DE VENTAS
+    # =========================================================================
+
+    async def cambiar_estado(self, id: int, nuevo_estado: str, updated_by: int) -> dict:
+        """Cambia el estado del cliente (PROSPECTO <-> EN_NEGOCIACION <-> CLIENTE)"""
         try:
-            result = await self.db.execute(
-                select(Cliente).where(Cliente.id == id, Cliente.is_active == True)
-            )
-            db_cliente = result.scalar()
+            result = await self.db.execute(select(Cliente).where(Cliente.id == id, Cliente.is_active == True))
+            cliente = result.scalar()
             
-            if not db_cliente:
+            if not cliente:
                 return {"success": 0, "message": "Cliente no encontrado"}
             
-            db_cliente.is_active = False
-            db_cliente.updated_by = updated_by
-            db_cliente.updated_at = datetime.now()
+            cliente.tipo_estado = nuevo_estado
+            cliente.updated_by = updated_by
+            cliente.updated_at = datetime.now()
             
             await self.db.commit()
+            return {"success": 1, "message": f"Estado actualizado a {nuevo_estado}"}
+        except Exception as e:
+            print(f"ERROR CAMBIAR ESTADO: {e}")
+            await self.db.rollback()
+            return {"success": 0, "message": f"Error al cambiar estado: {str(e)}"}
+
+    async def marcar_perdido(self, id: int, motivo: str, fecha_reactivacion: datetime.date, updated_by: int) -> dict:
+        """Marca como PERDIDO. Si no hay fecha de reactivación, archiva a INACTIVO."""
+        try:
+            result = await self.db.execute(select(Cliente).where(Cliente.id == id, Cliente.is_active == True))
+            cliente = result.scalar()
             
-            return {"success": 1, "message": "Cliente eliminado exitosamente"}
+            if not cliente:
+                return {"success": 0, "message": "Cliente no encontrado"}
+            
+            if not fecha_reactivacion:
+                # Si no se piensa reactivar, va directo a INACTIVO
+                return await self.archivar(id, updated_by)
+            
+            # Caso recuperable
+            cliente.tipo_estado = "PERDIDO"
+            cliente.motivo_perdida = motivo
+            cliente.fecha_perdida = datetime.now().date()
+            cliente.fecha_reactivacion = fecha_reactivacion
+            # Sync with next contact date for reminders
+            cliente.proxima_fecha_contacto = fecha_reactivacion
+            cliente.updated_by = updated_by
+            cliente.updated_at = datetime.now()
+            
+            # En estado PERDIDO (recuperable), los contactos se mantienen activos pero no gestionables
+            # Dejamos is_active=True en cliente y contactos
+            
+            await self.db.commit()
+            return {"success": 1, "message": "Cliente marcado como perdido (temporalmente)"}
         except Exception as e:
             await self.db.rollback()
-            return {"success": 0, "message": f"Error al eliminar cliente: {str(e)}"}
+            return {"success": 0, "message": f"Error al marcar perdido: {str(e)}"}
+
+    async def reactivar(self, id: int, updated_by: int) -> dict:
+        """Reactiva un cliente PERDIDO o INACTIVO a PROSPECTO."""
+        try:
+            # Buscamos incluso si is_active=False (para recuperar archivados)
+            result = await self.db.execute(select(Cliente).where(Cliente.id == id))
+            cliente = result.scalar()
+            
+            if not cliente:
+                return {"success": 0, "message": "Cliente no encontrado"}
+            
+            cliente.tipo_estado = "PROSPECTO"
+            cliente.is_active = True  # Reactivar si estaba archivado
+            cliente.motivo_perdida = None
+            cliente.fecha_perdida = None
+            cliente.fecha_reactivacion = None
+            cliente.updated_by = updated_by
+            cliente.updated_at = datetime.now()
+            
+            # Reactivar contactos asociados
+            if cliente.ruc:
+                await self._cascade_contactos(cliente.ruc, activate=True)
+            
+            await self.db.commit()
+            return {"success": 1, "message": "Cliente reactivado a PROSPECTO"}
+        except Exception as e:
+            await self.db.rollback()
+            return {"success": 0, "message": f"Error al reactivar: {str(e)}"}
+
+    async def archivar(self, id: int, updated_by: int) -> dict:
+        """Pasa a INACTIVO y desactiva contactos."""
+        try:
+            result = await self.db.execute(select(Cliente).where(Cliente.id == id))
+            cliente = result.scalar()
+            
+            if not cliente:
+                return {"success": 0, "message": "Cliente no encontrado"}
+            
+            cliente.tipo_estado = "INACTIVO"
+            cliente.is_active = False # Soft delete
+            cliente.updated_by = updated_by
+            cliente.updated_at = datetime.now()
+            
+            # Desactivar contactos asociados
+            if cliente.ruc:
+                await self._cascade_contactos(cliente.ruc, activate=False)
+            
+            await self.db.commit()
+            return {"success": 1, "message": "Cliente archivado (INACTIVO)"}
+        except Exception as e:
+            await self.db.rollback()
+            return {"success": 0, "message": f"Error al archivar: {str(e)}"}
+
+    async def _cascade_contactos(self, ruc: str, activate: bool):
+        """Activa o desactiva contactos según el RUC."""
+        stmt =  select(ClienteContacto).where(ClienteContacto.ruc == ruc)
+        result = await self.db.execute(stmt)
+        contactos = result.scalars().all()
+        
+        for c in contactos:
+            c.is_active = activate

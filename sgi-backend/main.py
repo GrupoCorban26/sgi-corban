@@ -18,7 +18,9 @@ from app.api.v1.comercial.contactos import router as contactos_router
 from app.api.v1.comercial.casos_llamada import router as casos_llamada_router
 from app.api.v1.comercial.base import router as base_router
 from app.api.v1.comercial.clientes import router as clientes_router
+from app.api.v1.comercial.inbox import router as inbox_router
 from app.api.v1.comercial.citas import router as citas_router
+from app.api.v1.comercial.whatsapp import router as whatsapp_router
 
 app = FastAPI(
     title="SGI Grupo Corban",
@@ -54,6 +56,8 @@ app.include_router(casos_llamada_router, prefix="/api/v1")
 app.include_router(base_router, prefix="/api/v1")
 app.include_router(clientes_router, prefix="/api/v1")
 app.include_router(citas_router, prefix="/api/v1")
+app.include_router(inbox_router, prefix="/api/v1/comercial/inbox", tags=["inbox"])
+app.include_router(whatsapp_router, prefix="/api/v1/comercial/whatsapp", tags=["whatsapp"])
 
 @app.get("/")
 def read_root():

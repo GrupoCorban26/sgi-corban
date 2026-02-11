@@ -13,11 +13,12 @@ export interface FormErrors {
 
 interface UseClienteFormProps {
     clienteToEdit?: Cliente | null;
-    onSuccess?: (ruc: string, razonSocial: string) => void;
+    initialData?: Partial<ClienteUpdate>;
+    onSuccess?: (ruc: string, razonSocial: string, id?: number) => void;
     onClose?: () => void;
 }
 
-export function useClienteForm({ clienteToEdit, onSuccess, onClose }: UseClienteFormProps) {
+export function useClienteForm({ clienteToEdit, initialData, onSuccess, onClose }: UseClienteFormProps) {
     const isEditMode = !!clienteToEdit;
     const { createMutation, updateMutation } = useClientes();
 
@@ -52,6 +53,18 @@ export function useClienteForm({ clienteToEdit, onSuccess, onClose }: UseCliente
             setProximaFecha(clienteToEdit.proxima_fecha_contacto || '');
             setAreaEncargadaId(clienteToEdit.area_encargada_id || null);
             setComercialEncargadoId(clienteToEdit.comercial_encargado_id || null);
+        } else if (initialData) {
+            // New Client with pre-filled data (e.g. from Inbox)
+            setRuc(initialData.ruc || '');
+            setRazonSocial(initialData.razon_social || '');
+            setNombreComercial(initialData.nombre_comercial || '');
+            setDireccionFiscal(initialData.direccion_fiscal || '');
+            setTipoEstado(initialData.tipo_estado || 'PROSPECTO');
+            setUltimoContacto(initialData.ultimo_contacto ? String(initialData.ultimo_contacto) : '');
+            setComentario(initialData.comentario_ultima_llamada || '');
+            setProximaFecha(initialData.proxima_fecha_contacto ? String(initialData.proxima_fecha_contacto) : '');
+            setAreaEncargadaId(initialData.area_encargada_id || null);
+            setComercialEncargadoId(initialData.comercial_encargado_id || null);
         } else {
             setRuc('');
             setRazonSocial('');
@@ -66,7 +79,7 @@ export function useClienteForm({ clienteToEdit, onSuccess, onClose }: UseCliente
         }
         setErrors({});
         setTouched(new Set());
-    }, [clienteToEdit]);
+    }, [clienteToEdit, initialData]);
 
     const validateField = (field: string, value: string): string | undefined => {
         switch (field) {
@@ -150,10 +163,10 @@ export function useClienteForm({ clienteToEdit, onSuccess, onClose }: UseCliente
                 await updateMutation.mutateAsync({ id: clienteToEdit.id, data: commonData });
                 toast.success('Cliente actualizado correctamente');
             } else {
-                await createMutation.mutateAsync(commonData);
+                const response = await createMutation.mutateAsync(commonData);
                 toast.success('Cliente creado correctamente');
                 if (onSuccess && ruc) {
-                    onSuccess(ruc, razonSocial.trim());
+                    onSuccess(ruc, razonSocial.trim(), response.id);
                 }
             }
             if (onClose) onClose();

@@ -6,7 +6,9 @@ import {
     ClienteStats,
     ClienteCreate,
     ClienteUpdate,
-    Cliente
+    Cliente,
+    ClienteCambiarEstado,
+    ClienteMarcarPerdido
 } from '@/types/cliente';
 
 const CLIENTES_URL = '/clientes';
@@ -73,6 +75,55 @@ export const useClientes = (
         },
     });
 
+    // 5. Cambiar Estado (Prospecto <-> En Negociación <-> Cliente)
+    const cambiarEstadoMutation = useMutation({
+        mutationFn: async ({ id, nuevoEstado }: { id: number; nuevoEstado: string }) => {
+            const payload: ClienteCambiarEstado = { nuevo_estado: nuevoEstado };
+            const { data } = await api.post<ClienteOperationResult>(`${CLIENTES_URL}/${id}/cambiar-estado`, payload);
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['clientes'] });
+            queryClient.invalidateQueries({ queryKey: ['clientes-stats'] });
+        },
+    });
+
+    // 6. Marcar Perdido
+    const marcarPerdidoMutation = useMutation({
+        mutationFn: async ({ id, data }: { id: number; data: ClienteMarcarPerdido }) => {
+            const { data: response } = await api.post<ClienteOperationResult>(`${CLIENTES_URL}/${id}/marcar-perdido`, data);
+            return response;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['clientes'] });
+            queryClient.invalidateQueries({ queryKey: ['clientes-stats'] });
+        },
+    });
+
+    // 7. Reactivar
+    const reactivarMutation = useMutation({
+        mutationFn: async (id: number) => {
+            const { data } = await api.post<ClienteOperationResult>(`${CLIENTES_URL}/${id}/reactivar`, {});
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['clientes'] });
+            queryClient.invalidateQueries({ queryKey: ['clientes-stats'] });
+        },
+    });
+
+    // 8. Archivar (Soft Delete)
+    const archivarMutation = useMutation({
+        mutationFn: async (id: number) => {
+            const { data } = await api.post<ClienteOperationResult>(`${CLIENTES_URL}/${id}/archivar`, {});
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['clientes'] });
+            queryClient.invalidateQueries({ queryKey: ['clientes-stats'] });
+        },
+    });
+
     return {
         listQuery,
         clientes: listQuery.data?.data || [],
@@ -86,8 +137,14 @@ export const useClientes = (
         createMutation,
         updateMutation,
         deleteMutation,
+        cambiarEstadoMutation,
+        marcarPerdidoMutation,
+        reactivarMutation,
+        archivarMutation
     };
 };
+
+
 
 export const useClientesStats = (comercialId: number | null = null) => {
     return useQuery({

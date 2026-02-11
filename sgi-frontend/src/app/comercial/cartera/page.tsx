@@ -14,18 +14,25 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
-  Filter
+  Filter,
+  ArrowRight,
+  History,
+  Archive,
+  UserMinus
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useClientes, useClientesStats } from '@/hooks/comercial/useClientes';
-import { Cliente } from '@/types/cliente';
+import { Cliente, ClienteMarcarPerdido } from '@/types/cliente';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import ModalCliente from './components/modal-cliente';
 import ModalContactosCliente from './components/modal-contactos-cliente';
+import ModalMarcarPerdido from './components/modal-marcar-perdido';
 
 const ESTADO_COLORS = {
   'PROSPECTO': 'bg-yellow-100 text-yellow-700',
+  'EN_NEGOCIACION': 'bg-blue-100 text-blue-700',
   'CLIENTE': 'bg-green-100 text-green-700',
+  'PERDIDO': 'bg-red-100 text-red-700',
   'INACTIVO': 'bg-gray-100 text-gray-500',
 };
 
@@ -55,6 +62,10 @@ export default function CarteraPage() {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [clienteToDelete, setClienteToDelete] = useState<Cliente | null>(null);
 
+  // Modal Perdido
+  const [isPerdidoModalOpen, setIsPerdidoModalOpen] = useState(false);
+  const [clienteToMarkLost, setClienteToMarkLost] = useState<Cliente | null>(null);
+
   // Modal de contactos
   const [isContactosModalOpen, setIsContactosModalOpen] = useState(false);
   const [contactosRuc, setContactosRuc] = useState('');
@@ -68,7 +79,11 @@ export default function CarteraPage() {
     isLoading,
     isError,
     isFetching,
-    deleteMutation
+    deleteMutation,
+    cambiarEstadoMutation,
+    marcarPerdidoMutation,
+    reactivarMutation,
+    archivarMutation
   } = useClientes(busqueda, tipoEstado, null, page, pageSize);
 
   const { data: stats } = useClientesStats();
@@ -112,6 +127,40 @@ export default function CarteraPage() {
     }
   };
 
+  const handleCambiarEstado = async (cliente: Cliente, nuevoEstado: string) => {
+    try {
+      await cambiarEstadoMutation.mutateAsync({ id: cliente.id, nuevoEstado });
+      toast.success(`Estado actualizado a ${nuevoEstado}`);
+    } catch {
+      toast.error('Error al actualizar estado');
+    }
+  };
+
+  const handleReactivar = async (cliente: Cliente) => {
+    try {
+      await reactivarMutation.mutateAsync(cliente.id);
+      toast.success('Cliente reactivado a Prospecto');
+    } catch {
+      toast.error('Error al reactivar cliente');
+    }
+  };
+
+  const handleOpenMarcarPerdido = (cliente: Cliente) => {
+    setClienteToMarkLost(cliente);
+    setIsPerdidoModalOpen(true);
+  };
+
+  const handleConfirmMarcarPerdido = async (data: ClienteMarcarPerdido) => {
+    if (!clienteToMarkLost) return;
+    try {
+      await marcarPerdidoMutation.mutateAsync({ id: clienteToMarkLost.id, data });
+      toast.success('Cliente marcado como perdido');
+    } catch (error: any) {
+      const message = error?.response?.data?.detail || 'Error al marcar como perdido';
+      toast.error(message);
+    }
+  };
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 bg-gray-50 min-h-screen">
       {/* Header */}
@@ -145,6 +194,13 @@ export default function CarteraPage() {
             </div>
             <span className="text-2xl font-bold">{(stats.prospectos ?? 0).toLocaleString()}</span>
           </div>
+          <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-4 rounded-xl text-white shadow-lg shadow-indigo-200">
+            <div className="flex items-center gap-2 mb-1">
+              <History className="w-5 h-5 opacity-80" />
+              <span className="text-sm opacity-80">En Negociación</span>
+            </div>
+            <span className="text-2xl font-bold">{(stats.en_negociacion ?? 0).toLocaleString()}</span>
+          </div>
           <div className="bg-gradient-to-br from-green-500 to-green-600 p-4 rounded-xl text-white shadow-lg shadow-green-200">
             <div className="flex items-center gap-2 mb-1">
               <UserCheck className="w-5 h-5 opacity-80" />
@@ -152,12 +208,12 @@ export default function CarteraPage() {
             </div>
             <span className="text-2xl font-bold">{(stats.clientes_activos ?? 0).toLocaleString()}</span>
           </div>
-          <div className="bg-gradient-to-br from-gray-500 to-gray-600 p-4 rounded-xl text-white shadow-lg shadow-gray-200">
+          <div className="bg-gradient-to-br from-red-500 to-red-600 p-4 rounded-xl text-white shadow-lg shadow-red-200">
             <div className="flex items-center gap-2 mb-1">
-              <UserX className="w-5 h-5 opacity-80" />
-              <span className="text-sm opacity-80">Inactivos</span>
+              <UserMinus className="w-5 h-5 opacity-80" />
+              <span className="text-sm opacity-80">Perdidos</span>
             </div>
-            <span className="text-2xl font-bold">{(stats.inactivos ?? 0).toLocaleString()}</span>
+            <span className="text-2xl font-bold">{(stats.perdidos ?? 0).toLocaleString()}</span>
           </div>
         </div>
       )}
@@ -186,7 +242,9 @@ export default function CarteraPage() {
             >
               <option value="">Todos los estados</option>
               <option value="PROSPECTO">Prospectos</option>
+              <option value="EN_NEGOCIACION">En Negociación</option>
               <option value="CLIENTE">Clientes</option>
+              <option value="PERDIDO">Perdidos</option>
               <option value="INACTIVO">Inactivos</option>
             </select>
             <button className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors text-gray-600">
@@ -254,6 +312,47 @@ export default function CarteraPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {/* Acciones Pipeline */}
+                        {cliente.tipo_estado === 'PROSPECTO' && (
+                          <button
+                            onClick={() => handleCambiarEstado(cliente, 'EN_NEGOCIACION')}
+                            className="p-2 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-colors cursor-pointer"
+                            title="Avanzar a Negociación"
+                          >
+                            <ArrowRight size={16} />
+                          </button>
+                        )}
+
+                        {cliente.tipo_estado === 'EN_NEGOCIACION' && (
+                          <>
+                            <button
+                              onClick={() => handleCambiarEstado(cliente, 'CLIENTE')}
+                              className="p-2 hover:bg-green-100 text-green-600 rounded-lg transition-colors cursor-pointer"
+                              title="Cerrar Venta"
+                            >
+                              <UserCheck size={16} />
+                            </button>
+                            <button
+                              onClick={() => handleOpenMarcarPerdido(cliente)}
+                              className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-colors cursor-pointer"
+                              title="Marcar Perdido"
+                            >
+                              <UserMinus size={16} />
+                            </button>
+                          </>
+                        )}
+
+                        {cliente.tipo_estado === 'PERDIDO' && (
+                          <button
+                            onClick={() => handleReactivar(cliente)}
+                            className="p-2 hover:bg-yellow-100 text-yellow-600 rounded-lg transition-colors cursor-pointer"
+                            title="Reactivar Prospecto"
+                          >
+                            <History size={16} />
+                          </button>
+                        )}
+
+                        {/* Edición Genérica */}
                         <button
                           onClick={() => handleOpenEdit(cliente)}
                           className="p-2 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors cursor-pointer"
@@ -261,12 +360,14 @@ export default function CarteraPage() {
                         >
                           <Edit2 size={16} />
                         </button>
+
+                        {/* Archivar / Eliminar */}
                         <button
                           onClick={() => handleOpenDelete(cliente)}
-                          className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-colors cursor-pointer"
-                          title="Eliminar"
+                          className="p-2 hover:bg-gray-100 text-gray-600 rounded-lg transition-colors cursor-pointer"
+                          title="Archivar"
                         >
-                          <Trash2 size={16} />
+                          <Archive size={16} />
                         </button>
                       </div>
                     </td>
@@ -319,6 +420,14 @@ export default function CarteraPage() {
         onClose={() => { setIsContactosModalOpen(false); setContactosRuc(''); setContactosRazonSocial(''); }}
         ruc={contactosRuc}
         razonSocial={contactosRazonSocial}
+      />
+
+      <ModalMarcarPerdido
+        isOpen={isPerdidoModalOpen}
+        onClose={() => { setIsPerdidoModalOpen(false); setClienteToMarkLost(null); }}
+        onConfirm={handleConfirmMarcarPerdido}
+        isLoading={marcarPerdidoMutation.isPending}
+        clienteNombre={clienteToMarkLost?.razon_social || ''}
       />
 
       <ConfirmModal
