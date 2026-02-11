@@ -1,4 +1,3 @@
-
 import asyncio
 import os
 import sys
@@ -12,11 +11,12 @@ load_dotenv()
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from app.database.db_connection import get_db
-from app.models.seguridad import Rol, Permiso
+from app.models.seguridad import Rol, Permiso, Usuario
 from app.core.initial_data import PERMISOS_DEFINICION, ROLES_DEFINICION
+from app.core.security import hashear_password
 
 async def seed_security():
-    print("Iniciando Seeding de Seguridad...", flush=True)
+    print("🚀 Iniciando Seeding de Seguridad...", flush=True)
     
     # Get session generator
     session_gen = get_db()
@@ -27,11 +27,12 @@ async def seed_security():
         
         try:
             # 1. PERMISOS
+            print("\n--- 1. Sincronizando Permisos ---")
             for tec, display, mod in PERMISOS_DEFINICION:
                 stmt = select(Permiso).where(Permiso.nombre_tecnico == tec)
                 permiso = (await db.execute(stmt)).scalars().first()
                 if not permiso:
-                    print(f"[+] Creando Permiso: {tec}", flush=True)
+                    print(f"   [+] Creando Permiso: {tec}", flush=True)
                     permiso = Permiso(nombre_tecnico=tec, nombre_display=display, modulo=mod)
                     db.add(permiso)
                 else:
@@ -40,21 +41,26 @@ async def seed_security():
                     permiso.modulo = mod
             
             await db.commit()
-            print("Permisos sincronizados.", flush=True)
+            print("   ✅ Permisos sincronizados.")
 
             # 2. ROLES
+            print("\n--- 2. Sincronizando Roles ---")
+            roles_map = {} # Cache local
+            
             for nombre_rol, lista_permisos in ROLES_DEFINICION.items():
                 stmt = select(Rol).where(Rol.nombre == nombre_rol).options(selectinload(Rol.permisos))
                 rol = (await db.execute(stmt)).scalars().first()
                 
                 if not rol:
-                    print(f"[+] Creando Rol: {nombre_rol}", flush=True)
+                    print(f"   [+] Creando Rol: {nombre_rol}", flush=True)
                     rol = Rol(nombre=nombre_rol, descripcion=f"Rol {nombre_rol}")
                     db.add(rol)
                     await db.commit()
-                    # Refresh manually with eager load
+                    # Refresh to get ID and empty relationships
                     stmt = select(Rol).where(Rol.id == rol.id).options(selectinload(Rol.permisos))
                     rol = (await db.execute(stmt)).scalars().first()
+                
+                roles_map[nombre_rol] = rol
                 
                 # Asignar permisos
                 perms_objs = []
@@ -64,19 +70,56 @@ async def seed_security():
                     if p_obj:
                         perms_objs.append(p_obj)
                     else:
-                        print(f"[!] ADVERTENCIA: Permiso '{p_tec}' requerido por Rol '{nombre_rol}' no encontrado.", flush=True)
+                        print(f"   [!] Advertencia: Permiso '{p_tec}' no encontrado.", flush=True)
                 
                 rol.permisos = perms_objs
-                print(f"[*] Rol '{nombre_rol}': {len(perms_objs)} permisos asignados.", flush=True)
+                print(f"   [*] Rol '{nombre_rol}': {len(perms_objs)} permisos asignados.", flush=True)
             
             await db.commit()
-            print("--- SEEDING COMPLETADO CON ÉXITO ---", flush=True)
+            print("   ✅ Roles sincronizados.")
+
+            # 3. SUPERUSUARIO
+            print("\n--- 3. Verificando Superusuario ---")
+            admin_email = "admin@grupocorban.com"
+            stmt = select(Usuario).where(Usuario.correo_corp == admin_email).options(selectinload(Usuario.roles))
+            admin_user = (await db.execute(stmt)).scalars().first()
+
+            if not admin_user:
+                print(f"   [+] Creando usuario admin: {admin_email}", flush=True)
+                # Password por defecto: admin123 (Se recomienda cambiarlo)
+                hashed_pw = hashear_password("admin123")
+                
+                admin_user = Usuario(
+                    correo_corp=admin_email,
+                    password_hash=hashed_pw,
+                    is_active=True,
+                    is_bloqueado=False,
+                    debe_cambiar_pass=True # Obligar cambio en primer login
+                )
+                
+                # Asignar Rol SISTEMAS (Super Admin)
+                if "SISTEMAS" in roles_map:
+                    admin_user.roles.append(roles_map["SISTEMAS"])
+                
+                db.add(admin_user)
+                await db.commit()
+                print(f"   ✅ Usuario creado. Password temporal: 'admin123'")
+            else:
+                print(f"   ℹ️ El usuario {admin_email} ya existe.", flush=True)
+                # Asegurar que tenga rol SISTEMAS
+                has_role = any(r.nombre == "SISTEMAS" for r in admin_user.roles)
+                if not has_role and "SISTEMAS" in roles_map:
+                    print("   [+] Asignando rol SISTEMAS al usuario existente.")
+                    admin_user.roles.append(roles_map["SISTEMAS"])
+                    await db.commit()
+
+            print("\n--- ✅ SEEDING COMPLETADO CON ÉXITO ---", flush=True)
 
         finally:
             await db.close()
 
     except Exception as e:
-        print(f"ERROR CRITICO EN SEEDING: {e}", flush=True)
+        print(f"\n❌ ERROR CRÍTICO EN SEEDING: {e}", flush=True)
         import traceback
         traceback.print_exc()
 
@@ -85,5 +128,7 @@ if __name__ == "__main__":
         if sys.platform == 'win32':
              asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
         asyncio.run(seed_security())
-    except ImportError:
-        print("Error importing libraries. Ensure requirements are installed.", flush=True)
+    except ImportError as e:
+        print(f"Error importing libraries: {e}", flush=True)
+    except Exception as e:
+        print(f"Error executing script: {e}", flush=True)
