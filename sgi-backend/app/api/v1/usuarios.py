@@ -20,11 +20,6 @@ router = APIRouter(prefix="/usuarios", tags=["Usuarios"])
 # DROPDOWNS
 # ===========================================
 
-
-# ===========================================
-# DROPDOWNS
-# ===========================================
-
 @router.get("/roles/dropdown")
 async def get_roles_dropdown(
     db: AsyncSession = Depends(get_db),

@@ -12,10 +12,13 @@ import {
   AlertCircle,
   Users,
   ChevronLeft,
-  ChevronRight
+  ChevronRight,
+  Download
 } from 'lucide-react';
+import api from '@/lib/axios';
 import { useEmpleados } from '@/hooks/organizacion/useEmpleado';
 import { Empleado } from '@/types/organizacion/empleado';
+import { toast } from 'sonner';
 
 interface ColaboradoresTabProps {
   onOpenHistory: (entity: Empleado) => void;
@@ -27,6 +30,7 @@ interface ColaboradoresTabProps {
 export function ColaboradoresTab({ onOpenHistory, onEdit, onNew, onToggleStatus }: ColaboradoresTabProps) {
   const [busqueda, setBusqueda] = useState('');
   const [page, setPage] = useState(1);
+  const [isExporting, setIsExporting] = useState(false);
   const pageSize = 15;
 
   // Hook para obtener empleados reales de la API
@@ -43,6 +47,43 @@ export function ColaboradoresTab({ onOpenHistory, onEdit, onNew, onToggleStatus 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setBusqueda(e.target.value);
     setPage(1); // Resetear a página 1 al buscar
+  };
+
+  const handleExport = async () => {
+    try {
+      setIsExporting(true);
+
+      const response = await api.post('/empleados/exportar', {}, {
+        responseType: 'blob'
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const a = document.createElement('a');
+      a.href = url;
+
+      // El nombre del archivo viene en los headers o generamos uno
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `empleados_${new Date().toISOString().split('T')[0]}.xlsx`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename=(.+)/);
+        if (filenameMatch && filenameMatch.length > 1) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      toast.success('Exportación completada');
+    } catch (error) {
+      console.error(error);
+      toast.error('Error al exportar empleados');
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -65,6 +106,15 @@ export function ColaboradoresTab({ onOpenHistory, onEdit, onNew, onToggleStatus 
         </div>
 
         <div className="flex gap-2 w-full md:w-auto">
+          <button
+            onClick={handleExport}
+            disabled={isExporting}
+            className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 border border-green-200 bg-green-50 text-green-700 rounded-xl text-sm font-medium hover:bg-green-100 transition-colors disabled:opacity-50"
+          >
+            {isExporting ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+            Exportar Excel
+          </button>
+
           <button className="flex-1 md:flex-none flex items-center justify-center gap-2 px-4 py-2 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors text-gray-600">
             <Filter size={16} /> Filtros
           </button>
@@ -103,6 +153,7 @@ export function ColaboradoresTab({ onOpenHistory, onEdit, onNew, onToggleStatus 
                 <th className="px-6 py-4 font-semibold">Colaborador</th>
                 <th className="px-6 py-4 font-semibold">Área / Cargo</th>
                 <th className="px-6 py-4 font-semibold">Departamento</th>
+                <th className="px-6 py-4 font-semibold">Empresa</th>
                 <th className="px-6 py-4 font-semibold text-center">Acciones</th>
               </tr>
             </thead>
@@ -130,6 +181,9 @@ export function ColaboradoresTab({ onOpenHistory, onEdit, onNew, onToggleStatus 
                     <div className="text-sm text-gray-700">{emp.departamento_nombre || 'Sin departamento'}</div>
                   </td>
                   <td className="px-6 py-4">
+                    <div className="text-sm text-gray-700 font-medium">{emp.empresa || 'Corban Trans Logistic'}</div>
+                  </td>
+                  <td className="px-6 py-4">
                     <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
 
                       {/* BOTÓN EDITAR */}
@@ -154,8 +208,8 @@ export function ColaboradoresTab({ onOpenHistory, onEdit, onNew, onToggleStatus 
                       <button
                         onClick={() => onToggleStatus(emp)}
                         className={`p-2 rounded-lg transition-colors cursor-pointer ${emp.is_active
-                            ? 'hover:bg-amber-100 text-amber-600'
-                            : 'hover:bg-green-100 text-green-600'
+                          ? 'hover:bg-amber-100 text-amber-600'
+                          : 'hover:bg-green-100 text-green-600'
                           }`}
                         title={emp.is_active ? 'Desactivar colaborador' : 'Reactivar colaborador'}
                       >

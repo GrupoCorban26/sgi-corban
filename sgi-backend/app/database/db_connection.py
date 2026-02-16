@@ -1,9 +1,12 @@
 import asyncio
+import logging
 import urllib.parse
 import os
 from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import QueuePool
+
+logger = logging.getLogger(__name__)
 
 # 1. Cargar variables desde el .env
 load_dotenv()
@@ -53,11 +56,10 @@ async def test_connection():
     try:
         # En motores asíncronos se usa "async with engine.begin()"
         async with engine.begin() as conn:
-            print("✅ ¡Conexión asíncrona exitosa!")
-            print(f"Conectado a: {DB_NAME} en {DB_SERVER}")
+            logger.info("Conexión asíncrona exitosa")
+            logger.info(f"Conectado a: {DB_NAME} en {DB_SERVER}")
     except Exception as e:
-        print("❌ Error en la conexión asíncrona:")
-        print(e)
+        logger.error(f"Error en la conexión asíncrona: {e}")
 
 if __name__ == "__main__":
     # Para probar código 'async' fuera de FastAPI necesitamos asyncio

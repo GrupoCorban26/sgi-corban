@@ -22,7 +22,11 @@ const api = axios.create({
 // Interceptor para agregar token automáticamente
 api.interceptors.request.use(
     (config) => {
-        const token = getCookie('token');
+        let token = getCookie('token');
+        if (!token && typeof window !== 'undefined') {
+            token = localStorage.getItem('token') || undefined;
+        }
+
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }

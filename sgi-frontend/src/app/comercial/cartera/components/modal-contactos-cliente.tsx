@@ -4,8 +4,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Plus, Save, Loader2, Phone, Mail, User, Briefcase, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ModalBase, ModalHeader, ModalFooter, useModalContext } from '@/components/ui/modal';
-import axios from 'axios';
-import Cookies from 'js-cookie';
+
+import api from '@/lib/axios';
 
 // ============================================
 // TIPOS
@@ -34,13 +34,7 @@ interface ModalContentProps {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
-const getAuthHeaders = () => {
-    const token = Cookies.get('token');
-    return {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`
-    };
-};
+
 
 // ============================================
 // COMPONENTE INTERNO
@@ -61,9 +55,7 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
         if (!ruc) return;
         setIsLoading(true);
         try {
-            const response = await axios.get(`${API_URL}/contactos/ruc/${ruc}`, {
-                headers: getAuthHeaders()
-            });
+            const response = await api.get(`/contactos/ruc/${ruc}`);
             setContactos(response.data || []);
         } catch (error) {
             console.error('Error loading contacts:', error);
@@ -119,9 +111,7 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
                 correo: getFieldValue(contacto, 'correo') || null
             };
 
-            await axios.put(`${API_URL}/contactos/${contacto.id}`, updateData, {
-                headers: getAuthHeaders()
-            });
+            await api.put(`/contactos/${contacto.id}`, updateData);
 
             toast.success('Contacto actualizado');
             setEditedRows(prev => {
@@ -147,14 +137,12 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
 
         setIsCreating(true);
         try {
-            await axios.post(`${API_URL}/contactos/`, {
+            await api.post(`/contactos/`, {
                 ruc,
                 nombre: newContacto.nombre || null,
                 cargo: newContacto.cargo || null,
                 telefono: newContacto.telefono,
                 correo: newContacto.correo || null
-            }, {
-                headers: getAuthHeaders()
             });
 
             toast.success('Contacto agregado');

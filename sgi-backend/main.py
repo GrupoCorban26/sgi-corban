@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
 import os
+
 # Routers
 from app.api.v1.auth import router as auth_router
 from app.api.v1.usuarios import router as usuarios_router
@@ -12,6 +13,7 @@ from app.api.v1.organizacion.cargos import router as cargos_router
 from app.api.v1.organizacion.activos import router as activos_router
 from app.api.v1.organizacion.estado_activo import router as estado_activo_router
 from app.api.v1.organizacion.lineas import router as lineas_router
+from app.api.v1.organizacion.dashboard import router as dashboard_router
 from app.api.v1.core.ubigeo import router as ubigeo_router
 from app.api.v1.comercial.importaciones import router as importaciones_router
 from app.api.v1.comercial.contactos import router as contactos_router
@@ -58,6 +60,7 @@ app.include_router(clientes_router, prefix="/api/v1")
 app.include_router(citas_router, prefix="/api/v1")
 app.include_router(inbox_router, prefix="/api/v1/comercial/inbox", tags=["inbox"])
 app.include_router(whatsapp_router, prefix="/api/v1/comercial/whatsapp", tags=["whatsapp"])
+app.include_router(dashboard_router, prefix="/api/v1/organizacion/dashboard", tags=["dashboard"])
 
 @app.get("/")
 def read_root():

@@ -1,8 +1,11 @@
+import logging
 import pandas as pd
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 from fastapi import UploadFile, HTTPException
 import io
+
+logger = logging.getLogger(__name__)
 
 class ImportacionesService:
     
@@ -171,5 +174,5 @@ class ImportacionesService:
             return {"total": total, "page": page, "page_size": page_size, "data": rows}
             
         except Exception as e:
-            print(f"Error get_importaciones: {e}")
+            logger.error(f"Error get_importaciones: {e}")
             return {"total": 0, "page": page, "page_size": page_size, "data": []}

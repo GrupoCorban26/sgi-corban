@@ -29,28 +29,6 @@ export default function ComercialDashboardContent({ data }: Props) {
 
       <ModalCita isOpen={isCitaOpen} onClose={() => setIsCitaOpen(false)} />
 
-      {/* Sección de KPIs Rápidos */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard
-          title="Meta de cierres"
-          value="5/10"
-          icon={<DollarSign size={20} />}
-          change={4}
-        />
-        <StatCard
-          title="Órdenes"
-          value="32"
-          icon={<Package size={20} />}
-          change={-5}
-        />
-        <StatCard
-          title="Cotizaciones"
-          value="46"
-          icon={<TrendingUp size={20} />}
-          change={-1}
-        />
-      </div>
-
       {/* SECCIÓN DE AGENDA Y RECORDATORIOS */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[500px]">
         <RecordatorioLlamadas />

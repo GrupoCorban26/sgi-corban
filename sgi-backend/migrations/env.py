@@ -26,7 +26,11 @@ SQLALCHEMY_URL = (
     f"mssql+pyodbc://{DB_USER}:{DB_PASS}@{DB_SERVER}/{DB_NAME}?"
     f"driver={DB_DRIVER}&TrustServerCertificate=yes"
 )
-config.set_main_option("sqlalchemy.url", SQLALCHEMY_URL)
+
+# Escapar % para ConfigParser (necesario si hay caracteres especiales URL-encoded)
+SQLALCHEMY_URL_ESCAPED = SQLALCHEMY_URL.replace("%", "%%")
+
+config.set_main_option("sqlalchemy.url", SQLALCHEMY_URL_ESCAPED)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.

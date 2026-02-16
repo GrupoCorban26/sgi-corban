@@ -7,6 +7,7 @@ import { format, parseISO, isSameDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import ModalAprobarCita from '@/components/comercial/ModalAprobarCita';
+import ModalCalendario from '@/components/comercial/ModalCalendario';
 import { toast } from 'sonner';
 
 export default function UpcomingAppointments() {
@@ -15,6 +16,7 @@ export default function UpcomingAppointments() {
 
     const [selectedCita, setSelectedCita] = useState<Cita | null>(null);
     const [isApprovalOpen, setIsApprovalOpen] = useState(false);
+    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const [filterStatus, setFilterStatus] = useState<string>('PENDIENTE');
 
     // If Boss -> fetch all (comercial_id=undefined)
@@ -66,6 +68,15 @@ export default function UpcomingAppointments() {
                         <Calendar className="text-indigo-600" size={20} />
                         {isBoss ? 'Citas del Equipo' : 'Mis Citas'}
                     </h3>
+                    {isBoss && (
+                        <button
+                            onClick={() => setIsCalendarOpen(true)}
+                            className="text-xs bg-indigo-50 text-indigo-700 hover:bg-indigo-100 px-3 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1"
+                        >
+                            <Calendar size={14} />
+                            Ver Calendario
+                        </button>
+                    )}
                 </div>
 
                 {/* Filter Tabs */}
@@ -173,6 +184,12 @@ export default function UpcomingAppointments() {
                 isOpen={isApprovalOpen}
                 onClose={() => setIsApprovalOpen(false)}
                 cita={selectedCita}
+            />
+
+            <ModalCalendario
+                isOpen={isCalendarOpen}
+                onClose={() => setIsCalendarOpen(false)}
+                citas={citas}
             />
         </div>
     );

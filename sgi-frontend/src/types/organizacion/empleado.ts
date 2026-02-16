@@ -26,6 +26,7 @@ export interface Empleado {
     departamento_nombre?: string | null; // Departamento organizacional
     jefe_id?: number | null;
     jefe_nombre?: string | null;
+    empresa?: string | null;
 }
 
 export interface EmpleadoPaginationResponse {
@@ -63,6 +64,7 @@ export interface EmpleadoCreate {
     area_id: number;
     departamento_id: number;
     jefe_id?: number | null;
+    empresa?: string;
 }
 
 export interface EmpleadoUpdate {
@@ -81,4 +83,5 @@ export interface EmpleadoUpdate {
     area_id?: number;
     departamento_id?: number;
     jefe_id?: number | null;
+    empresa?: string;
 }

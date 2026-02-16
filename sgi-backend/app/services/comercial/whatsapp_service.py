@@ -1,6 +1,9 @@
+import logging
 import httpx
 import os
 from dotenv import load_dotenv
+
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -93,6 +96,6 @@ class WhatsAppService:
         async with httpx.AsyncClient() as client:
             response = await client.post(WHATSAPP_API_URL, json=payload, headers=headers)
             if response.status_code >= 400:
-                print(f"❌ WhatsApp API Error (Interactive): {response.status_code} - {response.text}")
+                logger.error(f"WhatsApp API Error (Interactive): {response.status_code} - {response.text}")
             response.raise_for_status()
             return response.json()

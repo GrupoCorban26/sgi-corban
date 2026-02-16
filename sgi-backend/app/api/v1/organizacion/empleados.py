@@ -141,3 +141,25 @@ async def reactivar_empleado(
     """Reactiva un empleado desactivado - limpia fecha_cese"""
     service = EmpleadoService(db)
     return await service.reactivate(empleado_id)
+
+
+from fastapi.responses import StreamingResponse
+from datetime import datetime
+
+@router.post("/exportar", dependencies=[Depends(require_permission("empleados.listar"))])
+async def exportar_empleados(
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
+):
+    """Genera y descarga un archivo Excel con todos los empleados"""
+    service = EmpleadoService(db)
+    file_content = await service.get_all_for_export()
+    
+    # Generar nombre de archivo con fecha
+    filename = f"empleados_sgi_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+    
+    return StreamingResponse(
+        content=iter([file_content]),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )

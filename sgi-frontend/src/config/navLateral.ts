@@ -2,8 +2,6 @@ export const MENU_ROLES = {
   comercial: [
     { label: 'Inicio', href: '/comercial/' },
     { label: 'Base', href: '/comercial/base' },
-    { label: 'Cotizaciones', href: '/comercial/cotizaciones' },
-    { label: 'Ordenes', href: '/comercial/ordenes' },
     { label: 'Cartera', href: '/comercial/cartera' },
     { label: 'Buzón', href: '/comercial/buzon' },
   ],
@@ -18,8 +16,7 @@ export const MENU_ROLES = {
   ],
   jefa_comercial: [
     { label: 'Inicio', href: '/comercial' },
-    { label: 'Reportes', href: '/comercial/reportes' },
-    { label: 'Validaciones', href: '/comercial/citas' },
+    { label: 'Citas', href: '/comercial/citas' },
     { label: 'Cartera Global', href: '/comercial/cartera-global' },
     { label: 'Buzón', href: '/comercial/buzon' },
   ],

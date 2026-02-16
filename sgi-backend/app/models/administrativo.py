@@ -82,6 +82,10 @@ class Empleado(Base):
     is_active = Column(Boolean, default=True, nullable=False)
     cargo_id = Column(Integer, ForeignKey("adm.cargos.id"), nullable=True)
     jefe_id = Column(Integer, ForeignKey("adm.empleados.id"), nullable=True)
+    
+    # Nuevo campo Empresa
+    empresa = Column(String(50), default="Corban Trans Logistic", nullable=False)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

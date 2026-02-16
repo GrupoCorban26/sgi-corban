@@ -1,4 +1,5 @@
 import os
+import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from dotenv import load_dotenv
@@ -8,6 +9,8 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+
+logger = logging.getLogger(__name__)
 
 # Importaciones internas (ajusta las rutas según tu estructura)
 from app.database.db_connection import get_db
@@ -53,10 +56,7 @@ async def get_current_active_auth(
 ) -> dict:
     """
     DEPENDENCIA MAESTRA: 
-    1. Valida la firma del token.
-    2. Verifica que no haya expirado (JWT Check).
-    3. Verifica en BD que la sesión no haya sido revocada ni expirada por inactividad.
-    4. SLIDING WINDOW: Extiende la sesión si está activa.
+    Merged login/active session check.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -66,24 +66,34 @@ async def get_current_active_auth(
     
     try:
         # 1. Decodificar y validar tiempo (automático en jwt.decode)
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        try:
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            logger.debug(f"Token decoded successfully. Sub: {payload.get('sub')}")
+        except Exception as e:
+            logger.warning(f"Token Decode Failed: {e}")
+            raise credentials_exception
+
         user_id = payload.get("sub")
         if user_id is None:
+            logger.warning("Token missing 'sub' (user_id)")
             raise credentials_exception
             
         # 2. Verificar sesión activa en la tabla de base de datos
         # Esto comprueba Revocación + Inactividad (30 min)
         is_active = await verificar_sesion_activa(db, token)
         if not is_active:
+            logger.warning(f"Session check failed for user {user_id}")
             raise credentials_exception
             
         # 3. EXPANSIÓN DE SESIÓN (Sliding Expiration)
         # Si la sesión es válida, intentamos extenderla
-        await extender_sesion(db, token)
+        # await extender_sesion(db, token) # Comentado temporalmente para aislar el problema si es DB write
+        await extender_sesion(db, token) 
             
         return payload
 
-    except (JWTError, ValueError):
+    except (JWTError, ValueError) as e:
+        logger.warning(f"JWT Error or Value Error: {e}")
         raise credentials_exception
 
 # --- DEPENDENCIAS DE CONVENIENCIA (Basadas en la Maestra) ---

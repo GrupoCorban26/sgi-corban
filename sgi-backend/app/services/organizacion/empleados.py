@@ -389,3 +389,90 @@ class EmpleadoService:
         """)
         result = await self.db.execute(query)
         return [dict(row) for row in result.mappings().all()]
+
+    async def get_all_for_export(self) -> bytes:
+        """
+        Obtiene todos los empleados para exportar a Excel.
+        Retorna los bytes del archivo Excel generado.
+        """
+        import pandas as pd
+        import io
+
+        query = text("""
+            SELECT
+                e.id,
+                e.nombres,
+                e.apellido_paterno,
+                e.apellido_materno,
+                e.tipo_documento,
+                e.nro_documento,
+                e.celular,
+                e.email_personal,
+                d.nombre AS departamento,
+                a.nombre AS area,
+                c.nombre AS cargo,
+                e.empresa,
+                e.fecha_ingreso,
+                CASE WHEN e.is_active = 1 THEN 'ACTIVO' ELSE 'INACTIVO' END AS estado,
+                ISNULL(emp_jefe.nombres + ' ' + emp_jefe.apellido_paterno, 'Sin jefe') AS jefe_directo
+            FROM adm.empleados e
+            LEFT JOIN adm.cargos c ON c.id = e.cargo_id
+            LEFT JOIN adm.areas a ON a.id = c.area_id
+            LEFT JOIN adm.departamentos d ON d.id = a.departamento_id
+            LEFT JOIN adm.empleados emp_jefe ON emp_jefe.id = e.jefe_id
+            ORDER BY e.apellido_paterno, e.nombres
+        """)
+        
+        result = await self.db.execute(query)
+        data = [dict(row) for row in result.mappings().all()]
+        
+        if not data:
+            # Crear DataFrame vacío con columnas si no hay datos
+            df = pd.DataFrame(columns=[
+                "ID", "Nombres", "Apellido Paterno", "Apellido Materno", 
+                "Tipo Doc.", "Nro. Documento", "Celular", "Email", 
+                "Departamento", "Área", "Cargo", "Empresa", 
+                "Fecha Ingreso", "Estado", "Jefe Directo"
+            ])
+        else:
+            df = pd.DataFrame(data)
+            # Renombrar columnas para el Excel
+            df = df.rename(columns={
+                "id": "ID",
+                "nombres": "Nombres",
+                "apellido_paterno": "Apellido Paterno",
+                "apellido_materno": "Apellido Materno",
+                "tipo_documento": "Tipo Doc.",
+                "nro_documento": "Nro. Documento",
+                "celular": "Celular",
+                "email_personal": "Email",
+                "departamento": "Departamento",
+                "area": "Área",
+                "cargo": "Cargo",
+                "empresa": "Empresa",
+                "fecha_ingreso": "Fecha Ingreso",
+                "estado": "Estado",
+                "jefe_directo": "Jefe Directo"
+            })
+            
+        # Generar Excel en memoria
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
+            df.to_excel(writer, index=False, sheet_name='Colaboradores')
+            
+            # Ajustar ancho de columnas (opcional, básico)
+            worksheet = writer.sheets['Colaboradores']
+            for column in worksheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = (max_length + 2)
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+
+        output.seek(0)
+        return output.getvalue()

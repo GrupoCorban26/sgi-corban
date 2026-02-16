@@ -1,3 +1,4 @@
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import text, func, or_, case
@@ -7,6 +8,8 @@ from app.models.comercial import Cliente, ClienteContacto
 from app.models.administrativo import Area, Empleado
 from app.models.seguridad import Usuario
 from datetime import datetime, timedelta, date
+
+logger = logging.getLogger(__name__)
 
 
 class ClientesService:
@@ -288,7 +291,7 @@ class ClientesService:
             await self.db.commit()
             return {"success": 1, "message": f"Estado actualizado a {nuevo_estado}"}
         except Exception as e:
-            print(f"ERROR CAMBIAR ESTADO: {e}")
+            logger.error(f"Error cambiar estado: {e}")
             await self.db.rollback()
             return {"success": 0, "message": f"Error al cambiar estado: {str(e)}"}
 

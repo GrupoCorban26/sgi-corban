@@ -35,6 +35,7 @@ interface FormState {
   area_id: number | null;
   cargo_id: number | null;
   jefe_id: number | null;
+  empresa: string;
 }
 
 interface FormErrors {
@@ -49,6 +50,7 @@ interface FormErrors {
   area_id?: string;
   cargo_id?: string;
   email_personal?: string;
+  empresa?: string;
 }
 
 const initialFormState: FormState = {
@@ -69,6 +71,7 @@ const initialFormState: FormState = {
   area_id: null,
   cargo_id: null,
   jefe_id: null,
+  empresa: 'Corban Trans Logistic',
 };
 
 // ============================================
@@ -280,6 +283,7 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
         area_id: empleadoData.area_id || null,
         cargo_id: empleadoData.cargo_id || null,
         jefe_id: empleadoData.jefe_id || null,
+        empresa: empleadoData.empresa || 'Corban Trans Logistic',
       });
       setErrors({});
       setTouched(new Set());
@@ -392,6 +396,7 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
           area_id: formData.area_id!,
           cargo_id: formData.cargo_id!,
           jefe_id: formData.jefe_id,
+          empresa: formData.empresa,
         };
         await updateMutation.mutateAsync({ id: empleadoData.id, data: updateData });
         toast.success('Empleado actualizado correctamente');
@@ -412,6 +417,7 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
           area_id: formData.area_id!,
           cargo_id: formData.cargo_id!,
           jefe_id: formData.jefe_id,
+          empresa: formData.empresa,
         };
         await createMutation.mutateAsync(createData);
         toast.success('Empleado registrado correctamente');
@@ -598,6 +604,34 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
             <Building2 size={16} className="text-indigo-600" />
             <h3 className="font-semibold text-gray-700 uppercase text-xs tracking-wider">Información Laboral</h3>
           </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <label className="text-xs font-semibold text-gray-600">Empresa <span className="text-red-500">*</span></label>
+              <select
+                name="empresa"
+                value={formData.empresa}
+                onChange={handleChange}
+                className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                disabled={isLoading}
+              >
+                <option value="Corban Trans Logistic">Corban Trans Logistic</option>
+                <option value="Corban Agencia de Aduanas">Corban Agencia de Aduanas</option>
+                <option value="EBL">EBL</option>
+              </select>
+            </div>
+            <InputField
+              label="Fecha Ingreso"
+              name="fecha_ingreso"
+              type="date"
+              value={formData.fecha_ingreso}
+              onChange={handleChange}
+              error={touched.has('fecha_ingreso') ? errors.fecha_ingreso : undefined}
+              required
+              disabled={isLoading}
+              icon={<Calendar size={12} />}
+            />
+          </div>
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <SelectField
               label="Departamento Org."
