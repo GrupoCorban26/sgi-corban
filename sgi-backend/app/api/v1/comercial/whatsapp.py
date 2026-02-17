@@ -83,9 +83,17 @@ async def receive_webhook_message(
                         if interactive.get("type") == "button_reply":
                             incoming.button_id = interactive.get("button_reply", {}).get("id", "")
                             incoming.message_text = interactive.get("button_reply", {}).get("title", "")
-                    elif msg_type == "button": # Template buttons response often comes as 'button' type in legacy or specific api versions but mostly interactive
+                        elif interactive.get("type") == "list_reply":
+                            incoming.button_id = interactive.get("list_reply", {}).get("id", "")
+                            incoming.message_text = interactive.get("list_reply", {}).get("title", "")
+                    elif msg_type == "button":
                         button = msg.get("button", {})
                         incoming.message_text = button.get("text", "")
+                    elif msg_type == "location":
+                        location = msg.get("location", {})
+                        incoming.latitude = location.get("latitude")
+                        incoming.longitude = location.get("longitude")
+                        incoming.message_text = location.get("name", "")
                         
                     # Procesar con el bot
                     response = await service.process_message(incoming)
@@ -99,11 +107,15 @@ async def receive_webhook_message(
                             await WhatsAppService.send_interactive_buttons(
                                 from_number, bot_msg.body, buttons
                             )
+                        elif bot_msg.type == "list":
+                            await WhatsAppService.send_interactive_list(
+                                from_number, bot_msg.body, bot_msg.header,
+                                bot_msg.button_text, bot_msg.sections
+                            )
 
         return {"status": "ok"}
             
     except Exception as e:
-        # Importante: Retornar 200 ok a Meta incluso si fallamos internamente para evitar reintentos infinitos
-        # Loguear el error
-        print(f"Error processing webhook: {str(e)}")
+        import logging
+        logging.getLogger(__name__).error(f"Error processing webhook: {e}", exc_info=True)
         return {"status": "error", "detail": str(e)}

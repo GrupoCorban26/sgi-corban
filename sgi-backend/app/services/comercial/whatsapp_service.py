@@ -99,3 +99,38 @@ class WhatsAppService:
                 logger.error(f"WhatsApp API Error (Interactive): {response.status_code} - {response.text}")
             response.raise_for_status()
             return response.json()
+
+    @staticmethod
+    async def send_interactive_list(to: str, body_text: str, header: str, button_text: str, sections: list) -> dict:
+        """
+        Send an interactive list message.
+        sections: [{"title": "Section", "rows": [{"id": "x", "title": "Y", "description": "Z"}]}]
+        Max 10 rows per section, max 10 sections.
+        """
+        headers = {
+            "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+            "Content-Type": "application/json",
+        }
+        interactive_data = {
+            "type": "list",
+            "body": {"text": body_text},
+            "action": {
+                "button": button_text,
+                "sections": sections
+            }
+        }
+        if header:
+            interactive_data["header"] = {"type": "text", "text": header}
+
+        payload = {
+            "messaging_product": "whatsapp",
+            "to": to,
+            "type": "interactive",
+            "interactive": interactive_data,
+        }
+        async with httpx.AsyncClient() as client:
+            response = await client.post(WHATSAPP_API_URL, json=payload, headers=headers)
+            if response.status_code >= 400:
+                logger.error(f"WhatsApp API Error (List): {response.status_code} - {response.text}")
+            response.raise_for_status()
+            return response.json()

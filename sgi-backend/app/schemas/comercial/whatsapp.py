@@ -6,9 +6,11 @@ class WhatsAppIncoming(BaseModel):
     """Normalized incoming message (simplified for internal use)."""
     from_number: str
     contact_name: str
-    message_type: str  # text, interactive, image, audio, video, sticker, location, button
+    message_type: str  # text, interactive, location, button
     message_text: str = ""
     button_id: str = ""
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
 
 
 # ==========================================
@@ -36,13 +38,17 @@ class WhatsAppWebhookPayload(BaseModel):
 
 class BotMessage(BaseModel):
     """A single message the bot should send."""
-    type: str  # "text" or "buttons"
+    type: str  # "text", "buttons", or "list"
     content: str = ""
     body: str = ""
     buttons: Optional[List[dict]] = None
+    # List message fields
+    header: str = ""
+    button_text: str = ""
+    sections: Optional[List[dict]] = None
 
 
 class WhatsAppResponse(BaseModel):
-    """Response from /process endpoint telling n8n what to send."""
-    action: str  # "send_text", "send_buttons", "send_multiple", "no_action"
+    """Response from chatbot service."""
+    action: str  # "send_text", "send_buttons", "send_list", "send_multiple", "no_action"
     messages: List[BotMessage] = []
