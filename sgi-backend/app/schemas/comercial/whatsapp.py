@@ -3,12 +3,35 @@ from typing import Optional, List
 
 
 class WhatsAppIncoming(BaseModel):
-    """Incoming message from n8n webhook."""
+    """Normalized incoming message (simplified for internal use)."""
     from_number: str
     contact_name: str
-    message_type: str  # text, interactive, image, audio, video, sticker, location
+    message_type: str  # text, interactive, image, audio, video, sticker, location, button
     message_text: str = ""
     button_id: str = ""
+
+
+# ==========================================
+# META WEBHOOK RAW SCHEMAS
+# ==========================================
+
+class WhatsAppWebhookValue(BaseModel):
+    messaging_product: str
+    metadata: dict
+    contacts: Optional[List[dict]] = None
+    messages: Optional[List[dict]] = None
+
+class WhatsAppWebhookChange(BaseModel):
+    value: WhatsAppWebhookValue
+    field: str
+
+class WhatsAppWebhookEntry(BaseModel):
+    id: str
+    changes: List[WhatsAppWebhookChange]
+
+class WhatsAppWebhookPayload(BaseModel):
+    object: str
+    entry: List[WhatsAppWebhookEntry]
 
 
 class BotMessage(BaseModel):
