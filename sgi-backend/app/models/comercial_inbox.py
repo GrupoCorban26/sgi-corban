@@ -31,6 +31,18 @@ class Inbox(Base):
     @property
     def telefono_asignado(self):
         if self.usuario_asignado and self.usuario_asignado.empleado:
-            return self.usuario_asignado.empleado.celular
+            # Buscar celular corporativo
+            # 1. Recorrer los activos asignados al empleado (backref: 'activos_asignados')
+            for asignacion in getattr(self.usuario_asignado.empleado, 'activos_asignados', []):
+                # 2. Verificar que la asignación esté vigente (sin fecha de devolución) y tenga activo
+                if asignacion.fecha_devolucion is None and asignacion.activo:
+                    # 3. Verificar si el activo tiene una línea corporativa instalada (backref: 'linea_instalada')
+                    # Nota: linea_instalada es una lista de líneas asociadas al activo
+                    for linea in getattr(asignacion.activo, 'linea_instalada', []):
+                        if linea.is_active:
+                            return linea.numero
+                            
+            # Si no se encuentra línea corporativa activa, retornamos None
+            return None
         return None
 

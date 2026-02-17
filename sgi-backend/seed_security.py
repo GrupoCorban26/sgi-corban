@@ -80,7 +80,7 @@ async def seed_security():
 
             # 3. SUPERUSUARIO
             print("\n--- 3. Verificando Superusuario ---")
-            admin_email = "admin@grupocorban.com"
+            admin_email = "admin@grupocorban.pe"
             stmt = select(Usuario).where(Usuario.correo_corp == admin_email).options(selectinload(Usuario.roles))
             admin_user = (await db.execute(stmt)).scalars().first()
 
