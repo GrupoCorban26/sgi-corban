@@ -31,6 +31,11 @@ export const MENU_ROLES = {
     { label: 'Contactos', href: '/sistemas/contactos', icon: 'UserGroupIcon' },
     { label: 'Base', href: '/sistemas/base', icon: 'PriceIcon' },
     { label: 'Usuarios', href: '/sistemas/usuarios', icon: 'FileIcon' },
+    // Admin sections (SISTEMAS = Super Admin)
+    { label: 'Organización', href: '/administracion/organizacion', icon: 'OrgIcon' },
+    { label: 'Inventario', href: '/administracion/inventario', icon: 'BoxIcon' },
+    { label: 'Líneas', href: '/administracion/lineas', icon: 'LineIcon' },
+    { label: 'Asistencias', href: '/administracion/asistencias', icon: 'ClockIcon' },
   ],
 } as const;
 
