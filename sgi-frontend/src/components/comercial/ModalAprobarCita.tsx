@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { CheckCircle, XCircle, Car, UserPlus, User, Loader2, MessageSquare } from 'lucide-react';
+import { CheckCircle, XCircle, UserPlus, User, Loader2, MessageSquare } from 'lucide-react';
 import { toast } from 'sonner';
-import { useCitas, useConductores, Cita, useComercialesDropdown } from '@/hooks/comercial/useCitas';
+import { useCitas, Cita, useSubordinadosDropdown } from '@/hooks/comercial/useCitas';
 import { ModalBase, ModalHeader, ModalFooter } from '@/components/ui/modal';
 
 interface ModalAprobarCitaProps {
@@ -14,10 +14,8 @@ interface ModalAprobarCitaProps {
 
 export default function ModalAprobarCita({ isOpen, onClose, cita }: ModalAprobarCitaProps) {
     const { approveMutation, rejectMutation } = useCitas();
-    const { data: conductores } = useConductores();
-    const { data: comerciales } = useComercialesDropdown();
+    const { data: subordinados } = useSubordinadosDropdown();
 
-    const [conductorId, setConductorId] = useState<number>(0);
     const [acompananteId, setAcompananteId] = useState<number>(0);
     const [iraSolo, setIraSolo] = useState(false);
     const [motivoRechazo, setMotivoRechazo] = useState('');
@@ -32,7 +30,6 @@ export default function ModalAprobarCita({ isOpen, onClose, cita }: ModalAprobar
                 data: {
                     acompanado_por_id: iraSolo ? undefined : (acompananteId || undefined),
                     ira_solo: iraSolo,
-                    conductor_id: conductorId || undefined
                 }
             });
             toast.success('Cita aprobada correctamente');
@@ -73,7 +70,7 @@ export default function ModalAprobarCita({ isOpen, onClose, cita }: ModalAprobar
                     title="Detalle de Salida a Campo"
                 />
 
-                <div className="p-6 space-y-4">
+                <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                     <div className="bg-emerald-50 p-4 rounded-xl space-y-2">
                         <p className="font-semibold text-emerald-800">Salida a Campo</p>
                         <div className="flex gap-4 text-sm text-gray-600">
@@ -122,7 +119,7 @@ export default function ModalAprobarCita({ isOpen, onClose, cita }: ModalAprobar
                 title={modoRechazo ? 'Rechazar Cita' : 'Aprobar Solicitud de Cita'}
             />
 
-            <div className="p-6 space-y-6">
+            <div className="p-6 space-y-6 max-h-[70vh] overflow-y-auto">
                 {/* Resumen de la cita */}
                 <div className="bg-gray-50 p-4 rounded-xl space-y-2">
                     <p className="font-semibold text-gray-800">{cita.cliente_razon_social}</p>
@@ -167,7 +164,7 @@ export default function ModalAprobarCita({ isOpen, onClose, cita }: ModalAprobar
                             <div className="space-y-2">
                                 <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
                                     <UserPlus size={18} className="text-indigo-600" />
-                                    Acompañante
+                                    Acompañante (Subordinado)
                                 </label>
                                 <select
                                     className="w-full p-3 border rounded-xl bg-white outline-none focus:ring-2 focus:ring-indigo-500"
@@ -175,35 +172,15 @@ export default function ModalAprobarCita({ isOpen, onClose, cita }: ModalAprobar
                                     onChange={(e) => setAcompananteId(Number(e.target.value))}
                                 >
                                     <option value={0}>-- Seleccionar Acompañante --</option>
-                                    {comerciales?.map(u => (
+                                    {subordinados?.map(u => (
                                         <option key={u.id} value={u.id}>{u.nombre}</option>
                                     ))}
                                 </select>
+                                {subordinados?.length === 0 && (
+                                    <p className="text-xs text-orange-500">No tiene subordinados directos asignados.</p>
+                                )}
                             </div>
                         )}
-
-                        {/* Transporte (opcional) */}
-                        <div className="space-y-2">
-                            <label className="flex items-center gap-2 text-sm font-bold text-gray-700">
-                                <Car size={18} className="text-gray-500" />
-                                Transporte (Opcional)
-                            </label>
-                            <select
-                                className="w-full p-3 border rounded-xl bg-white outline-none focus:ring-2 focus:ring-indigo-500"
-                                value={conductorId}
-                                onChange={(e) => setConductorId(Number(e.target.value))}
-                            >
-                                <option value={0}>-- Sin transporte asignado --</option>
-                                {conductores?.map((c) => (
-                                    <option key={c.id} value={c.id}>
-                                        {c.display_label} - ({c.placa})
-                                    </option>
-                                ))}
-                            </select>
-                            <p className="text-xs text-gray-500 pl-1">
-                                El transporte es opcional. Déjelo vacío si usará el transporte habitual.
-                            </p>
-                        </div>
                     </div>
                 ) : (
                     /* Modo Rechazo */

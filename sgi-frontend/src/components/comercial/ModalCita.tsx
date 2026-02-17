@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Calendar, Clock, MapPin, FileText, Gift, Building2, Save, X, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Calendar, Clock, MapPin, FileText, Gift, Building2, Save, X, Loader2, ChevronDown, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { useCitas, Cita, CitaCreate, CitaUpdate } from '@/hooks/comercial/useCitas';
 import { useClientes } from '@/hooks/comercial/useClientes';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { ModalBase, ModalHeader, ModalFooter } from '@/components/ui/modal';
 
 interface ModalCitaProps {
@@ -15,10 +16,8 @@ interface ModalCitaProps {
 
 export default function ModalCita({ isOpen, onClose, citaToEdit }: ModalCitaProps) {
     const { createMutation, updateMutation } = useCitas();
-    const { clientes } = useClientes('', 'CLIENTE', null, 1, 100);
-    // Assuming useClientes might need a specific dropdown mode or we just filter list. 
-    // Let's check useClientes implementation if possible, or use the one we saw earlier.
-    // Earlier 'useClientes' returned 'clientes' array. We'll assume it works.
+    const { user } = useCurrentUser();
+    const { clientes, isLoading: loadingClientes } = useClientes('', null, user?.id ?? null, 1, 100);
 
     const [clienteId, setClienteId] = useState<number>(0);
     const [fecha, setFecha] = useState('');
@@ -28,21 +27,39 @@ export default function ModalCita({ isOpen, onClose, citaToEdit }: ModalCitaProp
     const [motivo, setMotivo] = useState('');
     const [conPresente, setConPresente] = useState(false);
 
-    // Derived state for dropdown
-    const [filteredClientes, setFilteredClientes] = useState<any[]>([]);
+    // Dropdown state
+    const [dropdownOpen, setDropdownOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
+    // Close dropdown on outside click
+    useEffect(() => {
+        const handleClickOutside = (e: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+                setDropdownOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    // Focus search when dropdown opens
+    useEffect(() => {
+        if (dropdownOpen && searchInputRef.current) {
+            searchInputRef.current.focus();
+        }
+    }, [dropdownOpen]);
 
     useEffect(() => {
         if (citaToEdit) {
             setClienteId(citaToEdit.cliente_id ?? 0);
-            // Format fecha to YYYY-MM-DD
             setFecha(citaToEdit.fecha.split('T')[0]);
             setHora(citaToEdit.hora);
             setTipoCita(citaToEdit.tipo_cita);
             setDireccion(citaToEdit.direccion);
             setMotivo(citaToEdit.motivo);
             setConPresente(citaToEdit.con_presente);
-            setSearchTerm(citaToEdit.cliente_razon_social || '');
         } else {
             resetForm();
         }
@@ -64,7 +81,6 @@ export default function ModalCita({ isOpen, onClose, citaToEdit }: ModalCitaProp
 
         if (!clienteId) return toast.error('Seleccione un cliente');
         if (!fecha || !hora) return toast.error('Defina fecha y hora');
-
         if (!motivo) return toast.error('Ingrese motivo');
 
         try {
@@ -88,23 +104,13 @@ export default function ModalCita({ isOpen, onClose, citaToEdit }: ModalCitaProp
         }
     };
 
-    // Simple autocomplete logic
-    // NOTE: Ideally this uses a dedicated async select component
-    const handleSearchChange = (val: string) => {
-        setSearchTerm(val);
-        if (clientes) {
-            const matches = clientes.filter((c: any) =>
-                c.razon_social.toLowerCase().includes(val.toLowerCase())
-            ).slice(0, 5);
-            setFilteredClientes(matches);
-        }
-    }
+    // Filtered list for search
+    const filteredClientes = clientes?.filter((c: any) =>
+        c.razon_social?.toLowerCase().includes(searchTerm.toLowerCase())
+    ) || [];
 
-    const selectCliente = (c: any) => {
-        setClienteId(c.id);
-        setSearchTerm(c.razon_social);
-        setFilteredClientes([]);
-    }
+    // Selected client label
+    const selectedCliente = clientes?.find((c: any) => c.id === clienteId);
 
     return (
         <ModalBase isOpen={isOpen} onClose={onClose}>
@@ -114,30 +120,75 @@ export default function ModalCita({ isOpen, onClose, citaToEdit }: ModalCitaProp
             />
 
             <form onSubmit={handleSubmit} className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
-                {/* Cliente Autocomplete */}
-                <div className="space-y-1 relative">
+                {/* Cliente Dropdown */}
+                <div className="space-y-1 relative" ref={dropdownRef}>
                     <label className="text-xs font-bold text-gray-500 uppercase">Cliente</label>
-                    <input
-                        type="text"
-                        value={searchTerm}
-                        onChange={(e) => handleSearchChange(e.target.value)}
-                        className="w-full px-3 py-2 border rounded-xl"
-                        placeholder="Buscar cliente..."
-                        disabled={!!citaToEdit} // Disable client change on edit? Usually safer.
-                    />
-                    {filteredClientes.length > 0 && !citaToEdit && (
-                        <div className="absolute z-10 w-full bg-white border rounded-xl shadow-lg mt-1 overflow-hidden">
-                            {filteredClientes.map(c => (
-                                <div
-                                    key={c.id}
-                                    className="px-4 py-2 hover:bg-gray-50 cursor-pointer text-sm"
-                                    onClick={() => selectCliente(c)}
-                                >
-                                    {c.razon_social}
+                    <button
+                        type="button"
+                        onClick={() => !citaToEdit && setDropdownOpen(!dropdownOpen)}
+                        disabled={!!citaToEdit}
+                        className={`w-full px-3 py-2.5 border rounded-xl flex items-center justify-between text-left transition-all
+                            ${dropdownOpen ? 'border-indigo-400 ring-2 ring-indigo-100' : 'border-gray-200 hover:border-gray-300'}
+                            ${citaToEdit ? 'bg-gray-50 cursor-not-allowed opacity-70' : 'bg-white cursor-pointer'}`}
+                    >
+                        <span className={`text-sm truncate ${clienteId ? 'text-gray-800' : 'text-gray-400'}`}>
+                            {loadingClientes
+                                ? 'Cargando clientes...'
+                                : selectedCliente
+                                    ? selectedCliente.razon_social
+                                    : 'Seleccionar cliente...'
+                            }
+                        </span>
+                        <ChevronDown size={16} className={`text-gray-400 transition-transform flex-shrink-0 ${dropdownOpen ? 'rotate-180' : ''}`} />
+                    </button>
+
+                    {dropdownOpen && (
+                        <div className="absolute z-20 w-full bg-white border border-gray-200 rounded-xl shadow-xl mt-1 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-150">
+                            {/* Search */}
+                            <div className="p-2 border-b border-gray-100">
+                                <div className="relative">
+                                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                                    <input
+                                        ref={searchInputRef}
+                                        type="text"
+                                        placeholder="Buscar cliente..."
+                                        value={searchTerm}
+                                        onChange={(e) => setSearchTerm(e.target.value)}
+                                        className="w-full pl-8 pr-3 py-2 text-sm border border-gray-100 rounded-lg focus:outline-none focus:border-indigo-300 focus:ring-1 focus:ring-indigo-100"
+                                    />
                                 </div>
-                            ))}
+                            </div>
+
+                            {/* Options */}
+                            <div className="max-h-48 overflow-y-auto">
+                                {filteredClientes.length === 0 ? (
+                                    <div className="px-4 py-3 text-sm text-gray-400 text-center">
+                                        {searchTerm ? 'Sin resultados' : 'No hay clientes en tu cartera'}
+                                    </div>
+                                ) : (
+                                    filteredClientes.map((c: any) => (
+                                        <div
+                                            key={c.id}
+                                            onClick={() => {
+                                                setClienteId(c.id);
+                                                setDropdownOpen(false);
+                                                setSearchTerm('');
+                                            }}
+                                            className={`px-4 py-2.5 cursor-pointer text-sm transition-colors flex items-center gap-2
+                                                ${c.id === clienteId
+                                                    ? 'bg-indigo-50 text-indigo-700 font-medium'
+                                                    : 'text-gray-700 hover:bg-gray-50'
+                                                }`}
+                                        >
+                                            <Building2 size={14} className={c.id === clienteId ? 'text-indigo-500' : 'text-gray-300'} />
+                                            {c.razon_social}
+                                        </div>
+                                    ))
+                                )}
+                            </div>
                         </div>
                     )}
+
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

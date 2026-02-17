@@ -44,6 +44,9 @@ class LineaResponse(BaseModel):
     proveedor: Optional[str]
     activo_id: Optional[int]
     activo_nombre: Optional[str]  # Ej: "Samsung A54"
+    activo_serie: Optional[str] = None  # IMEI del dispositivo
+    empleado_id: Optional[int] = None  # Derivado de Activo → EmpleadoActivo
+    empleado_nombre: Optional[str] = None  # Nombre del responsable
     fecha_asignacion: Optional[datetime]
     is_active: bool
     observaciones: Optional[str]

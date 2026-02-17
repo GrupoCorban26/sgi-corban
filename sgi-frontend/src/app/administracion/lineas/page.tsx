@@ -1,7 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Phone, Plus, Pencil, Trash2, Search, Loader2, Smartphone, UserPlus, UserMinus, History } from 'lucide-react';
+import {
+    Phone, Plus, Pencil, Trash2, Search, Loader2, Smartphone,
+    History, Mail, User, Signal, Building2
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useLineas } from '@/hooks/organizacion/useLineas';
@@ -92,42 +95,56 @@ export default function LineasPage() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 p-6">
+        <div className="min-h-screen bg-gray-50/50 p-6 lg:p-8">
             <div className="max-w-7xl mx-auto space-y-6">
-                {/* Header */}
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-                            <Phone className="text-indigo-600" /> Líneas Corporativas
-                        </h1>
-                        <p className="text-gray-500 text-sm mt-1">Gestión de chips y cuentas Gmail corporativas</p>
+
+                {/* ── Header ── */}
+                <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-xl shadow-lg shadow-emerald-200/50">
+                            <Phone className="h-5 w-5 text-white" />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-bold text-gray-900">Líneas Corporativas</h1>
+                            <p className="text-gray-400 text-sm">Gestión de chips, cuentas Gmail y asignación de dispositivos</p>
+                        </div>
                     </div>
                     <button
                         onClick={handleOpenCreate}
-                        className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 transition-colors shadow-sm font-medium"
+                        className="cursor-pointer flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white rounded-xl hover:from-emerald-700 hover:to-teal-700 transition-all shadow-md shadow-emerald-200/50 font-medium text-sm"
                     >
                         <Plus size={18} /> Nueva Línea
                     </button>
                 </div>
 
-                {/* Filtros */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-4">
-                    <div className="flex flex-col md:flex-row gap-4">
-                        <div className="flex-1 relative">
-                            <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                {/* ── Info Banner ── */}
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-2xl px-5 py-3 flex items-center gap-3">
+                    <Signal className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                    <p className="text-xs text-blue-700">
+                        <span className="font-semibold">Modelo Device-Centric:</span> El empleado responsable se determina por quién tiene asignado el dispositivo en Inventario.
+                        <span className="text-blue-400 ml-1">Línea → Dispositivo → Empleado</span>
+                    </p>
+                </div>
+
+                {/* ── Filters ── */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+                    <div className="flex flex-col md:flex-row gap-3 items-center">
+                        <div className="flex-1 relative w-full">
+                            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400" />
                             <input
                                 type="text"
-                                placeholder="Buscar por número, gmail u operador..."
+                                placeholder="Buscar por número, Gmail, operador..."
                                 value={busqueda}
                                 onChange={(e) => { setBusqueda(e.target.value); setPage(1); }}
-                                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm"
+                                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm bg-gray-50/50 hover:bg-white transition-colors"
                             />
                         </div>
-                        <div className="relative w-64">
+                        <div className="relative w-full md:w-64">
+                            <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                             <select
                                 value={empleadoId ?? ''}
                                 onChange={(e) => { setEmpleadoId(e.target.value ? Number(e.target.value) : null); setPage(1); }}
-                                className="w-full px-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none text-sm appearance-none bg-white"
+                                className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 focus:ring-2 focus:ring-emerald-500 focus:border-transparent outline-none text-sm appearance-none bg-gray-50/50 hover:bg-white transition-colors cursor-pointer"
                             >
                                 <option value="">Todos los empleados</option>
                                 {empleados.map((emp) => (
@@ -135,41 +152,40 @@ export default function LineasPage() {
                                 ))}
                             </select>
                         </div>
-                        <div className="text-sm text-gray-500 flex items-center gap-2">
-                            <Phone size={16} />
-                            <span>{totalRegistros} líneas registradas</span>
+                        <div className="hidden md:flex items-center gap-2 text-sm text-gray-400 whitespace-nowrap pl-2">
+                            <Phone size={14} />
+                            <span><span className="font-semibold text-gray-600">{totalRegistros}</span> líneas</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Tabla */}
-                <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                {/* ── Table ── */}
+                <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                     <div className="overflow-x-auto">
                         <table className="w-full">
-                            <thead className="bg-gray-50 border-b border-gray-200">
-                                <tr>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Número</th>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Gmail</th>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Operador</th>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Proveedor</th>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Celular</th>
-                                    <th className="text-left py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Empleado Asignado</th>
-                                    <th className="text-center py-3 px-4 text-xs font-semibold text-gray-600 uppercase tracking-wider">Acciones</th>
+                            <thead>
+                                <tr className="bg-gray-50/80 border-b border-gray-100">
+                                    <th className="text-left py-3.5 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Celular</th>
+                                    <th className="text-left py-3.5 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Correo</th>
+                                    <th className="text-left py-3.5 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Dispositivo / IMEI</th>
+                                    <th className="text-left py-3.5 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Empleado</th>
+                                    <th className="text-center py-3.5 px-5 text-xs font-semibold text-gray-500 uppercase tracking-wider w-36">Acciones</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-100">
+                            <tbody className="divide-y divide-gray-50">
                                 {isLoading ? (
                                     <tr>
-                                        <td colSpan={6} className="text-center py-12">
-                                            <Loader2 className="h-8 w-8 animate-spin text-indigo-600 mx-auto" />
-                                            <p className="text-gray-500 mt-2">Cargando líneas...</p>
+                                        <td colSpan={5} className="text-center py-16">
+                                            <Loader2 className="h-7 w-7 animate-spin text-emerald-500 mx-auto" />
+                                            <p className="text-gray-400 mt-2.5 text-sm">Cargando líneas...</p>
                                         </td>
                                     </tr>
                                 ) : lineas.length === 0 ? (
                                     <tr>
-                                        <td colSpan={6} className="text-center py-12">
-                                            <Phone className="h-12 w-12 text-gray-300 mx-auto" />
-                                            <p className="text-gray-500 mt-2">No se encontraron líneas</p>
+                                        <td colSpan={5} className="text-center py-16">
+                                            <Phone className="h-12 w-12 text-gray-200 mx-auto" />
+                                            <p className="text-gray-400 mt-2.5 font-medium">No se encontraron líneas</p>
+                                            <p className="text-gray-300 text-sm mt-1">Intenta con otro filtro o crea una nueva</p>
                                         </td>
                                     </tr>
                                 ) : (
@@ -177,62 +193,100 @@ export default function LineasPage() {
                                         <tr
                                             key={linea.id}
                                             onClick={() => handleRowClick(linea)}
-                                            className="hover:bg-gray-50 transition-colors cursor-pointer"
+                                            className="hover:bg-emerald-50/30 transition-colors cursor-pointer group"
                                         >
-                                            <td className="py-3 px-4">
-                                                <span className="font-medium text-gray-900">{linea.numero}</span>
+                                            {/* Celular (número de línea) */}
+                                            <td className="py-3.5 px-5">
+                                                <div className="flex items-center gap-2.5">
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${linea.empleado_nombre ? 'bg-emerald-50' : 'bg-gray-50'
+                                                        }`}>
+                                                        <Phone className={`h-3.5 w-3.5 ${linea.empleado_nombre ? 'text-emerald-600' : 'text-gray-400'
+                                                            }`} />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-semibold text-gray-900 text-sm tracking-wide">{linea.numero}</p>
+                                                        {linea.operador && (
+                                                            <p className="text-[11px] text-gray-400">{linea.operador}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </td>
-                                            <td className="py-3 px-4 text-sm text-gray-600">{linea.gmail}</td>
-                                            <td className="py-3 px-4 text-sm text-gray-600">{linea.operador || '-'}</td>
-                                            <td className="py-3 px-4 text-sm text-gray-600">{linea.proveedor || '-'}</td>
-                                            <td className="py-3 px-4">
+
+                                            {/* Correo */}
+                                            <td className="py-3.5 px-5">
+                                                <div className="flex items-center gap-2">
+                                                    <Mail className="h-3.5 w-3.5 text-gray-300 flex-shrink-0" />
+                                                    <span className="text-sm text-gray-600 truncate max-w-[200px]">{linea.gmail}</span>
+                                                </div>
+                                            </td>
+
+                                            {/* Dispositivo / IMEI */}
+                                            <td className="py-3.5 px-5">
                                                 {linea.activo_nombre ? (
-                                                    <span className="inline-flex items-center gap-1 px-2 py-1 bg-blue-50 text-blue-700 rounded-lg text-xs">
-                                                        <Smartphone size={12} /> {linea.activo_nombre}
-                                                    </span>
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="w-8 h-8 rounded-lg bg-blue-50 flex items-center justify-center flex-shrink-0">
+                                                            <Smartphone className="h-3.5 w-3.5 text-blue-600" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="text-sm font-medium text-gray-700">{linea.activo_nombre}</p>
+                                                            {linea.activo_serie ? (
+                                                                <p className="text-[11px] text-gray-400 font-mono">{linea.activo_serie}</p>
+                                                            ) : (
+                                                                <p className="text-[11px] text-gray-300 italic">Sin IMEI</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
                                                 ) : (
-                                                    <span className="text-gray-400 text-sm">Sin celular</span>
+                                                    <span className="text-sm text-gray-300 italic">Sin dispositivo</span>
                                                 )}
                                             </td>
-                                            <td className="py-3 px-4">
+
+                                            {/* Empleado */}
+                                            <td className="py-3.5 px-5">
                                                 {linea.empleado_nombre ? (
-                                                    <span className="text-sm text-gray-900">{linea.empleado_nombre}</span>
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="w-8 h-8 rounded-lg bg-violet-50 flex items-center justify-center flex-shrink-0">
+                                                            <User className="h-3.5 w-3.5 text-violet-600" />
+                                                        </div>
+                                                        <span className="text-sm font-medium text-gray-800">{linea.empleado_nombre}</span>
+                                                    </div>
                                                 ) : (
-                                                    <span className="inline-flex items-center px-2 py-1 bg-green-50 text-green-700 rounded-lg text-xs">
+                                                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-600 rounded-full text-xs font-medium">
                                                         Disponible
                                                     </span>
                                                 )}
                                             </td>
-                                            <td className="py-3 px-4">
-                                                <div className="flex items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+
+                                            {/* Acciones */}
+                                            <td className="py-3.5 px-5">
+                                                <div className="flex items-center justify-center gap-0.5" onClick={(e) => e.stopPropagation()}>
                                                     <button
                                                         onClick={() => handleHistorial(linea)}
                                                         className="p-1.5 text-gray-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
                                                         title="Ver historial"
                                                     >
-                                                        <History size={16} />
+                                                        <History size={15} />
                                                     </button>
                                                     <button
                                                         onClick={() => handleCambiarCelular(linea)}
                                                         className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                                                         title="Cambiar dispositivo"
                                                     >
-                                                        <Smartphone size={16} />
+                                                        <Smartphone size={15} />
                                                     </button>
-                                                    {/* Botones de asignacion manual removidos por refactor Device-Centric */}
                                                     <button
                                                         onClick={() => handleEdit(linea)}
-                                                        className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                                                        className="p-1.5 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
                                                         title="Editar"
                                                     >
-                                                        <Pencil size={16} />
+                                                        <Pencil size={15} />
                                                     </button>
                                                     <button
                                                         onClick={() => handleDeleteClick(linea)}
                                                         className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                                                         title="Dar de baja"
                                                     >
-                                                        <Trash2 size={16} />
+                                                        <Trash2 size={15} />
                                                     </button>
                                                 </div>
                                             </td>
@@ -243,26 +297,26 @@ export default function LineasPage() {
                         </table>
                     </div>
 
-                    {/* Paginación */}
+                    {/* Pagination */}
                     {totalPages > 1 && (
-                        <div className="flex items-center justify-between px-4 py-3 border-t border-gray-200 bg-gray-50">
-                            <div className="text-sm text-gray-600">
-                                Página {page} de {totalPages}
-                            </div>
+                        <div className="flex items-center justify-between px-5 py-3.5 border-t border-gray-100 bg-gray-50/50">
+                            <p className="text-sm text-gray-500">
+                                Página <span className="font-semibold text-gray-700">{page}</span> de <span className="font-semibold text-gray-700">{totalPages}</span>
+                            </p>
                             <div className="flex gap-2">
                                 <button
                                     onClick={() => setPage(p => Math.max(1, p - 1))}
                                     disabled={page === 1 || isFetching}
-                                    className="px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="px-4 py-2 text-sm bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium text-gray-600"
                                 >
-                                    Anterior
+                                    ← Anterior
                                 </button>
                                 <button
                                     onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                                     disabled={page === totalPages || isFetching}
-                                    className="px-3 py-1.5 text-sm bg-white border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    className="px-4 py-2 text-sm bg-white border border-gray-200 rounded-xl hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium text-gray-600"
                                 >
-                                    Siguiente
+                                    Siguiente →
                                 </button>
                             </div>
                         </div>

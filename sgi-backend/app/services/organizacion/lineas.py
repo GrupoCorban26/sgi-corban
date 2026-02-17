@@ -49,14 +49,31 @@ class LineaService:
         page: int = 1,
         page_size: int = 15
     ) -> dict:
-        """Lista todas las líneas con paginación y filtros"""
+        """Lista todas las líneas con paginación y filtros.
+        Usa LEFT JOINs explícitos para resolver el empleado responsable
+        via la cadena: Línea → Activo → EmpleadoActivo → Empleado.
+        """
         offset = (page - 1) * page_size
         
-        # Necesitamos cargar el activo y sus asignaciones (para saber quién lo tiene)
-        # Nota: selectinload('activo.asignaciones') puede ser pesado si hay muchos cambios
-        stmt = select(LineaCorporativa).options(
-            selectinload(LineaCorporativa.activo).selectinload(Activo.asignaciones).selectinload(EmpleadoActivo.empleado)
-        ).where(LineaCorporativa.is_active == True)
+        # Query con LEFT JOINs explícitos para traer todo en un solo viaje
+        stmt = (
+            select(
+                LineaCorporativa,
+                Activo.producto.label("activo_producto"),
+                Activo.marca.label("activo_marca"),
+                Activo.serie.label("activo_serie"),
+                Empleado.id.label("resp_id"),
+                Empleado.nombres.label("resp_nombres"),
+                Empleado.apellido_paterno.label("resp_apellido"),
+            )
+            .outerjoin(Activo, LineaCorporativa.activo_id == Activo.id)
+            .outerjoin(
+                EmpleadoActivo,
+                (Activo.id == EmpleadoActivo.activo_id) & (EmpleadoActivo.fecha_devolucion.is_(None))
+            )
+            .outerjoin(Empleado, EmpleadoActivo.empleado_id == Empleado.id)
+            .where(LineaCorporativa.is_active == True)
+        )
         
         if busqueda:
             stmt = stmt.where(or_(
@@ -65,24 +82,15 @@ class LineaService:
                 LineaCorporativa.operador.ilike(f"%{busqueda}%")
             ))
             
-        # Filtro por empleado (COMPLEJO: ahora depende del activo)
-        # Por simplicidad en MVP: Filtrar en memoria o usar JOIN complejo.
-        # Dado que SQL Server maneja bien JOINS, haremos el JOIN si se pide empleado.
         if empleado_id is not None:
-             # Unir con activos y empleado_activo vigente
-             stmt = stmt.join(LineaCorporativa.activo).join(Activo.asignaciones).where(
-                 EmpleadoActivo.empleado_id == empleado_id,
-                 EmpleadoActivo.fecha_devolucion.is_(None)
-             )
+            stmt = stmt.where(Empleado.id == empleado_id)
         
         # Data sorting & pagination
         stmt = stmt.order_by(LineaCorporativa.numero).offset(offset).limit(page_size)
         result = await self.db.execute(stmt)
-        lineas = result.scalars().all()
+        rows = result.all()
         
-        # Count (aproximado, optimizar despues)
-        # Nota: El count real requeriría replicar los joins.
-        # Para mantener performance, hacemos count simple de lineas activas por ahora.
+        # Count
         count_stmt = select(func.count()).select_from(LineaCorporativa).where(LineaCorporativa.is_active == True)
         if busqueda:
             count_stmt = count_stmt.where(or_(
@@ -92,9 +100,12 @@ class LineaService:
         total = (await self.db.execute(count_stmt)).scalar() or 0
         
         data = []
-        for l in lineas:
-            # Lógica Device-Centric: El responsable es quien tiene el activo
-            responsable = l.responsable
+        for row in rows:
+            l = row[0]  # LineaCorporativa object
+            
+            activo_nombre = None
+            if row.activo_producto:
+                activo_nombre = f"{row.activo_producto} {row.activo_marca or ''}".strip()
             
             data.append({
                 "id": l.id,
@@ -104,10 +115,10 @@ class LineaService:
                 "plan": l.plan,
                 "proveedor": l.proveedor,
                 "activo_id": l.activo_id,
-                "activo_nombre": f"{l.activo.producto} {l.activo.marca or ''}" if l.activo else None,
-                # DEPRECATED: l.empleado_id -> Usar derived
-                "empleado_id": responsable.id if responsable else None,
-                "empleado_nombre": f"{responsable.nombres} {responsable.apellido_paterno}" if responsable else None,
+                "activo_nombre": activo_nombre,
+                "activo_serie": row.activo_serie,
+                "empleado_id": row.resp_id,
+                "empleado_nombre": f"{row.resp_nombres} {row.resp_apellido}" if row.resp_id else None,
                 "fecha_asignacion": l.fecha_asignacion,
                 "is_active": l.is_active,
                 "observaciones": l.observaciones,
@@ -124,18 +135,36 @@ class LineaService:
         }
 
     async def get_by_id(self, linea_id: int) -> dict:
-        """Obtiene una línea por ID"""
-        stmt = select(LineaCorporativa).options(
-            selectinload(LineaCorporativa.activo).selectinload(Activo.asignaciones).selectinload(EmpleadoActivo.empleado)
-        ).where(LineaCorporativa.id == linea_id)
+        """Obtiene una línea por ID con JOINs explícitos"""
+        stmt = (
+            select(
+                LineaCorporativa,
+                Activo.producto.label("activo_producto"),
+                Activo.marca.label("activo_marca"),
+                Activo.serie.label("activo_serie"),
+                Empleado.id.label("resp_id"),
+                Empleado.nombres.label("resp_nombres"),
+                Empleado.apellido_paterno.label("resp_apellido"),
+            )
+            .outerjoin(Activo, LineaCorporativa.activo_id == Activo.id)
+            .outerjoin(
+                EmpleadoActivo,
+                (Activo.id == EmpleadoActivo.activo_id) & (EmpleadoActivo.fecha_devolucion.is_(None))
+            )
+            .outerjoin(Empleado, EmpleadoActivo.empleado_id == Empleado.id)
+            .where(LineaCorporativa.id == linea_id)
+        )
         
         result = await self.db.execute(stmt)
-        l = result.scalars().first()
+        row = result.first()
         
-        if not l:
+        if not row:
             return None
-            
-        responsable = l.responsable
+        
+        l = row[0]
+        activo_nombre = None
+        if row.activo_producto:
+            activo_nombre = f"{row.activo_producto} {row.activo_marca or ''}".strip()
         
         return {
             "id": l.id,
@@ -145,9 +174,10 @@ class LineaService:
             "plan": l.plan,
             "proveedor": l.proveedor,
             "activo_id": l.activo_id,
-            "activo_nombre": f"{l.activo.producto} {l.activo.marca or ''}" if l.activo else None,
-            "empleado_id": responsable.id if responsable else None,
-            "empleado_nombre": f"{responsable.nombres} {responsable.apellido_paterno}" if responsable else None,
+            "activo_nombre": activo_nombre,
+            "activo_serie": row.activo_serie,
+            "empleado_id": row.resp_id,
+            "empleado_nombre": f"{row.resp_nombres} {row.resp_apellido}" if row.resp_id else None,
             "fecha_asignacion": l.fecha_asignacion,
             "is_active": l.is_active,
             "observaciones": l.observaciones,
@@ -313,7 +343,7 @@ class LineaService:
     async def desasignar_empleado(self, linea_id: int, observaciones: str = None, usuario_id: int = None) -> dict:
         """
         [DEPRECATED FLOW]
-        En el modelo Device-Centric, se desasigna devolviendo el activo.
+        En el modelo Device-Centric, se desasigna devolviendo el activo en Inventario.
         """
         linea = await self.db.get(LineaCorporativa, linea_id)
         if not linea:
@@ -325,10 +355,7 @@ class LineaService:
                 detail="Esta línea está en un celular. Realice la devolución del celular en el módulo de Inventario."
             )
         
-        # Si llegamos aqui, es un chip suelto legacy. Limpiamos.
-        linea.empleado_id = None
-        await self.db.commit()
-        
+        # Chip suelto sin activo: ya está desasignado por definición
         return {"success": True, "message": "Línea desasignada", "id": linea_id}
 
     async def delete(self, linea_id: int, usuario_id: int = None) -> dict:

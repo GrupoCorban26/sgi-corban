@@ -37,14 +37,59 @@ async def listar_citas(
 # ENDPOINTS AUXILIARES (Deben ir antes de /{id} para evitar conflicto)
 # ============================================================
 
+@router.get("/dropdown/subordinados")
+async def listar_subordinados_dropdown(
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_active_auth)
+):
+    """Lista usuarios que son subordinados directos del usuario logueado (Jefe)"""
+    from sqlalchemy import select
+    from sqlalchemy.orm import aliased
+    from app.models.seguridad import Usuario
+    from app.models.administrativo import Empleado
+
+    user_id = int(current_user.get("sub"))
+    
+    # 1. Obtener el empleado_id del usuario logueado
+    stmt_jefe = select(Usuario.empleado_id).where(Usuario.id == user_id)
+    result_jefe = await db.execute(stmt_jefe)
+    jefe_empleado_id = result_jefe.scalar_one_or_none()
+    
+    if not jefe_empleado_id:
+        return []
+
+    # 2. Buscar empleados cuyo jefe_id sea jefe_empleado_id y obtener sus usuarios
+    # Empleado (subordinado) -> Usuario
+    stmt = select(
+        Usuario.id,
+        Empleado.nombres,
+        Empleado.apellido_paterno
+    ).join(Empleado, Usuario.empleado_id == Empleado.id)\
+     .where(
+         (Usuario.is_active == True) &
+         (Empleado.jefe_id == jefe_empleado_id)
+     )
+    
+    result = await db.execute(stmt)
+    rows = result.all()
+    
+    return [
+        {
+            "id": row.id,
+            "nombre": f"{row.nombres} {row.apellido_paterno}"
+        }
+        for row in rows
+    ]
+
+
 @router.get("/dropdown/comerciales")
 async def listar_comerciales_dropdown(
     db: AsyncSession = Depends(get_db),
     _: dict = Depends(get_current_active_auth)
 ):
-    """Lista comerciales disponibles para selección en salidas a campo"""
+    """Lista usuarios con rol COMERCIAL para salidas a campo"""
     from sqlalchemy import select
-    from app.models.seguridad import Usuario
+    from app.models.seguridad import Usuario, Rol, usuarios_roles
     from app.models.administrativo import Empleado
     
     stmt = select(
@@ -52,7 +97,11 @@ async def listar_comerciales_dropdown(
         Empleado.nombres,
         Empleado.apellido_paterno
     ).join(Empleado, Usuario.empleado_id == Empleado.id)\
-     .where(Usuario.is_active == True)
+     .join(Usuario.roles)\
+     .where(
+         (Usuario.is_active == True) &
+         (Rol.nombre == "COMERCIAL")
+     )
     
     result = await db.execute(stmt)
     rows = result.all()

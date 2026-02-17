@@ -9,6 +9,7 @@ export interface Linea {
     proveedor?: string | null;
     activo_id?: number | null;
     activo_nombre?: string | null;
+    activo_serie?: string | null;
     empleado_id?: number | null;
     empleado_nombre?: string | null;
     fecha_asignacion?: string | null;

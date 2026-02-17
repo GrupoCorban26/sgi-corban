@@ -271,3 +271,16 @@ export const useComercialesDropdown = () => {
         }
     });
 };
+
+export const useSubordinadosDropdown = () => {
+    const token = Cookies.get('token');
+    return useQuery({
+        queryKey: ['subordinados-dropdown'],
+        queryFn: async () => {
+            const { data } = await axios.get(`${API_URL}/citas/dropdown/subordinados`, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            return data as ComercialDropdown[];
+        }
+    });
+};
