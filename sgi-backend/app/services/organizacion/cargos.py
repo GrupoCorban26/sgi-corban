@@ -122,9 +122,9 @@ class CargoService:
             raise HTTPException(400, f'Ya existe un cargo activo con el nombre "{cargo.nombre}".')
         
         query = text("""
-            INSERT INTO adm.cargos (nombre, descripcion, area_id)
+            INSERT INTO adm.cargos (nombre, descripcion, area_id, is_active)
             OUTPUT INSERTED.id
-            VALUES (:nombre, :descripcion, :area_id)
+            VALUES (:nombre, :descripcion, :area_id, 1)
         """)
         
         result = await self.db.execute(query, {
