@@ -170,14 +170,14 @@ class EmpleadoService:
                 nombres, apellido_paterno, apellido_materno, fecha_nacimiento, 
                 tipo_documento, nro_documento, celular, email_personal, 
                 distrito_id, direccion, fecha_ingreso, fecha_cese, is_active, 
-                cargo_id, jefe_id
+                cargo_id, jefe_id, empresa
             )
             OUTPUT INSERTED.id
             VALUES (
                 :nombres, :apellido_paterno, :apellido_materno, :fecha_nacimiento, 
                 :tipo_documento, :nro_documento, :celular, :email_personal, 
                 :distrito_id, :direccion, :fecha_ingreso, NULL, 1, 
-                :cargo_id, :jefe_id
+                :cargo_id, :jefe_id, :empresa
             )
         """)
         
@@ -194,7 +194,8 @@ class EmpleadoService:
             "direccion": empleado.direccion,
             "fecha_ingreso": empleado.fecha_ingreso,
             "cargo_id": empleado.cargo_id,
-            "jefe_id": empleado.jefe_id
+            "jefe_id": empleado.jefe_id,
+            "empresa": empleado.empresa
         })
         await self.db.commit()
         
@@ -239,6 +240,7 @@ class EmpleadoService:
                 fecha_ingreso = :fecha_ingreso,
                 cargo_id = :cargo_id,
                 jefe_id = :jefe_id,
+                empresa = :empresa,
                 updated_at = GETDATE()
             WHERE id = :id
         """)
@@ -257,7 +259,8 @@ class EmpleadoService:
             "direccion": empleado.direccion,
             "fecha_ingreso": empleado.fecha_ingreso,
             "cargo_id": empleado.cargo_id,
-            "jefe_id": empleado.jefe_id
+            "jefe_id": empleado.jefe_id,
+            "empresa": empleado.empresa
         })
         await self.db.commit()
         
