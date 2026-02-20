@@ -5,6 +5,7 @@ from sqlalchemy.orm import selectinload
 from app.models.comercial_inbox import Inbox
 from app.models.seguridad import Usuario, Rol, usuarios_roles
 from app.models.comercial import Cliente, ClienteContacto
+from app.models.administrativo import Empleado, EmpleadoActivo, Activo, LineaCorporativa
 from app.schemas.comercial.inbox import InboxDistribute
 from datetime import datetime
 
@@ -125,7 +126,11 @@ class InboxService:
                 Inbox.estado == 'PENDIENTE'
             )
         ).options(
-            selectinload(Inbox.usuario_asignado).selectinload(Usuario.empleado)
+            selectinload(Inbox.usuario_asignado)
+                .selectinload(Usuario.empleado)
+                .selectinload(Empleado.activos_asignados)
+                .selectinload(EmpleadoActivo.activo)
+                .selectinload(Activo.linea_instalada)
         ).order_by(Inbox.fecha_recepcion.desc())
         result = await self.db.execute(query)
         return result.scalars().all()
@@ -134,7 +139,11 @@ class InboxService:
         query = select(Inbox).where(
             Inbox.estado == 'PENDIENTE'
         ).options(
-            selectinload(Inbox.usuario_asignado).selectinload(Usuario.empleado)
+            selectinload(Inbox.usuario_asignado)
+                .selectinload(Usuario.empleado)
+                .selectinload(Empleado.activos_asignados)
+                .selectinload(EmpleadoActivo.activo)
+                .selectinload(Activo.linea_instalada)
         ).order_by(Inbox.fecha_recepcion.desc())
         result = await self.db.execute(query)
         return result.scalars().all()
