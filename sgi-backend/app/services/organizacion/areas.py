@@ -146,9 +146,9 @@ class AreaService:
             raise HTTPException(400, "El empleado responsable especificado no existe o está inactivo.")
         
         query = text("""
-            INSERT INTO adm.areas (nombre, descripcion, departamento_id, area_padre_id, responsable_id)
+            INSERT INTO adm.areas (nombre, descripcion, departamento_id, area_padre_id, responsable_id, is_active)
             OUTPUT INSERTED.id
-            VALUES (:nombre, :descripcion, :departamento_id, :area_padre_id, :responsable_id)
+            VALUES (:nombre, :descripcion, :departamento_id, :area_padre_id, :responsable_id, 1)
         """)
         
         result = await self.db.execute(query, {
