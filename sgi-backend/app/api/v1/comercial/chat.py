@@ -5,6 +5,7 @@ from typing import List
 from app.database.db_connection import get_db
 from app.core.security import get_current_active_auth
 from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from app.models.seguridad import Usuario
 from app.schemas.comercial.chat import (
     ChatMessageResponse, 
@@ -23,7 +24,7 @@ async def get_current_user_obj(
     payload: dict = Depends(get_current_active_auth)
 ) -> Usuario:
     user_id = int(payload.get("sub"))
-    result = await db.execute(select(Usuario).where(Usuario.id == user_id))
+    result = await db.execute(select(Usuario).options(selectinload(Usuario.roles)).where(Usuario.id == user_id))
     user = result.scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
