@@ -29,7 +29,13 @@ class ChatService:
             .options(
                 selectinload(Inbox.mensajes)
             )
-            .order_by(Inbox.ultimo_mensaje_at.desc().nullslast())
+            .order_by(
+                func.case(
+                    (Inbox.ultimo_mensaje_at == None, 1), 
+                    else_=0
+                ),
+                Inbox.ultimo_mensaje_at.desc()
+            )
         )
         result = await self.db.execute(query)
         inboxes = result.scalars().all()
@@ -65,7 +71,13 @@ class ChatService:
             .options(
                 selectinload(Inbox.mensajes)
             )
-            .order_by(Inbox.ultimo_mensaje_at.desc().nullslast())
+            .order_by(
+                func.case(
+                    (Inbox.ultimo_mensaje_at == None, 1), 
+                    else_=0
+                ),
+                Inbox.ultimo_mensaje_at.desc()
+            )
         )
         result = await self.db.execute(query)
         inboxes = result.scalars().all()
