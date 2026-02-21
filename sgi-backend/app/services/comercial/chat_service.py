@@ -1,6 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import and_, update, func
+from sqlalchemy import and_, update, func, case
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 from datetime import datetime
@@ -30,7 +30,7 @@ class ChatService:
                 selectinload(Inbox.mensajes)
             )
             .order_by(
-                func.case(
+                case(
                     (Inbox.ultimo_mensaje_at == None, 1), 
                     else_=0
                 ),
@@ -72,7 +72,7 @@ class ChatService:
                 selectinload(Inbox.mensajes)
             )
             .order_by(
-                func.case(
+                case(
                     (Inbox.ultimo_mensaje_at == None, 1), 
                     else_=0
                 ),
