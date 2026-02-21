@@ -112,7 +112,7 @@ async def release_chat(
 @router.post("/{inbox_id}/mark-read")
 async def mark_messages_read(
     inbox_id: int,
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user_obj),
     db: AsyncSession = Depends(get_db)
 ):
     """Marcar todos los mensajes entrantes de este chat como leídos."""
@@ -124,7 +124,7 @@ async def mark_messages_read(
 async def change_lead_estado(
     inbox_id: int,
     request: ChangeEstadoRequest,
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user_obj),
     db: AsyncSession = Depends(get_db)
 ):
     """Cambiar el estado del lead."""
