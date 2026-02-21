@@ -168,7 +168,8 @@ class InboxService:
     async def convert_lead(self, lead_id: int, client_id: int):
         lead = await self.db.get(Inbox, lead_id)
         if lead:
-            lead.estado = 'CONVERTIDO'
+            lead.estado = 'CIERRE'
+            lead.modo = 'BOT' # Return to bot when closed
             lead.fecha_gestion = datetime.now()
             await self.db.commit()
             return True
@@ -178,6 +179,7 @@ class InboxService:
         lead = await self.db.get(Inbox, lead_id)
         if lead:
             lead.estado = 'DESCARTADO'
+            lead.modo = 'BOT'
             lead.fecha_gestion = datetime.now()
             await self.db.commit()
             return True

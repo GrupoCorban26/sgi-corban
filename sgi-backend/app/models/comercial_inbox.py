@@ -16,9 +16,12 @@ class Inbox(Base):
     tipo_interes = Column(String(30), nullable=True) # IMPORTACION, ASESORIA, DUDAS
     fecha_recepcion = Column(DateTime(timezone=True), server_default=func.now())
     fecha_gestion = Column(DateTime(timezone=True), nullable=True)
+    modo = Column(String(10), default="BOT", nullable=False) # BOT, ASESOR
+    ultimo_mensaje_at = Column(DateTime(timezone=True), nullable=True)
     
     # Relationships
     usuario_asignado = relationship("app.models.seguridad.Usuario", foreign_keys=[asignado_a])
+    mensajes = relationship("app.models.chat_message.ChatMessage", back_populates="inbox", cascade="all, delete-orphan")
 
     @property
     def nombre_asignado(self):

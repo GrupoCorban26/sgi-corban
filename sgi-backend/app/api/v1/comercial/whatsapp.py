@@ -94,12 +94,55 @@ async def receive_webhook_message(
                         incoming.latitude = location.get("latitude")
                         incoming.longitude = location.get("longitude")
                         incoming.message_text = location.get("name", "")
+                    # Extraer parámetros 
+                    from app.services.comercial.chat_service import ChatService
+                    from app.schemas.comercial.chat import ChatMessageCreate
+                    from app.models.comercial_inbox import Inbox
+                    from sqlalchemy import select, and_
+
+                    from_num_norm = from_number.replace(" ", "").replace("+", "")
+                    if from_num_norm.startswith("51"):
+                        from_num_norm = from_num_norm[2:]
+
+                    # Check if there's an active inbox
+                    query_inbox = select(Inbox).where(
+                        and_(
+                            Inbox.telefono.like(f"%{from_num_norm}%"),
+                            Inbox.estado.not_in(['CIERRE', 'DESCARTADO', 'CONVERTIDO'])
+                        )
+                    )
+                    result_inbox = await db.execute(query_inbox)
+                    inbox = result_inbox.scalars().first()
+
+                    chat_svc = ChatService(db)
+
+                    # Save incoming message if Inbox exists
+                    if inbox:
+                        await chat_svc.save_message(ChatMessageCreate(
+                            inbox_id=inbox.id,
+                            telefono=from_number,
+                            direccion='ENTRANTE',
+                            remitente_tipo='CLIENTE',
+                            contenido=incoming.message_text,
+                            whatsapp_msg_id=msg_id
+                        ))
+
+                    # If mode is ASESOR, skip bot
+                    if inbox and inbox.modo == 'ASESOR':
+                        # Here we would eventually add the rules for out of hours and +24h/+48h timeout
+                        continue
                         
                     # Procesar con el bot
                     response = await service.process_message(incoming)
                     
-                    # Enviar respuesta
+                    # Chequear si el bot creó el inbox recién
+                    if not inbox:
+                        result_inbox_after = await db.execute(query_inbox)
+                        inbox = result_inbox_after.scalars().first()
+                    
+                    # Enviar respuesta y guardarla
                     for bot_msg in response.messages:
+                        txt_content = bot_msg.content if bot_msg.type == "text" else bot_msg.body
                         if bot_msg.type == "text":
                             await WhatsAppService.send_text(from_number, bot_msg.content)
                         elif bot_msg.type == "buttons":
@@ -112,6 +155,17 @@ async def receive_webhook_message(
                                 from_number, bot_msg.body, bot_msg.header,
                                 bot_msg.button_text, bot_msg.sections
                             )
+                            
+                        # Save bot responses to history if inbox exists
+                        if inbox:
+                            await chat_svc.save_message(ChatMessageCreate(
+                                inbox_id=inbox.id,
+                                telefono=from_number,
+                                direccion='SALIENTE',
+                                remitente_tipo='BOT',
+                                contenido=txt_content,
+                                estado_envio='ENVIADO'
+                            ))
 
         return {"status": "ok"}
             
