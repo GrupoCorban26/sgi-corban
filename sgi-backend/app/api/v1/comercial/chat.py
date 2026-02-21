@@ -3,7 +3,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
 from app.database.db_connection import get_db
-from app.services.auth import get_current_user
+from app.core.security import get_current_active_auth
+from sqlalchemy import select
 from app.models.seguridad import Usuario
 from app.schemas.comercial.chat import (
     ChatMessageResponse, 
@@ -17,9 +18,20 @@ from app.services.comercial.whatsapp_service import WhatsAppService
 
 router = APIRouter()
 
+async def get_current_user_obj(
+    db: AsyncSession = Depends(get_db),
+    payload: dict = Depends(get_current_active_auth)
+) -> Usuario:
+    user_id = int(payload.get("sub"))
+    result = await db.execute(select(Usuario).where(Usuario.id == user_id))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=401, detail="Usuario no encontrado")
+    return user
+
 @router.get("/conversations", response_model=List[ChatConversationPreview])
 async def get_conversations(
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user_obj),
     db: AsyncSession = Depends(get_db)
 ):
     """Obtener todas las conversaciones activas para el comercial logueado."""
@@ -35,7 +47,7 @@ async def get_conversations(
 @router.get("/{inbox_id}/messages", response_model=List[ChatMessageResponse])
 async def get_messages(
     inbox_id: int,
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user_obj),
     db: AsyncSession = Depends(get_db)
 ):
     """Obtener historial de mensajes de un lead."""
@@ -46,7 +58,7 @@ async def get_messages(
 async def send_message(
     inbox_id: int,
     request: SendMessageRequest,
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user_obj),
     db: AsyncSession = Depends(get_db)
 ):
     """Enviar un mensaje de WhatsApp al lead desde el comercial."""
@@ -78,7 +90,7 @@ async def send_message(
 @router.post("/{inbox_id}/take")
 async def take_chat(
     inbox_id: int,
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user_obj),
     db: AsyncSession = Depends(get_db)
 ):
     """Tomar control del chat (cambia modo a ASESOR)."""
@@ -89,7 +101,7 @@ async def take_chat(
 @router.post("/{inbox_id}/release")
 async def release_chat(
     inbox_id: int,
-    current_user: Usuario = Depends(get_current_user),
+    current_user: Usuario = Depends(get_current_user_obj),
     db: AsyncSession = Depends(get_db)
 ):
     """Devolver el control del chat al bot (cambia modo a BOT)."""
