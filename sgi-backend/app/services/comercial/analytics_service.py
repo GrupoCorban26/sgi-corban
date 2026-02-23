@@ -10,6 +10,7 @@ from sqlalchemy import func, case, and_, extract
 from app.models.comercial import Cliente, ClienteContacto, Cita
 from app.models.comercial_inbox import Inbox
 from app.models.cliente_historial import ClienteHistorial
+from app.models.cliente_gestion import ClienteGestion
 from app.models.seguridad import Usuario, Rol
 from app.models.administrativo import Empleado
 from datetime import date, datetime, timedelta
@@ -31,6 +32,7 @@ class AnalyticsService:
         comerciales = await self._get_comerciales_stats(dt_inicio, dt_fin)
         origenes = await self._get_origenes_stats(dt_inicio, dt_fin)
         operativo = await self._get_operativo_stats(dt_inicio, dt_fin)
+        gestion = await self._get_gestion_stats(dt_inicio, dt_fin)
 
         return {
             "fecha_inicio": fecha_inicio.isoformat(),
@@ -38,7 +40,8 @@ class AnalyticsService:
             "pipeline": pipeline,
             "comerciales": comerciales,
             "origenes": origenes,
-            "operativo": operativo
+            "operativo": operativo,
+            "gestion": gestion
         }
 
     # =========================================================================
@@ -179,6 +182,16 @@ class AnalyticsService:
             )
             convertidos = (await self.db.execute(stmt_convertidos)).scalar() or 0
 
+            # Gestiones realizadas (nueva tabla)
+            stmt_gestiones = select(func.count()).select_from(ClienteGestion).where(
+                and_(
+                    ClienteGestion.comercial_id == uid,
+                    ClienteGestion.created_at >= dt_inicio,
+                    ClienteGestion.created_at <= dt_fin
+                )
+            )
+            gestiones = (await self.db.execute(stmt_gestiones)).scalar() or 0
+
             tasa = round((convertidos / leads * 100), 1) if leads > 0 else 0
 
             result.append({
@@ -188,6 +201,7 @@ class AnalyticsService:
                 "tiempo_respuesta_promedio_min": tiempo_resp,
                 "clientes_convertidos": convertidos,
                 "llamadas_realizadas": llamadas,
+                "gestiones_realizadas": gestiones,
                 "tasa_conversion": tasa
             })
 
@@ -289,4 +303,75 @@ class AnalyticsService:
             "leads_pendientes": leads_pendientes,
             "clientes_nuevos_periodo": clientes_nuevos,
             "tendencia_semanal": tendencia
+        }
+
+    # =========================================================================
+    # E. Gestión de Cartera
+    # =========================================================================
+
+    async def _get_gestion_stats(self, dt_inicio: datetime, dt_fin: datetime) -> dict:
+        """Métricas de gestión de cartera: actividades, contactabilidad, clientes abandonados."""
+        # Total gestiones en el período
+        stmt_total = select(func.count()).select_from(ClienteGestion).where(
+            and_(
+                ClienteGestion.created_at >= dt_inicio,
+                ClienteGestion.created_at <= dt_fin
+            )
+        )
+        total_gestiones = (await self.db.execute(stmt_total)).scalar() or 0
+
+        # Gestiones por tipo
+        stmt_tipo = select(
+            ClienteGestion.tipo,
+            func.count().label("total")
+        ).where(
+            and_(
+                ClienteGestion.created_at >= dt_inicio,
+                ClienteGestion.created_at <= dt_fin
+            )
+        ).group_by(ClienteGestion.tipo)
+        result_tipo = await self.db.execute(stmt_tipo)
+        por_tipo = {row.tipo: row.total for row in result_tipo.all()}
+
+        # Gestiones por resultado
+        stmt_resultado = select(
+            ClienteGestion.resultado,
+            func.count().label("total")
+        ).where(
+            and_(
+                ClienteGestion.created_at >= dt_inicio,
+                ClienteGestion.created_at <= dt_fin
+            )
+        ).group_by(ClienteGestion.resultado)
+        result_resultado = await self.db.execute(stmt_resultado)
+        por_resultado = {row.resultado: row.total for row in result_resultado.all()}
+
+        # Tasa de contactabilidad global
+        llamadas_total = por_tipo.get("LLAMADA", 0)
+        contactados = por_resultado.get("CONTESTO", 0) + por_resultado.get("INTERESADO", 0) + por_resultado.get("COTIZACION_ENVIADA", 0)
+        tasa_contactabilidad = round((contactados / llamadas_total * 100), 1) if llamadas_total > 0 else 0
+
+        # Clientes sin gestión > 30 días (clientes activos asignados que no tienen gestión reciente)
+        hace_30_dias = dt_fin - timedelta(days=30)
+        # Subquery: clientes que sí tienen gestión reciente
+        subq_con_gestion = select(ClienteGestion.cliente_id).where(
+            ClienteGestion.created_at >= hace_30_dias
+        ).distinct().subquery()
+
+        stmt_abandonados = select(func.count()).select_from(Cliente).where(
+            and_(
+                Cliente.is_active == True,
+                Cliente.tipo_estado.in_(['PROSPECTO', 'EN_NEGOCIACION', 'CLIENTE']),
+                Cliente.comercial_encargado_id.isnot(None),
+                ~Cliente.id.in_(select(subq_con_gestion))
+            )
+        )
+        clientes_sin_gestion = (await self.db.execute(stmt_abandonados)).scalar() or 0
+
+        return {
+            "total_gestiones": total_gestiones,
+            "por_tipo": por_tipo,
+            "por_resultado": por_resultado,
+            "tasa_contactabilidad": tasa_contactabilidad,
+            "clientes_sin_gestion_30d": clientes_sin_gestion
         }

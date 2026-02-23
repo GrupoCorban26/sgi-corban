@@ -18,7 +18,8 @@ import {
   ArrowRight,
   History,
   Archive,
-  UserMinus
+  UserMinus,
+  Phone
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useClientes, useClientesStats } from '@/hooks/comercial/useClientes';
@@ -27,6 +28,7 @@ import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import ModalCliente from './components/modal-cliente';
 import ModalContactosCliente from './components/modal-contactos-cliente';
 import ModalMarcarPerdido from './components/modal-marcar-perdido';
+import ModalRegistrarGestion from './components/ModalRegistrarGestion';
 
 const ESTADO_COLORS = {
   'PROSPECTO': 'bg-yellow-100 text-yellow-700',
@@ -34,6 +36,19 @@ const ESTADO_COLORS = {
   'CLIENTE': 'bg-green-100 text-green-700',
   'PERDIDO': 'bg-red-100 text-red-700',
   'INACTIVO': 'bg-gray-100 text-gray-500',
+};
+
+// Helper para semáforo de próxima fecha de contacto
+const getSemaforoColor = (fechaStr: string | null) => {
+  if (!fechaStr) return '';
+  const hoy = new Date();
+  hoy.setHours(0, 0, 0, 0);
+  const [year, month, day] = fechaStr.substring(0, 10).split('-').map(Number);
+  const fecha = new Date(year, month - 1, day);
+  const diff = Math.ceil((fecha.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+  if (diff < 0) return 'bg-red-100 text-red-700 font-semibold'; // Vencido
+  if (diff <= 3) return 'bg-yellow-100 text-yellow-700 font-semibold'; // Próximo
+  return 'bg-green-50 text-green-700'; // Al día
 };
 
 // Helper para formatear fechas evitando problemas de zona horaria
@@ -70,6 +85,11 @@ export default function CarteraPage() {
   const [isContactosModalOpen, setIsContactosModalOpen] = useState(false);
   const [contactosRuc, setContactosRuc] = useState('');
   const [contactosRazonSocial, setContactosRazonSocial] = useState('');
+
+  // Modal de gestión
+  const [isGestionModalOpen, setIsGestionModalOpen] = useState(false);
+  const [gestionClienteId, setGestionClienteId] = useState<number | null>(null);
+  const [gestionClienteNombre, setGestionClienteNombre] = useState('');
 
   // Data
   const {
@@ -306,7 +326,7 @@ export default function CarteraPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600">
+                      <span className={`px-2.5 py-1 rounded-full text-xs ${getSemaforoColor(cliente.proxima_fecha_contacto)}`}>
                         {formatDate(cliente.proxima_fecha_contacto)}
                       </span>
                     </td>
@@ -353,6 +373,17 @@ export default function CarteraPage() {
                         )}
 
                         {/* Edición Genérica */}
+                        <button
+                          onClick={() => {
+                            setGestionClienteId(cliente.id);
+                            setGestionClienteNombre(cliente.razon_social);
+                            setIsGestionModalOpen(true);
+                          }}
+                          className="p-2 hover:bg-emerald-100 text-emerald-600 rounded-lg transition-colors cursor-pointer"
+                          title="Registrar Gestión"
+                        >
+                          <Phone size={16} />
+                        </button>
                         <button
                           onClick={() => handleOpenEdit(cliente)}
                           className="p-2 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors cursor-pointer"
@@ -440,6 +471,15 @@ export default function CarteraPage() {
         isLoading={deleteMutation.isPending}
         variant="danger"
       />
+
+      {gestionClienteId && (
+        <ModalRegistrarGestion
+          clienteId={gestionClienteId}
+          clienteNombre={gestionClienteNombre}
+          isOpen={isGestionModalOpen}
+          onClose={() => { setIsGestionModalOpen(false); setGestionClienteId(null); }}
+        />
+      )}
     </div>
   );
 }

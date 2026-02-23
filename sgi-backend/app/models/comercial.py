@@ -70,6 +70,7 @@ class Cliente(Base):
     tipo_estado = Column(String(20), default="PROSPECTO", nullable=False)
     origen = Column(String(50))  # BASE_DATOS, PUBLICIDAD_META, CARTERA_PROPIA, WHATSAPP, REFERIDO, OTRO
     sub_origen = Column(String(100), nullable=True)  # Detalle adicional (ej. nombre de campaña Meta)
+    inbox_origen_id = Column(Integer, ForeignKey("comercial.inbox.id"), nullable=True)  # Lead de WhatsApp que originó este cliente
     is_active = Column(Boolean, default=True, nullable=False)
     
     # Timestamps de conversión para métricas
@@ -84,6 +85,7 @@ class Cliente(Base):
     distrito = relationship("app.models.core.Distrito")
     area_encargada = relationship("app.models.administrativo.Area")
     comercial = relationship("app.models.seguridad.Usuario", foreign_keys=[comercial_encargado_id])
+    inbox_origen = relationship("app.models.comercial_inbox.Inbox", foreign_keys=[inbox_origen_id])
 
 class ClienteContacto(Base):
     __tablename__ = "cliente_contactos"

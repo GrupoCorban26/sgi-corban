@@ -195,6 +195,14 @@ class InboxService:
                     (datetime.now() - lead.fecha_recepcion).total_seconds() / 60
                 )
             
+            # Trazabilidad: vincular el cliente con su lead de origen
+            if client_id:
+                cliente = await self.db.get(Cliente, client_id)
+                if cliente:
+                    cliente.inbox_origen_id = lead_id
+                    if not cliente.origen:
+                        cliente.origen = "WHATSAPP"
+            
             await self.db.commit()
             return True
         return False
