@@ -10,7 +10,7 @@ from sqlalchemy import func, case, and_, extract
 from app.models.comercial import Cliente, ClienteContacto, Cita
 from app.models.comercial_inbox import Inbox
 from app.models.cliente_historial import ClienteHistorial
-from app.models.seguridad import Usuario
+from app.models.seguridad import Usuario, Rol
 from app.models.administrativo import Empleado
 from datetime import date, datetime, timedelta
 
@@ -112,17 +112,27 @@ class AnalyticsService:
         stmt_comerciales = (
             select(
                 Usuario.id.label("usuario_id"),
-                func.concat(Empleado.nombres, ' ', Empleado.apellido_paterno).label("nombre")
+                Empleado.nombres,
+                Empleado.apellido_paterno
             )
             .join(Empleado, Usuario.empleado_id == Empleado.id)
-            .where(Usuario.is_active == True)
+            .join(Usuario.roles)
+            .where(
+                and_(
+                    Usuario.is_active == True,
+                    Rol.nombre == "COMERCIAL"
+                )
+            )
         )
         comerciales = (await self.db.execute(stmt_comerciales)).all()
 
         result = []
         for com in comerciales:
             uid = com.usuario_id
-            nombre = com.nombre
+            primer_nombre = com.nombres.split()[0] if com.nombres else ''
+            primer_apellido = com.apellido_paterno.split()[0] if com.apellido_paterno else ''
+            nombre_corto = f"{primer_nombre} {primer_apellido}".strip()
+            nombre = nombre_corto or "Sin Nombre"
 
             # Leads atendidos (del Inbox, en el período)
             stmt_leads = select(func.count()).select_from(Inbox).where(
