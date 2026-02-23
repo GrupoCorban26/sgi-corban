@@ -10,7 +10,7 @@ from datetime import date
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Ajustamos estos imports a la estructura de tu proyecto
-from app.database.db_connection import SessionLocal
+from app.database.db_connection import AsyncSessionLocal
 from app.models.comercial import Cliente, ClienteContacto
 from app.models.seguridad import Usuario
 from app.models.administrativo import Empleado
@@ -24,7 +24,7 @@ async def migrate_sispac(file_path: str):
     total_filas = len(df)
     print(f"Archivo cargado. Total de filas: {total_filas}")
 
-    async with SessionLocal() as db:
+    async with AsyncSessionLocal() as db:
         # 1. Extraer a los usuarios/ejecutivos del SGI para cruzarlos con la columna EJECUTIVO
         stmt_usuarios = select(
             Usuario.id.label("usuario_id"), 
