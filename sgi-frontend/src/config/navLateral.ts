@@ -27,6 +27,7 @@ export const MENU_ROLES = {
   ],
   sistemas: [
     { label: 'Inicio', href: '/sistemas', icon: 'HomeIcon' },
+    { label: 'Reportes', href: '/sistemas/reportes', icon: 'ChartIcon' },
     { label: 'Transacciones', href: '/sistemas/transacciones', icon: 'FileIcon' },
     { label: 'Contactos', href: '/sistemas/contactos', icon: 'UserGroupIcon' },
     { label: 'Base', href: '/sistemas/base', icon: 'PriceIcon' },
