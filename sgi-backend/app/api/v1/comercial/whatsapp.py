@@ -113,6 +113,23 @@ async def receive_webhook_message(
                     )
                     result_inbox = await db.execute(query_inbox)
                     inbox = result_inbox.scalars().first()
+                    
+                    chat_svc = ChatService(db)
+                    
+                    # If it's a new interaction and no inbox exists, create one in NUEVO state
+                    # This guarantees we capture all conversation history before it's assigned to a commercial
+                    if not inbox and msg_type in ("text", "interactive", "location"):
+                        new_inbox = Inbox(
+                            telefono=from_number,
+                            mensaje_inicial=incoming.message_text if msg_type == "text" else "Interacción inicial",
+                            nombre_whatsapp=contact_name,
+                            estado="NUEVO",
+                            modo="BOT"
+                        )
+                        db.add(new_inbox)
+                        await db.commit()
+                        await db.refresh(new_inbox)
+                        inbox = new_inbox
 
                     chat_svc = ChatService(db)
 
@@ -134,11 +151,6 @@ async def receive_webhook_message(
                         
                     # Procesar con el bot
                     response = await service.process_message(incoming)
-                    
-                    # Chequear si el bot creó el inbox recién
-                    if not inbox:
-                        result_inbox_after = await db.execute(query_inbox)
-                        inbox = result_inbox_after.scalars().first()
                     
                     # Enviar respuesta y guardarla
                     for bot_msg in response.messages:

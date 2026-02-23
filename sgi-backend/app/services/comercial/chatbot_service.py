@@ -247,6 +247,7 @@ class ChatbotService:
 
     async def _handle_menu(self, session, data, phone):
         button_id = data.button_id
+        text_lower = data.message_text.strip().lower()
 
         if button_id == "btn_asesor":
             return await self._handle_asesor(session, data, phone)
@@ -270,6 +271,28 @@ class ChatbotService:
                 ))]
             )
         else:
+            # Fallback para texto libre
+            if text_lower in ("menu", "menú", "inicio", "hola"):
+                 return self._send_menu(data.contact_name)
+                 
+            # Si escribio algo que no es boton pero parece una oracion o pregunta (> 5 chars)
+            if len(text_lower) > 5:
+                # Si en el texto dice explicitly "agendar" o "cita"
+                if any(word in text_lower for word in ["agendar", "cita", "visita"]):
+                    await self._update_session(session, "AGENDAR_RUC")
+                    return WhatsAppResponse(
+                        action="send_text",
+                        messages=[BotMessage(type="text", content=(
+                            "¡Perfecto! Para agendar una visita necesito algunos datos.\n\n"
+                            "📋 Por favor, ingresa tu *RUC* (11 dígitos):\n\n"
+                            "_Escribe *volver* para regresar al menú._"
+                        ))]
+                    )
+                else:
+                    # Enviar con asesor usando su mensaje original de contexto
+                    return await self._handle_asesor(session, data, phone)
+            
+            # Si solo puso "ok", "si", etc. repetimos menu
             return self._send_menu(data.contact_name)
 
     # ===================== ASESOR HANDLER =====================
@@ -295,9 +318,10 @@ class ChatbotService:
             )
         else:
             inbox_service = InboxService(self.db)
+            mensaje_contexto = data.message_text if data.message_text and data.button_id != "btn_asesor" else "Solicita hablar con un asesor"
             distribute_data = InboxDistribute(
                 telefono=data.from_number,
-                mensaje=data.message_text or "Solicita hablar con un asesor",
+                mensaje=mensaje_contexto,
                 nombre_display=data.contact_name,
                 tipo_interes="ASESORIA"
             )

@@ -19,17 +19,24 @@ class InboxService:
         if phone.startswith("51"):
             phone = phone[2:]
             
-        # 2. Check if already exists in Inbox (PENDIENTE)
-        query_inbox = select(Inbox).where(and_(Inbox.telefono.like(f"%{phone}%"), Inbox.estado == 'PENDIENTE'))
+        # 2. Check if already exists in Inbox (PENDIENTE or NUEVO)
+        query_inbox = select(Inbox).where(
+            and_(
+                Inbox.telefono.like(f"%{phone}%"), 
+                Inbox.estado.in_(['PENDIENTE', 'NUEVO'])
+            )
+        )
         result_inbox = await self.db.execute(query_inbox)
         existing_inbox = result_inbox.scalars().first()
         
         if existing_inbox:
-            # Return existing assignment
-            query_user = select(Usuario).options(selectinload(Usuario.empleado)).where(Usuario.id == existing_inbox.asignado_a)
-            result_user = await self.db.execute(query_user)
-            user = result_user.scalar_one_or_none()
-            return self._format_response(existing_inbox, user)
+            if existing_inbox.estado == 'PENDIENTE':
+                # Return existing assignment if already assigned
+                query_user = select(Usuario).options(selectinload(Usuario.empleado)).where(Usuario.id == existing_inbox.asignado_a)
+                result_user = await self.db.execute(query_user)
+                user = result_user.scalar_one_or_none()
+                return self._format_response(existing_inbox, user)
+            # If it's NUEVO, we will just assign it below instead of creating a new one
 
         # 3. Check if exists in Clientes or ClienteContactos
         # Buscar en Contactos primero
@@ -92,16 +99,26 @@ class InboxService:
             else:
                 assigned_user = commercials_sorted[0]
         
-        # 5. Create Inbox Entry
-        new_lead = Inbox(
-            telefono=phone,
-            mensaje_inicial=data.mensaje,
-            nombre_whatsapp=data.nombre_display,
-            asignado_a=assigned_user.id,
-            estado='PENDIENTE',
-            tipo_interes=data.tipo_interes,
-        )
-        self.db.add(new_lead)
+        # 5. Create or Update Inbox Entry
+        if existing_inbox and existing_inbox.estado == 'NUEVO':
+            new_lead = existing_inbox
+            new_lead.asignado_a = assigned_user.id
+            new_lead.estado = 'PENDIENTE'
+            new_lead.tipo_interes = data.tipo_interes
+            # Update the original message if None or generic
+            if not new_lead.mensaje_inicial or new_lead.mensaje_inicial == "Interacción inicial":
+                new_lead.mensaje_inicial = data.mensaje
+        else:
+            new_lead = Inbox(
+                telefono=phone,
+                mensaje_inicial=data.mensaje,
+                nombre_whatsapp=data.nombre_display,
+                asignado_a=assigned_user.id,
+                estado='PENDIENTE',
+                tipo_interes=data.tipo_interes,
+            )
+            self.db.add(new_lead)
+            
         await self.db.commit()
         await self.db.refresh(new_lead)
         
