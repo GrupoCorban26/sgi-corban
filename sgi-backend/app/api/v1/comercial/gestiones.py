@@ -4,7 +4,7 @@ from typing import Optional
 from datetime import date
 
 from app.database.db_connection import get_db
-from app.core.auth import get_current_user_id, get_current_token_payload, get_current_active_auth
+from app.core.security import get_current_user_id, get_current_token_payload, get_current_active_auth
 from app.services.comercial.gestion_service import GestionService
 from app.schemas.comercial.gestion import GestionCreate, GestionResponse
 
