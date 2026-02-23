@@ -312,9 +312,16 @@ class ChatbotService:
             nombre_comercial = self._get_user_name(user)
 
             await self._delete_session(session)
+            
+            mensajes = []
+            if data.button_id != "btn_asesor":
+              mensajes.append(BotMessage(type="text", content="No logré entender completamente tu solicitud, pero ¡no te preocupes! Voy a transferir tu consulta a uno de nuestros especialistas para que te atienda personalmente."))
+            
+            mensajes.append(BotMessage(type="text", content=f"¡Hola de nuevo, {data.contact_name}! Su comercial *{nombre_comercial}* le atenderá en unos minutos. 👋"))
+            
             return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content=f"¡Hola de nuevo, {data.contact_name}! Su comercial *{nombre_comercial}* le atenderá en unos minutos. 👋")]
+                action="send_multiple" if len(mensajes) > 1 else "send_text",
+                messages=mensajes
             )
         else:
             inbox_service = InboxService(self.db)
@@ -329,9 +336,16 @@ class ChatbotService:
             nombre_comercial = result["assigned_to"]["nombre"]
 
             await self._delete_session(session)
+            
+            mensajes = []
+            if data.button_id != "btn_asesor":
+              mensajes.append(BotMessage(type="text", content="No logré entender completamente tu solicitud, pero ¡no te preocupes! Voy a transferir tu consulta a uno de nuestros especialistas para que te atienda personalmente."))
+              
+            mensajes.append(BotMessage(type="text", content=f"¡Perfecto! El asesor *{nombre_comercial}* se pondrá en contacto contigo en breve. 🚀"))
+
             return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content=f"¡Perfecto! El asesor *{nombre_comercial}* se pondrá en contacto contigo en breve. 🚀")]
+                action="send_multiple" if len(mensajes) > 1 else "send_text",
+                messages=mensajes
             )
 
     # ===================== INFO HANDLER =====================
