@@ -66,8 +66,6 @@ async def get_my_leads(
     service = InboxService(db)
     return await service.get_my_leads(current_user.id)
 
-    return await service.get_my_leads(current_user.id)
-
 @router.get("/all-leads", response_model=List[InboxResponse])
 async def get_all_leads(
     db: AsyncSession = Depends(get_db),
@@ -76,17 +74,13 @@ async def get_all_leads(
     """
     Get all pending leads (For Jefa Comercial).
     """
-    # Optional: logic to check role
-    # if current_user.rol.nombre not in ['JEFA_COMERCIAL', 'ADMINISTRADOR']:
-    #     raise HTTPException(status_code=403, detail="Not authorized")
-    
     service = InboxService(db)
     return await service.get_all_leads()
 
 @router.post("/{id}/convertir")
 async def convert_lead(
     id: int,
-    cliente_id: int, # The ID of the newly created client
+    cliente_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(get_current_user_obj)
 ):
@@ -107,3 +101,16 @@ async def discard_lead(
     if not success:
         raise HTTPException(status_code=404, detail="Lead not found")
     return {"message": "Lead discarded"}
+
+@router.post("/{id}/escalar")
+async def escalar_a_directo(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user_obj)
+):
+    """Marca que el comercial compartió su número corporativo con el cliente."""
+    service = InboxService(db)
+    success = await service.escalar_a_directo(id)
+    if not success:
+        raise HTTPException(status_code=400, detail="Lead no encontrado o ya fue escalado")
+    return {"message": "Lead escalado a contacto directo"}

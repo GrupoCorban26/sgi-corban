@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
+from datetime import date
 
 # Importaciones de base de datos y esquemas
 from app.database.db_connection import get_db
@@ -11,6 +12,7 @@ from app.schemas.comercial.cliente import (
     ClienteCambiarEstado
 )
 from app.services.comercial.clientes_service import ClientesService
+from app.services.comercial.analytics_service import AnalyticsService
 
 # Importaciones de seguridad refinada
 from app.core.security import (
@@ -66,6 +68,25 @@ async def get_clientes_stats(
         comercial_ids = [comercial_id]
 
     return await service.get_stats(comercial_ids=comercial_ids)
+
+
+@router.get("/metricas/dashboard", dependencies=[Depends(require_permission("clientes.listar"))])
+async def get_dashboard(
+    fecha_inicio: date = Query(..., description="Fecha de inicio del reporte (YYYY-MM-DD)"),
+    fecha_fin: date = Query(..., description="Fecha de fin del reporte (YYYY-MM-DD)"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_token_payload)
+):
+    """Dashboard completo de métricas. Solo para Sistemas/Gerencia/Jefe Comercial."""
+    roles = current_user.get("roles", [])
+    if not any(role in roles for role in ALLOWED_ALL):
+        raise HTTPException(status_code=403, detail="No tienes permisos para acceder al dashboard")
+    
+    if fecha_inicio > fecha_fin:
+        raise HTTPException(status_code=400, detail="La fecha de inicio no puede ser posterior a la fecha de fin")
+    
+    service = AnalyticsService(db)
+    return await service.get_dashboard(fecha_inicio, fecha_fin)
 
 
 @router.get("", dependencies=[Depends(require_permission("clientes.listar"))])
@@ -181,9 +202,14 @@ async def cambiar_estado(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id)
 ):
-    """Cambia el estado del cliente (PROSPECTO <-> EN_NEGOCIACION <-> CLIENTE)."""
+    """Cambia el estado del cliente con validación de máquina de estados."""
     service = ClientesService(db)
-    result = await service.cambiar_estado(id, estado_data.nuevo_estado, updated_by=current_user_id)
+    result = await service.cambiar_estado(
+        id, 
+        estado_data.nuevo_estado, 
+        updated_by=current_user_id,
+        motivo=estado_data.motivo
+    )
     
     if result.get("success") == 0:
         raise HTTPException(status_code=400, detail=result.get("message"))
@@ -243,3 +269,17 @@ async def archivar_cliente(
         raise HTTPException(status_code=400, detail=result.get("message"))
         
     return result
+
+
+# =========================================================================
+# ENDPOINTS DE HISTORIAL Y ANALYTICS
+# =========================================================================
+
+@router.get("/{id}/historial", dependencies=[Depends(require_permission("clientes.listar"))])
+async def obtener_historial(
+    id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """Obtiene la línea de tiempo completa de transiciones del cliente."""
+    service = ClientesService(db)
+    return await service.get_historial(id)

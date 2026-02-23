@@ -68,8 +68,14 @@ class Cliente(Base):
     fecha_reactivacion = Column(Date, nullable=True)
     
     tipo_estado = Column(String(20), default="PROSPECTO", nullable=False)
-    origen = Column(String(50))
+    origen = Column(String(50))  # BASE_DATOS, PUBLICIDAD_META, CARTERA_PROPIA, WHATSAPP, REFERIDO, OTRO
+    sub_origen = Column(String(100), nullable=True)  # Detalle adicional (ej. nombre de campaña Meta)
     is_active = Column(Boolean, default=True, nullable=False)
+    
+    # Timestamps de conversión para métricas
+    fecha_primer_contacto = Column(DateTime(timezone=True), nullable=True)
+    fecha_conversion_cliente = Column(DateTime(timezone=True), nullable=True)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     created_by = Column(Integer)

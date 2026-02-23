@@ -200,7 +200,7 @@ class ContactosAsignacionService:
                     razon_social=razon_social,
                     comercial_encargado_id=user_id or contact.asignado_a,
                     tipo_estado='PROSPECTO',
-                    origen='BASE_COMERCIAL',
+                    origen='BASE_DATOS',
                     ultimo_contacto=func.now(),
                     comentario_ultima_llamada=comentario,
                     is_active=True,

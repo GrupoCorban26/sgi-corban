@@ -17,3 +17,4 @@ from .comercial import (
 from .comercial_inbox import Inbox
 from .comercial_session import ConversationSession
 from .chat_message import ChatMessage
+from .cliente_historial import ClienteHistorial

@@ -169,8 +169,15 @@ class InboxService:
         lead = await self.db.get(Inbox, lead_id)
         if lead:
             lead.estado = 'CIERRE'
-            lead.modo = 'BOT' # Return to bot when closed
+            lead.modo = 'BOT'
             lead.fecha_gestion = datetime.now()
+            
+            # Calcular y guardar tiempo de respuesta si existe fecha de recepción
+            if lead.fecha_recepcion and not lead.tiempo_respuesta_minutos:
+                lead.tiempo_respuesta_minutos = int(
+                    (datetime.now() - lead.fecha_recepcion).total_seconds() / 60
+                )
+            
             await self.db.commit()
             return True
         return False
@@ -181,6 +188,29 @@ class InboxService:
             lead.estado = 'DESCARTADO'
             lead.modo = 'BOT'
             lead.fecha_gestion = datetime.now()
+            await self.db.commit()
+            return True
+        return False
+
+    async def registrar_primera_respuesta(self, lead_id: int):
+        """Registra la primera respuesta del comercial y calcula el tiempo de respuesta."""
+        lead = await self.db.get(Inbox, lead_id)
+        if lead and not lead.fecha_primera_respuesta:
+            lead.fecha_primera_respuesta = datetime.now()
+            if lead.fecha_recepcion:
+                lead.tiempo_respuesta_minutos = int(
+                    (datetime.now() - lead.fecha_recepcion).total_seconds() / 60
+                )
+            await self.db.commit()
+            return True
+        return False
+
+    async def escalar_a_directo(self, lead_id: int) -> bool:
+        """Marca que el comercial compartió su número corporativo con el cliente."""
+        lead = await self.db.get(Inbox, lead_id)
+        if lead and not lead.escalado_a_directo:
+            lead.escalado_a_directo = True
+            lead.fecha_escalacion = datetime.now()
             await self.db.commit()
             return True
         return False

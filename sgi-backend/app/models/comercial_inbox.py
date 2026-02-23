@@ -19,6 +19,14 @@ class Inbox(Base):
     modo = Column(String(10), default="BOT", nullable=False) # BOT, ASESOR
     ultimo_mensaje_at = Column(DateTime(timezone=True), nullable=True)
     
+    # Tracking de tiempos
+    tiempo_respuesta_minutos = Column(Integer, nullable=True)  # Minutos hasta primera respuesta
+    fecha_primera_respuesta = Column(DateTime(timezone=True), nullable=True)
+    
+    # Escalación: el comercial comparte su número corporativo
+    escalado_a_directo = Column(Boolean, default=False)
+    fecha_escalacion = Column(DateTime(timezone=True), nullable=True)
+    
     # Relationships
     usuario_asignado = relationship("app.models.seguridad.Usuario", foreign_keys=[asignado_a])
     mensajes = relationship("app.models.chat_message.ChatMessage", back_populates="inbox", cascade="all, delete-orphan")
