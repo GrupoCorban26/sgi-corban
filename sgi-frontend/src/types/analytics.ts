@@ -5,6 +5,7 @@ export interface ComericalStats {
     tiempo_respuesta_promedio_min: number | null;
     clientes_convertidos: number;
     llamadas_realizadas: number;
+    gestiones_realizadas: number;
     tasa_conversion: number;
 }
 
@@ -37,6 +38,14 @@ export interface OperativoStats {
     tendencia_semanal: number[];
 }
 
+export interface GestionStats {
+    total_gestiones: number;
+    por_tipo: { [tipo: string]: number };
+    por_resultado: { [resultado: string]: number };
+    tasa_contactabilidad: number;
+    clientes_sin_gestion_30d: number;
+}
+
 export interface DashboardAnalytics {
     fecha_inicio: string;
     fecha_fin: string;
@@ -46,4 +55,5 @@ export interface DashboardAnalytics {
         [origen: string]: OrigenStats;
     };
     operativo: OperativoStats;
+    gestion: GestionStats;
 }

@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { format, subDays } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { Download, Loader2, RefreshCw, BarChart2, TrendingUp, Users, Phone } from 'lucide-react';
+import { Download, Loader2, RefreshCw, BarChart2, TrendingUp, Users, Phone, AlertTriangle, ClipboardList } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 
@@ -196,6 +196,59 @@ export default function ReportesDashboard() {
                         </div>
                     </div>
 
+                    {/* KPIs de Gestión de Cartera */}
+                    {data.gestion && (
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col">
+                                <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                                    Total Gestiones
+                                </span>
+                                <div className="text-3xl font-bold text-gray-800">
+                                    {data.gestion.total_gestiones}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-2 font-medium flex items-center gap-1">
+                                    <ClipboardList size={14} /> En el período
+                                </p>
+                            </div>
+
+                            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col">
+                                <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                                    Contactabilidad
+                                </span>
+                                <div className="text-3xl font-bold text-emerald-600">
+                                    {data.gestion.tasa_contactabilidad}%
+                                </div>
+                                <p className="text-xs text-gray-500 mt-2 font-medium">
+                                    De las llamadas realizadas
+                                </p>
+                            </div>
+
+                            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col">
+                                <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                                    Llamadas
+                                </span>
+                                <div className="text-3xl font-bold text-blue-600">
+                                    {data.gestion.por_tipo?.LLAMADA || 0}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-2 font-medium">
+                                    WhatsApp: {data.gestion.por_tipo?.WHATSAPP || 0} · Visitas: {data.gestion.por_tipo?.VISITA || 0}
+                                </p>
+                            </div>
+
+                            <div className="bg-white p-5 rounded-xl border border-red-100 shadow-sm flex flex-col">
+                                <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                                    ⚠️ Sin Gestión 30d
+                                </span>
+                                <div className={`text-3xl font-bold ${data.gestion.clientes_sin_gestion_30d > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                    {data.gestion.clientes_sin_gestion_30d}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-2 font-medium flex items-center gap-1">
+                                    <AlertTriangle size={14} className="text-red-500" /> Clientes abandonados
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Rendimiento Comerciales */}
                         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
@@ -257,6 +310,7 @@ export default function ReportesDashboard() {
                                         <th className="px-6 py-4 font-semibold text-center">Conversiones</th>
                                         <th className="px-6 py-4 font-semibold text-center">Tasa %</th>
                                         <th className="px-6 py-4 font-semibold text-center">Llamadas Realizadas</th>
+                                        <th className="px-6 py-4 font-semibold text-center">Gestiones</th>
                                         <th className="px-6 py-4 font-semibold text-center">Tiempo Resp. Prom.</th>
                                     </tr>
                                 </thead>
@@ -274,6 +328,7 @@ export default function ReportesDashboard() {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-center">{agente.llamadas_realizadas}</td>
+                                            <td className="px-6 py-4 text-center font-semibold text-indigo-600">{agente.gestiones_realizadas || 0}</td>
                                             <td className="px-6 py-4 text-center text-gray-500">
                                                 {agente.tiempo_respuesta_promedio_min ? `${agente.tiempo_respuesta_promedio_min} min` : '-'}
                                             </td>
@@ -281,7 +336,7 @@ export default function ReportesDashboard() {
                                     ))}
                                     {data.comerciales.length === 0 && (
                                         <tr>
-                                            <td colSpan={6} className="px-6 py-8 text-center text-gray-500 font-medium">
+                                            <td colSpan={7} className="px-6 py-8 text-center text-gray-500 font-medium">
                                                 No hay intervenciones comerciales en este rango de fechas.
                                             </td>
                                         </tr>
