@@ -191,7 +191,8 @@ class ChatbotService:
 
         # 5. If no session
         if not session:
-            if button_id in ("btn_asesor", "btn_info", "btn_agendar"):
+            # Si presiona un botón o si escribe algo largo (intención de hablar con un asesor o agendar)
+            if button_id in ("btn_asesor", "btn_info", "btn_agendar") or (not button_id and len(text_lower) > 5):
                 session = await self._create_session(phone, "MENU")
             else:
                 # Check if there's an expired session (timeout message)
