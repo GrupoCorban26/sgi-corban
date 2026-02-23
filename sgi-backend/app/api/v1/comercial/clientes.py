@@ -26,7 +26,7 @@ from app.core.dependencies import require_permission
 router = APIRouter(prefix="/clientes", tags=["Clientes"])
 
 # Lista de roles que pueden ver información de CUALQUIER comercial
-ALLOWED_ALL = ["JEFE_COMERCIAL", "ADMIN", "GERENCIA"]
+ALLOWED_ALL = ["JEFE_COMERCIAL", "ADMIN", "GERENCIA", "SISTEMAS"]
 
 @router.get("/recordatorios", dependencies=[Depends(require_permission("clientes.listar"))])
 async def get_recordatorios(
