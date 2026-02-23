@@ -226,8 +226,8 @@ class AnalyticsService:
         # Citas en el período: agendadas vs terminadas
         stmt_citas_total = select(func.count()).select_from(Cita).where(
             and_(
-                Cita.fecha_cita >= dt_inicio,
-                Cita.fecha_cita <= dt_fin,
+                Cita.fecha >= dt_inicio,
+                Cita.fecha <= dt_fin,
                 Cita.estado.in_(['APROBADO', 'TERMINADO'])
             )
         )
@@ -235,8 +235,8 @@ class AnalyticsService:
 
         stmt_citas_terminadas = select(func.count()).select_from(Cita).where(
             and_(
-                Cita.fecha_cita >= dt_inicio,
-                Cita.fecha_cita <= dt_fin,
+                Cita.fecha >= dt_inicio,
+                Cita.fecha <= dt_fin,
                 Cita.estado == 'TERMINADO'
             )
         )
