@@ -191,8 +191,9 @@ class InboxService:
             
             # Calcular y guardar tiempo de respuesta si existe fecha de recepción
             if lead.fecha_recepcion and not lead.tiempo_respuesta_minutos:
+                fecha_recepcion_naive = lead.fecha_recepcion.replace(tzinfo=None) if lead.fecha_recepcion.tzinfo else lead.fecha_recepcion
                 lead.tiempo_respuesta_minutos = int(
-                    (datetime.now() - lead.fecha_recepcion).total_seconds() / 60
+                    (datetime.now() - fecha_recepcion_naive).total_seconds() / 60
                 )
             
             # Trazabilidad: vincular el cliente con su lead de origen
@@ -223,8 +224,9 @@ class InboxService:
         if lead and not lead.fecha_primera_respuesta:
             lead.fecha_primera_respuesta = datetime.now()
             if lead.fecha_recepcion:
+                fecha_recepcion_naive = lead.fecha_recepcion.replace(tzinfo=None) if lead.fecha_recepcion.tzinfo else lead.fecha_recepcion
                 lead.tiempo_respuesta_minutos = int(
-                    (datetime.now() - lead.fecha_recepcion).total_seconds() / 60
+                    (datetime.now() - fecha_recepcion_naive).total_seconds() / 60
                 )
             await self.db.commit()
             return True

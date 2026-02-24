@@ -135,8 +135,9 @@ class ChatService:
             if msg_in.direccion == 'SALIENTE' and not inbox.fecha_primera_respuesta:
                 inbox.fecha_primera_respuesta = datetime.now()
                 if inbox.fecha_recepcion:
+                    fecha_recepcion_naive = inbox.fecha_recepcion.replace(tzinfo=None) if inbox.fecha_recepcion.tzinfo else inbox.fecha_recepcion
                     inbox.tiempo_respuesta_minutos = int(
-                        (datetime.now() - inbox.fecha_recepcion).total_seconds() / 60
+                        (datetime.now() - fecha_recepcion_naive).total_seconds() / 60
                     )
         
         await self.db.commit()
