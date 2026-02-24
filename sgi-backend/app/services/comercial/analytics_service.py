@@ -149,17 +149,17 @@ class AnalyticsService:
 
             # Tiempo promedio de respuesta
             stmt_tiempo = select(
-                func.avg(Inbox.tiempo_respuesta_minutos)
+                func.avg(Inbox.tiempo_respuesta_segundos)
             ).where(
                 and_(
                     Inbox.asignado_a == uid,
-                    Inbox.tiempo_respuesta_minutos.isnot(None),
+                    Inbox.tiempo_respuesta_segundos.isnot(None),
                     Inbox.fecha_recepcion >= dt_inicio,
                     Inbox.fecha_recepcion <= dt_fin
                 )
             )
             tiempo_resp = (await self.db.execute(stmt_tiempo)).scalar()
-            tiempo_resp = round(float(tiempo_resp), 1) if tiempo_resp is not None else None
+            tiempo_resp = round(float(tiempo_resp)) if tiempo_resp is not None else None
 
             # Llamadas realizadas (contactos con fecha_llamada en el período)
             stmt_llamadas = select(func.count()).select_from(ClienteContacto).where(

@@ -21,7 +21,7 @@ class Inbox(Base):
     ultimo_mensaje_at = Column(DateTime(timezone=True), nullable=True)
     
     # Tracking de tiempos
-    tiempo_respuesta_minutos = Column(Integer, nullable=True)  # Minutos hasta primera respuesta
+    tiempo_respuesta_segundos = Column(Integer, nullable=True)  # Segundos hasta primera respuesta
     fecha_primera_respuesta = Column(DateTime(timezone=True), nullable=True)
     
     # Escalación: el comercial comparte su número corporativo

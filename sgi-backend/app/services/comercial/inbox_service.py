@@ -105,7 +105,7 @@ class InboxService:
             new_lead.asignado_a = assigned_user.id
             new_lead.estado = 'PENDIENTE'
             new_lead.fecha_asignacion = datetime.now()
-            new_lead.tiempo_respuesta_minutos = None
+            new_lead.tiempo_respuesta_segundos = None
             new_lead.fecha_primera_respuesta = None
             new_lead.tipo_interes = data.tipo_interes
             # Update the original message if None or generic
@@ -195,10 +195,10 @@ class InboxService:
             
             # Calcular y guardar tiempo de respuesta si existe fecha de asignación o recepción
             base_date = lead.fecha_asignacion or lead.fecha_recepcion
-            if base_date and not lead.tiempo_respuesta_minutos:
+            if base_date and not lead.tiempo_respuesta_segundos:
                 base_date_naive = base_date.replace(tzinfo=None) if base_date.tzinfo else base_date
-                lead.tiempo_respuesta_minutos = int(
-                    (datetime.now() - base_date_naive).total_seconds() / 60
+                lead.tiempo_respuesta_segundos = int(
+                    (datetime.now() - base_date_naive).total_seconds()
                 )
             
             # Trazabilidad: vincular el cliente con su lead de origen
@@ -231,8 +231,8 @@ class InboxService:
             base_date = lead.fecha_asignacion or lead.fecha_recepcion
             if base_date:
                 base_date_naive = base_date.replace(tzinfo=None) if base_date.tzinfo else base_date
-                lead.tiempo_respuesta_minutos = int(
-                    (datetime.now() - base_date_naive).total_seconds() / 60
+                lead.tiempo_respuesta_segundos = int(
+                    (datetime.now() - base_date_naive).total_seconds()
                 )
             await self.db.commit()
             return True

@@ -2,7 +2,7 @@ export interface ComericalStats {
     usuario_id: number;
     nombre: string;
     leads_atendidos: number;
-    tiempo_respuesta_promedio_min: number | null;
+    tiempo_respuesta_promedio_seg: number | null;
     clientes_convertidos: number;
     llamadas_realizadas: number;
     gestiones_realizadas: number;

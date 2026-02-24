@@ -15,6 +15,15 @@ import {
 
 const COLORS = ['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
 
+function formatDuration(seconds: number | null | undefined): string {
+    if (seconds === null || seconds === undefined) return '-';
+    if (seconds === 0) return '0s';
+    const m = Math.floor(seconds / 60);
+    const s = Math.round(seconds % 60);
+    if (m === 0) return `${s}s`;
+    return `${m}m ${s}s`;
+}
+
 export default function ReportesDashboard() {
     const [fechaInicio, setFechaInicio] = useState<string>(format(subDays(new Date(), 30), 'yyyy-MM-dd'));
     const [fechaFin, setFechaFin] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
@@ -37,7 +46,7 @@ export default function ReportesDashboard() {
                 'Convertidos': c.clientes_convertidos,
                 'Llamadas Realizadas': c.llamadas_realizadas,
                 'Tasa Conversión (%)': c.tasa_conversion,
-                'Tiempo Resp. Prom. (Min)': c.tiempo_respuesta_promedio_min || 'N/D'
+                'Tiempo Resp. Prom.': formatDuration(c.tiempo_respuesta_promedio_seg)
             })));
             XLSX.utils.book_append_sheet(wb, wsComerciales, "Comerciales");
 
@@ -330,7 +339,7 @@ export default function ReportesDashboard() {
                                             <td className="px-6 py-4 text-center">{agente.llamadas_realizadas}</td>
                                             <td className="px-6 py-4 text-center font-semibold text-indigo-600">{agente.gestiones_realizadas || 0}</td>
                                             <td className="px-6 py-4 text-center text-gray-500">
-                                                {agente.tiempo_respuesta_promedio_min !== null && agente.tiempo_respuesta_promedio_min !== undefined ? `${agente.tiempo_respuesta_promedio_min} min` : '-'}
+                                                {formatDuration(agente.tiempo_respuesta_promedio_seg)}
                                             </td>
                                         </tr>
                                     ))}

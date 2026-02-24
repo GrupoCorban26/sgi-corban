@@ -137,8 +137,8 @@ class ChatService:
                 base_date = inbox.fecha_asignacion or inbox.fecha_recepcion
                 if base_date:
                     base_date_naive = base_date.replace(tzinfo=None) if base_date.tzinfo else base_date
-                    inbox.tiempo_respuesta_minutos = int(
-                        (datetime.now() - base_date_naive).total_seconds() / 60
+                    inbox.tiempo_respuesta_segundos = int(
+                        (datetime.now() - base_date_naive).total_seconds()
                     )
         
         await self.db.commit()
