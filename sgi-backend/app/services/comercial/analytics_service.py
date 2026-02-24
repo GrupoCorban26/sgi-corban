@@ -159,7 +159,7 @@ class AnalyticsService:
                 )
             )
             tiempo_resp = (await self.db.execute(stmt_tiempo)).scalar()
-            tiempo_resp = round(float(tiempo_resp), 1) if tiempo_resp else None
+            tiempo_resp = round(float(tiempo_resp), 1) if tiempo_resp is not None else None
 
             # Llamadas realizadas (contactos con fecha_llamada en el período)
             stmt_llamadas = select(func.count()).select_from(ClienteContacto).where(

@@ -330,7 +330,7 @@ export default function ReportesDashboard() {
                                             <td className="px-6 py-4 text-center">{agente.llamadas_realizadas}</td>
                                             <td className="px-6 py-4 text-center font-semibold text-indigo-600">{agente.gestiones_realizadas || 0}</td>
                                             <td className="px-6 py-4 text-center text-gray-500">
-                                                {agente.tiempo_respuesta_promedio_min ? `${agente.tiempo_respuesta_promedio_min} min` : '-'}
+                                                {agente.tiempo_respuesta_promedio_min !== null && agente.tiempo_respuesta_promedio_min !== undefined ? `${agente.tiempo_respuesta_promedio_min} min` : '-'}
                                             </td>
                                         </tr>
                                     ))}
