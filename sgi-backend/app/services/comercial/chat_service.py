@@ -134,10 +134,11 @@ class ChatService:
             # Registrar primera respuesta del asesor si es SALIENTE
             if msg_in.direccion == 'SALIENTE' and not inbox.fecha_primera_respuesta:
                 inbox.fecha_primera_respuesta = datetime.now()
-                if inbox.fecha_recepcion:
-                    fecha_recepcion_naive = inbox.fecha_recepcion.replace(tzinfo=None) if inbox.fecha_recepcion.tzinfo else inbox.fecha_recepcion
+                base_date = inbox.fecha_asignacion or inbox.fecha_recepcion
+                if base_date:
+                    base_date_naive = base_date.replace(tzinfo=None) if base_date.tzinfo else base_date
                     inbox.tiempo_respuesta_minutos = int(
-                        (datetime.now() - fecha_recepcion_naive).total_seconds() / 60
+                        (datetime.now() - base_date_naive).total_seconds() / 60
                     )
         
         await self.db.commit()

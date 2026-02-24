@@ -104,6 +104,9 @@ class InboxService:
             new_lead = existing_inbox
             new_lead.asignado_a = assigned_user.id
             new_lead.estado = 'PENDIENTE'
+            new_lead.fecha_asignacion = datetime.now()
+            new_lead.tiempo_respuesta_minutos = None
+            new_lead.fecha_primera_respuesta = None
             new_lead.tipo_interes = data.tipo_interes
             # Update the original message if None or generic
             if not new_lead.mensaje_inicial or new_lead.mensaje_inicial == "Interacción inicial":
@@ -114,6 +117,7 @@ class InboxService:
                 mensaje_inicial=data.mensaje,
                 nombre_whatsapp=data.nombre_display,
                 asignado_a=assigned_user.id,
+                fecha_asignacion=datetime.now(),
                 estado='PENDIENTE',
                 tipo_interes=data.tipo_interes,
             )
@@ -189,11 +193,12 @@ class InboxService:
             lead.modo = 'BOT'
             lead.fecha_gestion = datetime.now()
             
-            # Calcular y guardar tiempo de respuesta si existe fecha de recepción
-            if lead.fecha_recepcion and not lead.tiempo_respuesta_minutos:
-                fecha_recepcion_naive = lead.fecha_recepcion.replace(tzinfo=None) if lead.fecha_recepcion.tzinfo else lead.fecha_recepcion
+            # Calcular y guardar tiempo de respuesta si existe fecha de asignación o recepción
+            base_date = lead.fecha_asignacion or lead.fecha_recepcion
+            if base_date and not lead.tiempo_respuesta_minutos:
+                base_date_naive = base_date.replace(tzinfo=None) if base_date.tzinfo else base_date
                 lead.tiempo_respuesta_minutos = int(
-                    (datetime.now() - fecha_recepcion_naive).total_seconds() / 60
+                    (datetime.now() - base_date_naive).total_seconds() / 60
                 )
             
             # Trazabilidad: vincular el cliente con su lead de origen
@@ -223,10 +228,11 @@ class InboxService:
         lead = await self.db.get(Inbox, lead_id)
         if lead and not lead.fecha_primera_respuesta:
             lead.fecha_primera_respuesta = datetime.now()
-            if lead.fecha_recepcion:
-                fecha_recepcion_naive = lead.fecha_recepcion.replace(tzinfo=None) if lead.fecha_recepcion.tzinfo else lead.fecha_recepcion
+            base_date = lead.fecha_asignacion or lead.fecha_recepcion
+            if base_date:
+                base_date_naive = base_date.replace(tzinfo=None) if base_date.tzinfo else base_date
                 lead.tiempo_respuesta_minutos = int(
-                    (datetime.now() - fecha_recepcion_naive).total_seconds() / 60
+                    (datetime.now() - base_date_naive).total_seconds() / 60
                 )
             await self.db.commit()
             return True

@@ -15,6 +15,7 @@ class Inbox(Base):
     estado = Column(String(20), default="PENDIENTE", nullable=False) # PENDIENTE, CONVERTIDO, DESCARTADO
     tipo_interes = Column(String(30), nullable=True) # IMPORTACION, ASESORIA, DUDAS
     fecha_recepcion = Column(DateTime(timezone=True), server_default=func.now())
+    fecha_asignacion = Column(DateTime(timezone=True), nullable=True)
     fecha_gestion = Column(DateTime(timezone=True), nullable=True)
     modo = Column(String(10), default="BOT", nullable=False) # BOT, ASESOR
     ultimo_mensaje_at = Column(DateTime(timezone=True), nullable=True)
