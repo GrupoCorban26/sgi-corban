@@ -43,6 +43,20 @@ api.interceptors.response.use(
     (error) => {
         if (error.response?.status === 401) {
             console.error('Unauthorized - Token may be expired or missing');
+
+            // Only execute in the browser
+            if (typeof window !== 'undefined') {
+                // Clear cookies and local storage
+                document.cookie = 'token=; Max-Age=0; path=/;';
+                document.cookie = 'user_data=; Max-Age=0; path=/;';
+                localStorage.removeItem('token');
+                localStorage.removeItem('user_data');
+
+                // Avoid redirect loop if already on login page
+                if (window.location.pathname !== '/login') {
+                    window.location.href = '/login';
+                }
+            }
         }
         return Promise.reject(error);
     }

@@ -15,6 +15,7 @@ from app.models.seguridad import Usuario, Rol
 from app.schemas.comercial.whatsapp import WhatsAppIncoming, WhatsAppResponse, BotMessage
 from app.schemas.comercial.inbox import InboxDistribute
 from app.services.comercial.inbox_service import InboxService
+from app.services.core.openai_service import OpenAIService
 
 logger = logging.getLogger(__name__)
 
@@ -142,6 +143,7 @@ def _sanitizar_razon_social(texto: str) -> str:
 class ChatbotService:
     def __init__(self, db: AsyncSession):
         self.db = db
+        self.ai = OpenAIService()
 
     async def process_message(self, data: WhatsAppIncoming) -> WhatsAppResponse:
         """Main entry point: process an incoming message and return bot response."""
@@ -191,10 +193,11 @@ class ChatbotService:
 
         # 5. If no session
         if not session:
-            # Si presiona un botón o si escribe algo largo (intención de hablar con un asesor o agendar)
-            if button_id in ("btn_asesor", "btn_info", "btn_agendar") or (not button_id and len(text_lower) > 5):
+            # Si presiona un botón principales (asesor/info/agendar), crear sesión MENU
+            if button_id in ("btn_asesor", "btn_info", "btn_agendar"):
                 session = await self._create_session(phone, "MENU")
             else:
+                # Si escribió texto libre en vez de usar el menú de inicio...
                 # Check if there's an expired session (timeout message)
                 expired = await self._get_expired_session(phone)
                 if expired:
@@ -210,6 +213,10 @@ class ChatbotService:
                             ),
                         ]
                     )
+                # Si el texto es de verdad libre (y no solo un hola), lo clasificamos
+                if not button_id and text_lower not in ("menu", "menú", "inicio", "hola"):
+                    return await self._handle_intent(data, phone, session)
+                
                 return self._send_menu(data.contact_name)
 
         # 6. Route based on current state
@@ -244,6 +251,45 @@ class ChatbotService:
                 messages=[BotMessage(type="text", content="Ocurrió un error inesperado. Escribe *menu* para volver a empezar. 🔄")]
             )
 
+    # ===================== IA INTENT HANDLER =====================
+
+    async def _handle_intent(self, data: WhatsAppIncoming, phone: str, session: ConversationSession | None):
+        """Maneja el texto libre usando IA para prevenir bloqueos silenciosos o derivaciones erróneas"""
+        if not session:
+            session = await self._create_session(phone, "MENU")
+
+        intencion = await self.ai.clasificar_intencion(data.message_text)
+
+        if intencion == "ASESOR":
+            return await self._handle_asesor(session, data, phone)
+        elif intencion == "AGENDAR":
+            await self._update_session(session, "AGENDAR_RUC")
+            return WhatsAppResponse(
+                action="send_text",
+                messages=[BotMessage(type="text", content=(
+                    "¡Perfecto! Para agendar una visita necesito algunos datos.\n\n"
+                    "📋 Por favor, ingresa tu *RUC* (11 dígitos):\n\n"
+                    "_Escribe *volver* para regresar al menú._"
+                ))]
+            )
+        elif intencion == "INFO":
+            await self._update_session(session, "INFO")
+            return WhatsAppResponse(
+                action="send_multiple",
+                messages=[
+                    BotMessage(type="text", content=INFO_MESSAGE),
+                    BotMessage(type="buttons", body="¿Deseas algo más?", buttons=BACK_BUTTONS),
+                ]
+            )
+        else: # "SALUDO" o "DESCONOCIDO"
+            return WhatsAppResponse(
+                action="send_multiple",
+                messages=[
+                    BotMessage(type="text", content="No logré identificar exactamente qué necesitas 😅, pero aquí te dejo nuestras opciones principales:"),
+                    BotMessage(type="buttons", body=f"¡Hola {data.contact_name}! 👋 Bienvenido a *Grupo Corban*.\n\n¿En qué podemos ayudarte?", buttons=MENU_BUTTONS),
+                ]
+            )
+
     # ===================== MENU HANDLER =====================
 
     async def _handle_menu(self, session, data, phone):
@@ -272,29 +318,12 @@ class ChatbotService:
                 ))]
             )
         else:
-            # Fallback para texto libre
-            if text_lower in ("menu", "menú", "inicio", "hola"):
+            # Fallback para texto libre dentro de algun estado
+            if text_lower in ("menu", "menú", "inicio", "hola", "volver"):
                  return self._send_menu(data.contact_name)
                  
-            # Si escribio algo que no es boton pero parece una oracion o pregunta (> 5 chars)
-            if len(text_lower) > 5:
-                # Si en el texto dice explicitly "agendar" o "cita"
-                if any(word in text_lower for word in ["agendar", "cita", "visita"]):
-                    await self._update_session(session, "AGENDAR_RUC")
-                    return WhatsAppResponse(
-                        action="send_text",
-                        messages=[BotMessage(type="text", content=(
-                            "¡Perfecto! Para agendar una visita necesito algunos datos.\n\n"
-                            "📋 Por favor, ingresa tu *RUC* (11 dígitos):\n\n"
-                            "_Escribe *volver* para regresar al menú._"
-                        ))]
-                    )
-                else:
-                    # Enviar con asesor usando su mensaje original de contexto
-                    return await self._handle_asesor(session, data, phone)
-            
-            # Si solo puso "ok", "si", etc. repetimos menu
-            return self._send_menu(data.contact_name)
+            # Usar la nueva IA para clasificar el texto
+            return await self._handle_intent(data, phone, session)
 
     # ===================== ASESOR HANDLER =====================
 

@@ -130,6 +130,14 @@ class ChatService:
             if msg_in.direccion == 'ENTRANTE' and inbox.estado in ['CIERRE', 'DESCARTADO', 'CONVERTIDO']:
                 inbox.estado = 'NUEVO'
                 inbox.modo = 'BOT' # Return to bot when reactivated 
+            
+            # Registrar primera respuesta del asesor si es SALIENTE
+            if msg_in.direccion == 'SALIENTE' and not inbox.fecha_primera_respuesta:
+                inbox.fecha_primera_respuesta = datetime.now()
+                if inbox.fecha_recepcion:
+                    inbox.tiempo_respuesta_minutos = int(
+                        (datetime.now() - inbox.fecha_recepcion).total_seconds() / 60
+                    )
         
         await self.db.commit()
         await self.db.refresh(db_msg)

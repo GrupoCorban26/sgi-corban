@@ -17,7 +17,7 @@ const ESTADOS_MAP = [
     { value: 'COTIZADO', label: 'Cotización Enviada' },
 ];
 
-export default function LeadInfoPanel({ selectedConv, onChangeConv }: Props) {
+export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClick }: Props & { onCerrarClick?: () => void }) {
     const { changeEstado, releaseChat } = useChatActions();
 
     const handleEstadoChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -32,6 +32,10 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv }: Props) {
     };
 
     const handleConvertir = async () => {
+        if (onCerrarClick) {
+            onCerrarClick();
+            return;
+        }
         try {
             await changeEstado.mutateAsync({ inboxId: selectedConv.inbox_id, nuevo_estado: 'CIERRE' });
             toast.success('Lead cerrado exitosamente');

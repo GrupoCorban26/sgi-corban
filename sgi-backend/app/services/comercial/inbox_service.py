@@ -82,8 +82,8 @@ class InboxService:
             # Round-Robin: Find the last assigned commercial and pick the next one
             commercials_sorted = sorted(commercials, key=lambda u: u.id)
             
-            # Get the most recently assigned lead
-            last_assigned_query = select(Inbox).order_by(Inbox.id.desc()).limit(1)
+            # Get the most recently assigned lead (must have an assignee)
+            last_assigned_query = select(Inbox).where(Inbox.asignado_a.isnot(None)).order_by(Inbox.id.desc()).limit(1)
             last_result = await self.db.execute(last_assigned_query)
             last_lead = last_result.scalar_one_or_none()
             
