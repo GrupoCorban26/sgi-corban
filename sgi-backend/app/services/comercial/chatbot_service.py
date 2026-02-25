@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import re
@@ -15,7 +16,6 @@ from app.models.seguridad import Usuario, Rol
 from app.schemas.comercial.whatsapp import WhatsAppIncoming, WhatsAppResponse, BotMessage
 from app.schemas.comercial.inbox import InboxDistribute
 from app.services.comercial.inbox_service import InboxService
-from app.services.core.openai_service import OpenAIService
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +24,11 @@ logger = logging.getLogger(__name__)
 # CONSTANTS
 # ==========================================
 
+MENSAJE_BIENVENIDA = "Hola, soy Corby🤖, tu asistente virtual del Grupo Corban. ¿En qué puedo ayudarte hoy?🤗"
+
 MENU_BUTTONS = [
-    {"id": "btn_asesor", "title": "Hablar con asesor"},
-    {"id": "btn_info", "title": "Conocer Corban"},
+    {"id": "btn_asesor", "title": "Hablar con un asesor"},
+    {"id": "btn_cotizar", "title": "Quiero cotizar"},
     {"id": "btn_agendar", "title": "Agendar visita"},
 ]
 
@@ -42,18 +44,8 @@ CONFIRM_BUTTONS = [
     {"id": "btn_volver", "title": "⬅️ Volver"},
 ]
 
-BACK_BUTTONS = [
-    {"id": "btn_menu", "title": "Volver al menú"},
-    {"id": "btn_fin", "title": "Gracias, eso es todo"},
-]
-
-INFO_MESSAGE = (
-    "Somos *Grupo Corban*, una agencia de Cargas y Aduanas con más de "
-    "15 años de experiencia manejando todo tipo de cargas.\n\n"
-    "📍 Estamos ubicados en el *Centro Aéreo Comercial, módulo E, oficina 507*."
-)
-
 SESSION_TIMEOUT_MINUTES = 30
+COTIZAR_VENTANA_GRACIA_SEGUNDOS = 60
 
 DIAS_SEMANA = {
     0: "Lunes", 1: "Martes", 2: "Miércoles",
@@ -143,37 +135,29 @@ def _sanitizar_razon_social(texto: str) -> str:
 class ChatbotService:
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.ai = OpenAIService()
 
     async def process_message(self, data: WhatsAppIncoming) -> WhatsAppResponse:
-        """Main entry point: process an incoming message and return bot response."""
-        
-        # 0. Ignore non-processable messages (except location)
-        if data.message_type not in ("text", "interactive", "location"):
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content="Solo puedo recibir mensajes de texto o ubicación 😊. Escribe *menu* para ver las opciones.")]
-            )
+        """Punto de entrada principal: procesa un mensaje entrante y retorna la respuesta del bot."""
 
-        # 1. Normalize phone
+        # 1. Normalizar teléfono
         phone = data.from_number.replace(" ", "").replace("+", "")
         if phone.startswith("51"):
             phone = phone[2:]
 
-        # 2. Cleanup expired sessions (opportunistic)
+        # 2. Limpieza de sesiones expiradas (oportunista)
         await self._cleanup_expired_sessions()
 
-        # 3. Get active session
+        # 3. Obtener sesión activa
         session = await self._get_active_session(phone)
 
-        # 4. Check for global commands
+        # 4. Comandos globales
         text_lower = data.message_text.strip().lower()
         button_id = data.button_id
 
-        if text_lower in ("menu", "menú", "inicio", "hola") or button_id == "btn_menu":
+        if text_lower in ("menu", "menú", "inicio") or button_id == "btn_menu":
             if session:
                 await self._delete_session(session)
-            return self._send_menu(data.contact_name)
+            return self._send_menu()
 
         if text_lower in ("cancelar", "salir") or button_id == "btn_cancelar":
             if session:
@@ -183,54 +167,27 @@ class ChatbotService:
                 messages=[BotMessage(type="text", content="Operación cancelada. Escribe *menu* cuando quieras volver a empezar. 👋")]
             )
 
-        if button_id == "btn_fin":
-            if session:
-                await self._delete_session(session)
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content="¡Gracias por comunicarte con Grupo Corban! Estamos para ayudarte. 😊")]
-            )
-
-        # 5. If no session
+        # 5. Si no hay sesión activa → mensaje de bienvenida con botones
         if not session:
-            # Si presiona un botón principales (asesor/info/agendar), crear sesión MENU
-            if button_id in ("btn_asesor", "btn_info", "btn_agendar"):
+            # Si presionó un botón del menú principal, crear sesión y procesar
+            if button_id in ("btn_asesor", "btn_cotizar", "btn_agendar"):
                 session = await self._create_session(phone, "MENU")
             else:
-                # Si escribió texto libre en vez de usar el menú de inicio...
-                # Check if there's an expired session (timeout message)
-                expired = await self._get_expired_session(phone)
-                if expired:
-                    await self._delete_session(expired)
-                    return WhatsAppResponse(
-                        action="send_multiple",
-                        messages=[
-                            BotMessage(type="text", content="Tu sesión anterior expiró por inactividad. ¡Empecemos de nuevo! 👋"),
-                            BotMessage(
-                                type="buttons",
-                                body=f"¡Hola {data.contact_name}! 👋 Bienvenido a *Grupo Corban*.\n\n¿En qué podemos ayudarte?",
-                                buttons=MENU_BUTTONS
-                            ),
-                        ]
-                    )
-                # Si el texto es de verdad libre (y no solo un hola), lo clasificamos
-                if not button_id and text_lower not in ("menu", "menú", "inicio", "hola"):
-                    return await self._handle_intent(data, phone, session)
-                
-                return self._send_menu(data.contact_name)
+                # Cualquier otro mensaje (texto, imagen, audio, lo que sea) → bienvenida
+                return self._send_menu()
 
-        # 6. Route based on current state
+        # 6. Enrutar según estado actual
         state = session.estado if session else "MENU"
-        
+
         try:
             if state == "MENU":
                 return await self._handle_menu(session, data, phone)
-            elif state == "INFO":
-                return await self._handle_info(session, data)
+            elif state == "COTIZAR_REQUERIMIENTOS":
+                return await self._handle_cotizar_requerimientos(session, data, phone)
+            elif state == "COTIZAR_PROCESANDO":
+                return await self._handle_cotizar_procesando(session, data, phone)
             elif state == "AGENDAR_RUC":
                 return await self._handle_agendar_ruc(session, data)
-            elif state == "AGENDAR_RAZON":
-                return await self._handle_agendar_razon(session, data)
             elif state == "AGENDAR_TIPO":
                 return await self._handle_agendar_tipo(session, data)
             elif state == "AGENDAR_UBICACION":
@@ -243,7 +200,7 @@ class ChatbotService:
                 return await self._handle_agendar_confirmar(session, data, phone)
             else:
                 await self._delete_session(session)
-                return self._send_menu(data.contact_name)
+                return self._send_menu()
         except Exception as e:
             logger.error(f"Error en chatbot (state={state}, phone={phone}): {e}", exc_info=True)
             return WhatsAppResponse(
@@ -251,61 +208,19 @@ class ChatbotService:
                 messages=[BotMessage(type="text", content="Ocurrió un error inesperado. Escribe *menu* para volver a empezar. 🔄")]
             )
 
-    # ===================== IA INTENT HANDLER =====================
-
-    async def _handle_intent(self, data: WhatsAppIncoming, phone: str, session: ConversationSession | None):
-        """Maneja el texto libre usando IA para prevenir bloqueos silenciosos o derivaciones erróneas"""
-        if not session:
-            session = await self._create_session(phone, "MENU")
-
-        intencion = await self.ai.clasificar_intencion(data.message_text)
-
-        if intencion == "ASESOR":
-            return await self._handle_asesor(session, data, phone)
-        elif intencion == "AGENDAR":
-            await self._update_session(session, "AGENDAR_RUC")
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content=(
-                    "¡Perfecto! Para agendar una visita necesito algunos datos.\n\n"
-                    "📋 Por favor, ingresa tu *RUC* (11 dígitos):\n\n"
-                    "_Escribe *volver* para regresar al menú._"
-                ))]
-            )
-        elif intencion == "INFO":
-            await self._update_session(session, "INFO")
-            return WhatsAppResponse(
-                action="send_multiple",
-                messages=[
-                    BotMessage(type="text", content=INFO_MESSAGE),
-                    BotMessage(type="buttons", body="¿Deseas algo más?", buttons=BACK_BUTTONS),
-                ]
-            )
-        else: # "SALUDO" o "DESCONOCIDO"
-            return WhatsAppResponse(
-                action="send_multiple",
-                messages=[
-                    BotMessage(type="text", content="No logré identificar exactamente qué necesitas 😅, pero aquí te dejo nuestras opciones principales:"),
-                    BotMessage(type="buttons", body=f"¡Hola {data.contact_name}! 👋 Bienvenido a *Grupo Corban*.\n\n¿En qué podemos ayudarte?", buttons=MENU_BUTTONS),
-                ]
-            )
-
     # ===================== MENU HANDLER =====================
 
     async def _handle_menu(self, session, data, phone):
+        """Maneja la selección del menú principal (3 botones)."""
         button_id = data.button_id
-        text_lower = data.message_text.strip().lower()
 
         if button_id == "btn_asesor":
             return await self._handle_asesor(session, data, phone)
-        elif button_id == "btn_info":
-            await self._update_session(session, "INFO")
+        elif button_id == "btn_cotizar":
+            await self._update_session(session, "COTIZAR_REQUERIMIENTOS")
             return WhatsAppResponse(
-                action="send_multiple",
-                messages=[
-                    BotMessage(type="text", content=INFO_MESSAGE),
-                    BotMessage(type="buttons", body="¿Deseas algo más?", buttons=BACK_BUTTONS),
-                ]
+                action="send_text",
+                messages=[BotMessage(type="text", content="Cuénteme estimado, cuales son sus requerimientos😄")]
             )
         elif button_id == "btn_agendar":
             await self._update_session(session, "AGENDAR_RUC")
@@ -318,17 +233,13 @@ class ChatbotService:
                 ))]
             )
         else:
-            # Fallback para texto libre dentro de algun estado
-            if text_lower in ("menu", "menú", "inicio", "hola", "volver"):
-                 return self._send_menu(data.contact_name)
-                 
-            # Usar la nueva IA para clasificar el texto
-            return await self._handle_intent(data, phone, session)
+            # Si no presionó un botón válido, reenviar el menú
+            return self._send_menu()
 
     # ===================== ASESOR HANDLER =====================
 
-    async def _handle_asesor(self, session, data, phone):
-        """Check if client has existing lead/commercial, then assign."""
+    async def _handle_asesor(self, session, data, phone, tipo_interes="ASESORIA", mensaje_contexto=None):
+        """Verifica si el cliente ya tiene un lead/comercial asignado, si no, asigna uno por Round Robin."""
         query_inbox = select(Inbox).where(
             and_(Inbox.telefono.like(f"%{phone}%"), Inbox.estado == 'PENDIENTE')
         )
@@ -342,69 +253,62 @@ class ChatbotService:
             nombre_comercial = self._get_user_name(user)
 
             await self._delete_session(session)
-            
-            mensajes = []
-            if data.button_id != "btn_asesor":
-              mensajes.append(BotMessage(type="text", content="No logré entender completamente tu solicitud, pero ¡no te preocupes! Voy a transferir tu consulta a uno de nuestros especialistas para que te atienda personalmente."))
-            
-            mensajes.append(BotMessage(type="text", content=f"¡Hola de nuevo, {data.contact_name}! Su comercial *{nombre_comercial}* le atenderá en unos minutos. 👋"))
-            
             return WhatsAppResponse(
-                action="send_multiple" if len(mensajes) > 1 else "send_text",
-                messages=mensajes
+                action="send_text",
+                messages=[BotMessage(type="text", content=f"Su asesor *{nombre_comercial}* le atenderá en unos minutos. 👋")]
             )
         else:
             inbox_service = InboxService(self.db)
-            mensaje_contexto = data.message_text if data.message_text and data.button_id != "btn_asesor" else "Solicita hablar con un asesor"
             distribute_data = InboxDistribute(
                 telefono=data.from_number,
-                mensaje=mensaje_contexto,
+                mensaje=mensaje_contexto or "Solicita hablar con un asesor",
                 nombre_display=data.contact_name,
-                tipo_interes="ASESORIA"
+                tipo_interes=tipo_interes
             )
             result = await inbox_service.distribute_lead(distribute_data)
             nombre_comercial = result["assigned_to"]["nombre"]
 
             await self._delete_session(session)
-            
-            mensajes = []
-            if data.button_id != "btn_asesor":
-              mensajes.append(BotMessage(type="text", content="No logré entender completamente tu solicitud, pero ¡no te preocupes! Voy a transferir tu consulta a uno de nuestros especialistas para que te atienda personalmente."))
-              
-            mensajes.append(BotMessage(type="text", content=f"¡Perfecto! El asesor *{nombre_comercial}* se pondrá en contacto contigo en breve. 🚀"))
-
-            return WhatsAppResponse(
-                action="send_multiple" if len(mensajes) > 1 else "send_text",
-                messages=mensajes
-            )
-
-    # ===================== INFO HANDLER =====================
-
-    async def _handle_info(self, session, data):
-        if data.button_id == "btn_menu":
-            await self._update_session(session, "MENU")
-            return self._send_menu(data.contact_name)
-        elif data.button_id == "btn_fin":
-            await self._delete_session(session)
             return WhatsAppResponse(
                 action="send_text",
-                messages=[BotMessage(type="text", content="¡Gracias por comunicarte con Grupo Corban! 😊")]
+                messages=[BotMessage(type="text", content=f"¡Perfecto! El asesor *{nombre_comercial}* se pondrá en contacto contigo en breve. 🚀")]
             )
-        else:
-            return WhatsAppResponse(
-                action="send_buttons",
-                messages=[BotMessage(type="buttons", body="¿Deseas algo más?", buttons=BACK_BUTTONS)]
-            )
+
+    # ===================== COTIZAR HANDLER =====================
+
+    async def _handle_cotizar_requerimientos(self, session, data, phone):
+        """Primer mensaje de requerimientos recibido. Pasar a COTIZAR_PROCESANDO y guardar timestamp."""
+        text_lower = data.message_text.strip().lower()
+        if text_lower == "volver" or data.button_id == "btn_volver":
+            await self._delete_session(session)
+            return self._send_menu()
+
+        # Guardar timestamp del último mensaje recibido y pasar a PROCESANDO
+        datos = {"ultimo_mensaje_at": datetime.now().isoformat()}
+        await self._update_session(session, "COTIZAR_PROCESANDO", datos)
+
+        # No respondemos nada aún. La tarea en segundo plano se encargará.
+        return WhatsAppResponse(action="no_action", messages=[])
+
+    async def _handle_cotizar_procesando(self, session, data, phone):
+        """Cliente sigue enviando mensajes durante la ventana de gracia. Reiniciar el temporizador."""
+        # Solo actualizar el timestamp del último mensaje (reinicia el temporizador)
+        datos = self._get_session_data(session)
+        datos["ultimo_mensaje_at"] = datetime.now().isoformat()
+        await self._update_session(session, "COTIZAR_PROCESANDO", datos)
+
+        # No respondemos nada, silencio total.
+        return WhatsAppResponse(action="no_action", messages=[])
 
     # ===================== AGENDAR: RUC =====================
 
     async def _handle_agendar_ruc(self, session, data):
         text_lower = data.message_text.strip().lower()
-        
-        # Back
+
+        # Volver al menú
         if text_lower == "volver" or data.button_id == "btn_volver":
             await self._delete_session(session)
-            return self._send_menu(data.contact_name)
+            return self._send_menu()
 
         ruc = _sanitizar_ruc(data.message_text)
 
@@ -428,54 +332,15 @@ class ChatbotService:
                 ))]
             )
 
+        # RUC válido → pasar directamente a tipo de visita (sin pedir razón social)
         datos = {"ruc": ruc}
-        await self._update_session(session, "AGENDAR_RAZON", datos)
-        return WhatsAppResponse(
-            action="send_text",
-            messages=[BotMessage(type="text", content=(
-                f"✅ RUC registrado: *{ruc}*\n\n"
-                "Ahora ingresa tu *razón social*:\n\n"
-                "_Escribe *volver* para corregir el RUC._"
-            ))]
-        )
-
-    # ===================== AGENDAR: RAZON SOCIAL =====================
-
-    async def _handle_agendar_razon(self, session, data):
-        text_lower = data.message_text.strip().lower()
-        
-        if text_lower == "volver" or data.button_id == "btn_volver":
-            datos = self._get_session_data(session)
-            await self._update_session(session, "AGENDAR_RUC", datos)
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content=(
-                    "📋 Por favor, ingresa tu *RUC* (11 dígitos):\n\n"
-                    "_Escribe *volver* para regresar al menú._"
-                ))]
-            )
-
-        razon = _sanitizar_razon_social(data.message_text)
-
-        if len(razon) < 3:
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content=(
-                    "❌ La razón social es muy corta (mínimo 3 caracteres).\n\n"
-                    "Ingrésala de nuevo:\n\n"
-                    "_Escribe *volver* para corregir el RUC._"
-                ))]
-            )
-
-        datos = self._get_session_data(session)
-        datos["razon_social"] = razon
         await self._update_session(session, "AGENDAR_TIPO", datos)
 
         return WhatsAppResponse(
             action="send_buttons",
             messages=[BotMessage(
                 type="buttons",
-                body=f"Perfecto, *{razon}*.\n\n¿Cómo prefieren la visita?",
+                body=f"✅ RUC registrado: *{ruc}*\n\n¿Cómo prefieren la visita?",
                 buttons=VISIT_TYPE_BUTTONS
             )]
         )
@@ -487,13 +352,13 @@ class ChatbotService:
         datos = self._get_session_data(session)
 
         if button_id == "btn_volver":
-            await self._update_session(session, "AGENDAR_RAZON", datos)
+            # Volver a pedir el RUC
+            await self._update_session(session, "AGENDAR_RUC", datos)
             return WhatsAppResponse(
                 action="send_text",
                 messages=[BotMessage(type="text", content=(
-                    f"RUC actual: *{datos.get('ruc', 'N/A')}*\n\n"
-                    "Ingresa tu *razón social*:\n\n"
-                    "_Escribe *volver* para corregir el RUC._"
+                    "📋 Por favor, ingresa tu *RUC* (11 dígitos):\n\n"
+                    "_Escribe *volver* para regresar al menú._"
                 ))]
             )
 
@@ -531,7 +396,7 @@ class ChatbotService:
                 action="send_buttons",
                 messages=[BotMessage(
                     type="buttons",
-                    body=f"*{datos.get('razon_social', '')}*\n\n¿Cómo prefieren la visita?",
+                    body=f"RUC: *{datos.get('ruc', 'N/A')}*\n\n¿Cómo prefieren la visita?",
                     buttons=VISIT_TYPE_BUTTONS
                 )]
             )
@@ -644,7 +509,7 @@ class ChatbotService:
                     action="send_buttons",
                     messages=[BotMessage(
                         type="buttons",
-                        body=f"*{datos.get('razon_social', '')}*\n\n¿Cómo prefieren la visita?",
+                        body=f"RUC: *{datos.get('ruc', 'N/A')}*\n\n¿Cómo prefieren la visita?",
                         buttons=VISIT_TYPE_BUTTONS
                     )]
                 )
@@ -720,7 +585,6 @@ class ChatbotService:
             summary = (
                 f"📋 *Resumen de la cita:*\n\n"
                 f"🏢 RUC: {datos['ruc']}\n"
-                f"📛 Razón Social: {datos['razon_social']}\n"
                 f"📍 Modalidad: {tipo}\n"
                 f"📅 Fecha: {datos['fecha']}\n"
                 f"⏰ Hora: {hora}\n\n"
@@ -752,7 +616,7 @@ class ChatbotService:
             inbox_service = InboxService(self.db)
             distribute_data = InboxDistribute(
                 telefono=phone,
-                mensaje=f"Agendar visita - {datos['razon_social']}",
+                mensaje=f"Agendar visita - RUC: {datos['ruc']}",
                 nombre_display=data.contact_name,
                 tipo_interes="VISITA"
             )
@@ -760,7 +624,7 @@ class ChatbotService:
             comercial_nombre = result["assigned_to"]["nombre"]
             comercial_id = result["assigned_to"]["id"]
 
-            # Create appointment
+            # Crear cita
             try:
                 fecha = datetime.strptime(datos["fecha"], "%d/%m/%Y")
                 nueva_cita = Cita(
@@ -770,7 +634,7 @@ class ChatbotService:
                     hora=datos["hora"],
                     tipo_cita=datos["tipo_visita"],
                     direccion=datos.get("direccion", "Centro Aéreo Comercial, módulo E, oficina 507"),
-                    motivo=f"Cita agendada via WhatsApp - {datos['razon_social']} (RUC: {datos['ruc']})",
+                    motivo=f"Cita agendada via WhatsApp - RUC: {datos['ruc']}",
                     estado="PENDIENTE_APROBACION",
                     created_by=comercial_id,
                 )
@@ -811,12 +675,13 @@ class ChatbotService:
 
     # ===================== HELPERS =====================
 
-    def _send_menu(self, contact_name: str) -> WhatsAppResponse:
+    def _send_menu(self) -> WhatsAppResponse:
+        """Envía el mensaje de bienvenida universal con los 3 botones principales."""
         return WhatsAppResponse(
             action="send_buttons",
             messages=[BotMessage(
                 type="buttons",
-                body=f"¡Hola {contact_name}! 👋 Bienvenido a *Grupo Corban*.\n\n¿En qué podemos ayudarte?",
+                body=MENSAJE_BIENVENIDA,
                 buttons=MENU_BUTTONS
             )]
         )

@@ -5,6 +5,7 @@ import os
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.services.comercial.whatsapp_service import WhatsAppService
 from app.services.comercial.chatbot_service import ChatbotService
+from app.services.comercial.cotizar_background import iniciar_ventana_gracia
 from app.schemas.comercial.whatsapp import WhatsAppIncoming, WhatsAppResponse, WhatsAppWebhookPayload
 from app.database.db_connection import get_db
 
@@ -151,6 +152,11 @@ async def receive_webhook_message(
                         
                     # Procesar con el bot
                     response = await service.process_message(incoming)
+
+                    # Si el bot indica "no_action" (ej: ventana de gracia cotizar), iniciar tarea en segundo plano
+                    if response.action == "no_action":
+                        iniciar_ventana_gracia(from_num_norm, from_number, contact_name)
+                        continue
                     
                     # Enviar respuesta y guardarla
                     for bot_msg in response.messages:

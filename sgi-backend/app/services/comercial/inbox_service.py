@@ -1,3 +1,4 @@
+import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import and_, func
@@ -8,6 +9,10 @@ from app.models.comercial import Cliente, ClienteContacto
 from app.models.administrativo import Empleado, EmpleadoActivo, Activo, LineaCorporativa
 from app.schemas.comercial.inbox import InboxDistribute
 from datetime import datetime
+
+# Lock global para prevenir condiciones de carrera en el Round Robin
+_round_robin_lock = asyncio.Lock()
+
 
 class InboxService:
     def __init__(self, db: AsyncSession):
@@ -66,38 +71,40 @@ class InboxService:
 
         if not assigned_user:
             # 4. New Lead or Unassigned Client: Assign via Round-Robin
-            query_users = select(Usuario).join(Usuario.roles).where(
-                and_(
-                    Rol.nombre == 'COMERCIAL',
-                    Usuario.is_active == True
-                )
-            ).options(selectinload(Usuario.empleado))
-            
-            result_users = await self.db.execute(query_users)
-            commercials = result_users.scalars().all()
-            
-            if not commercials:
-                raise Exception("No active commercials found")
-            
-            # Round-Robin: Find the last assigned commercial and pick the next one
-            commercials_sorted = sorted(commercials, key=lambda u: u.id)
-            
-            # Get the most recently assigned lead (must have an assignee)
-            last_assigned_query = select(Inbox).where(Inbox.asignado_a.isnot(None)).order_by(Inbox.id.desc()).limit(1)
-            last_result = await self.db.execute(last_assigned_query)
-            last_lead = last_result.scalar_one_or_none()
-            
-            if last_lead and last_lead.asignado_a:
-                # Find the index of the last assigned commercial
-                commercial_ids = [c.id for c in commercials_sorted]
-                if last_lead.asignado_a in commercial_ids:
-                    last_index = commercial_ids.index(last_lead.asignado_a)
-                    next_index = (last_index + 1) % len(commercials_sorted)
+            # Lock para prevenir que dos clientes concurrentes obtengan el mismo comercial
+            async with _round_robin_lock:
+                query_users = select(Usuario).join(Usuario.roles).where(
+                    and_(
+                        Rol.nombre == 'COMERCIAL',
+                        Usuario.is_active == True
+                    )
+                ).options(selectinload(Usuario.empleado))
+                
+                result_users = await self.db.execute(query_users)
+                commercials = result_users.scalars().all()
+                
+                if not commercials:
+                    raise Exception("No active commercials found")
+                
+                # Round-Robin: Find the last assigned commercial and pick the next one
+                commercials_sorted = sorted(commercials, key=lambda u: u.id)
+                
+                # Get the most recently assigned lead (must have an assignee)
+                last_assigned_query = select(Inbox).where(Inbox.asignado_a.isnot(None)).order_by(Inbox.id.desc()).limit(1)
+                last_result = await self.db.execute(last_assigned_query)
+                last_lead = last_result.scalar_one_or_none()
+                
+                if last_lead and last_lead.asignado_a:
+                    # Find the index of the last assigned commercial
+                    commercial_ids = [c.id for c in commercials_sorted]
+                    if last_lead.asignado_a in commercial_ids:
+                        last_index = commercial_ids.index(last_lead.asignado_a)
+                        next_index = (last_index + 1) % len(commercials_sorted)
+                    else:
+                        next_index = 0
+                    assigned_user = commercials_sorted[next_index]
                 else:
-                    next_index = 0
-                assigned_user = commercials_sorted[next_index]
-            else:
-                assigned_user = commercials_sorted[0]
+                    assigned_user = commercials_sorted[0]
         
         # 5. Create or Update Inbox Entry
         if existing_inbox and existing_inbox.estado == 'NUEVO':
