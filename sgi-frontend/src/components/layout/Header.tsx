@@ -38,9 +38,11 @@ export function Header() {
             {/* Right side - User info */}
             <div className="flex items-center gap-4">
                 {/* Notifications */}
-                <button className="p-2 hover:bg-naranja-600 rounded-lg transition-colors relative">
+                <button
+                    className="p-2 hover:bg-naranja-600 rounded-lg transition-colors relative"
+                    aria-label="Notificaciones"
+                >
                     <Bell size={20} />
-                    <span className="absolute top-1 right-1 w-2 h-2 bg-white rounded-full"></span>
                 </button>
 
                 {/* User */}

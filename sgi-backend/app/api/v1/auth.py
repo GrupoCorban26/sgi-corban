@@ -5,7 +5,7 @@ from app.schemas.auth import UserLoginSchema
 from sqlalchemy.ext.asyncio import AsyncSession # Asegúrate de usar AsyncSession si tu service es async
 from app.database.db_connection import get_db 
 from app.core import security
-from app.services.auth import obtener_usuario_por_correo, registrar_sesion, revocar_sesion
+from app.services.auth import AuthService
 
 router = APIRouter(prefix="/login", tags=["Seguridad"])
 
@@ -17,7 +17,8 @@ async def login(
     db: AsyncSession = Depends(get_db) # Cambiado a AsyncSession para consistencia con tu service
 ):
     # 3. Accedemos a los datos mediante 'payload.correo' (ya no es .username)
-    user_data = await obtener_usuario_por_correo(db, payload.correo)
+    auth_svc = AuthService(db)
+    user_data = await auth_svc.obtener_usuario_por_correo(payload.correo)
     
     # DEBUG: Ver qué roles devuelve el SP
     logging.info(f"[LOGIN DEBUG] Roles del usuario: {user_data.get('roles', []) if user_data else 'No user data'}")
@@ -55,8 +56,7 @@ async def login(
     client_ip = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")
     
-    await registrar_sesion(
-        db, 
+    await auth_svc.registrar_sesion(
         usuario_id=user_data['usuario_id'],
         token=access_token,
         ip=client_ip,
@@ -85,7 +85,8 @@ async def logout(
     """
     Cierra la sesión actual revocando el token en la base de datos.
     """
-    revocado = await revocar_sesion(db, token)
+    auth_svc = AuthService(db)
+    revocado = await auth_svc.revocar_sesion(token)
     if not revocado:
         # Podríamos retornar 404 o 400, pero por seguridad a veces es mejor 200
         # o simplemente informar que no se encontró sesión activa

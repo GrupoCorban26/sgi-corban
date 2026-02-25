@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import type { UserData } from '@/types/usuario';
 
 // Rutas públicas que no requieren autenticación
 const PUBLIC_PATHS = ['/login', '/api'];
@@ -28,11 +29,6 @@ const ROLE_DEFAULT_PATH: Record<string, string> = {
     'RRHH': '/administracion',
 };
 
-interface UserData {
-    nombre: string;
-    roles: string[];
-    area: string;
-}
 
 function getUserDataFromCookie(request: NextRequest): UserData | null {
     try {

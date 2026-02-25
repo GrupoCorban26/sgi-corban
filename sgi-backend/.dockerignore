@@ -1,0 +1,42 @@
+# =========================================
+# Docker Ignore — SGI Backend
+# =========================================
+
+# Entorno virtual
+venv/
+env/
+ENV/
+
+# Cache de Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Variables de entorno (secretos)
+.env
+.env.local
+
+# Archivos de debug y scripts de desarrollo
+_archive/
+scripts/
+check_db_columns.py
+debug_serie.py
+
+# Git
+.git/
+.gitignore
+
+# Editores
+.vscode/
+.idea/
+.vs/
+
+# Documentación
+*.md
+!README.md
+
+# Otros
+Thumbs.db
+.DS_Store
+temp_migrations/

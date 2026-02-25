@@ -5,15 +5,10 @@ import NavLateral from '@/components/layout/navLateral';
 import { Header } from '@/components/layout/Header';
 import { Role, MENU_ROLES } from '@/config/navLateral';
 import Cookies from 'js-cookie';
+import type { UserData } from '@/types/usuario';
 
 interface DashboardLayoutProps {
     children: React.ReactNode;
-}
-
-interface UserData {
-    nombre: string;
-    roles: string[];
-    area: string;
 }
 
 // Mapeo de rol del backend a rol del menú

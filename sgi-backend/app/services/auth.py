@@ -178,31 +178,3 @@ class AuthService:
         except Exception as e:
             logger.error(f"Error extendiendo sesión: {e}")
 
-
-# =============================================================================
-# Funciones de compatibilidad (mantiene imports existentes funcionando)
-# =============================================================================
-
-async def obtener_usuario_por_correo(db: AsyncSession, correo: str):
-    """Wrapper de compatibilidad."""
-    return await AuthService(db).obtener_usuario_por_correo(correo)
-
-
-async def registrar_sesion(db: AsyncSession, usuario_id: int, token: str, ip: str = None, user_agent: str = None):
-    """Wrapper de compatibilidad."""
-    await AuthService(db).registrar_sesion(usuario_id, token, ip, user_agent)
-
-
-async def revocar_sesion(db: AsyncSession, token: str):
-    """Wrapper de compatibilidad."""
-    return await AuthService(db).revocar_sesion(token)
-
-
-async def verificar_sesion_activa(db: AsyncSession, token: str) -> bool:
-    """Wrapper de compatibilidad."""
-    return await AuthService(db).verificar_sesion_activa(token)
-
-
-async def extender_sesion(db: AsyncSession, token: str):
-    """Wrapper de compatibilidad."""
-    await AuthService(db).extender_sesion(token)

@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 # Importaciones internas (ajusta las rutas según tu estructura)
 from app.database.db_connection import get_db
-from app.services.auth import verificar_sesion_activa, extender_sesion
+from app.services.auth import AuthService
 from app.models.seguridad import Usuario
 
 load_dotenv()
@@ -22,6 +22,8 @@ load_dotenv()
 # --- CONFIGURACIÓN ---
 # Clave secreta del .env
 SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("SECRET_KEY no está definida en .env. No se puede iniciar el módulo de seguridad.")
 # Algoritmo por usar
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 # Minutos de expiración del TOKEN JWT (Ahora 24 horas para permitir sliding window en BD)
@@ -80,7 +82,8 @@ async def get_current_active_auth(
             
         # 2. Verificar sesión activa en la tabla de base de datos
         # Esto comprueba Revocación + Inactividad (30 min)
-        is_active = await verificar_sesion_activa(db, token)
+        auth_svc = AuthService(db)
+        is_active = await auth_svc.verificar_sesion_activa(token)
         if not is_active:
             logger.warning(f"Session check failed for user {user_id}")
             raise credentials_exception
@@ -88,7 +91,7 @@ async def get_current_active_auth(
         # 3. EXPANSIÓN DE SESIÓN (Sliding Expiration)
         # Si la sesión es válida, intentamos extenderla
         # await extender_sesion(db, token) # Comentado temporalmente para aislar el problema si es DB write
-        await extender_sesion(db, token) 
+        await auth_svc.extender_sesion(token) 
             
         return payload
 
@@ -120,8 +123,14 @@ async def get_current_empleado_id(
     stmt = select(Usuario.empleado_id).where(Usuario.id == user_id)
     result = await db.execute(stmt)
     eid = result.scalar()
-    
-    return int(eid) if eid else 0
+
+    # Si no tiene empleado asociado, lanzar error explícito
+    if eid is None:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="El usuario no tiene un empleado asociado."
+        )
+    return int(eid)
 
 def get_current_token_payload(payload: dict = Depends(get_current_active_auth)) -> dict:
     """Retorna el diccionario completo de datos del token (roles, permisos, etc)."""

@@ -4,22 +4,10 @@ from typing import List
 from app.database.db_connection import get_db
 from app.services.comercial.inbox_service import InboxService
 from app.schemas.comercial.inbox import InboxDistribute, InboxDistributionResponse, InboxResponse
-from app.core.security import get_current_active_auth
+from app.core.dependencies import get_current_user_obj
 from app.models.seguridad import Usuario
-from sqlalchemy import select
 
 router = APIRouter()
-
-async def get_current_user_obj(
-    db: AsyncSession = Depends(get_db),
-    payload: dict = Depends(get_current_active_auth)
-) -> Usuario:
-    user_id = int(payload.get("sub"))
-    result = await db.execute(select(Usuario).where(Usuario.id == user_id))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=401, detail="User not found")
-    return user
 
 @router.post("/distribute", response_model=InboxDistributionResponse)
 async def distribute_lead(data: InboxDistribute, db: AsyncSession = Depends(get_db)):

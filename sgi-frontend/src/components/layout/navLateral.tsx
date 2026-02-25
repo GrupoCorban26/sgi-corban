@@ -35,7 +35,7 @@ export default function Sidebar({ role }: SidebarProps) {
                 : "hover:bg-azul-800 text-azul-100"
             )}
           >
-            {/* Aquí iría tu icono */}
+            {item.icon && <item.icon size={18} />}
             <span className="font-medium">{item.label}</span>
 
             {/* Badge for Inbox */}

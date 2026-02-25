@@ -1,7 +1,28 @@
+import logging
+import os
+import sys
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
-import os
+from sqlalchemy import text
+
+# =========================================================================
+# CONFIGURACIÓN DE LOGGING CENTRALIZADO
+# =========================================================================
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+logger = logging.getLogger(__name__)
+
+# =========================================================================
+# VALIDACIÓN DE VARIABLES CRÍTICAS AL STARTUP
+# =========================================================================
+if not os.getenv("SECRET_KEY"):
+    logger.critical("❌ SECRET_KEY no está definida en el archivo .env. El servidor NO puede arrancar sin ella.")
+    sys.exit(1)
 
 # Routers
 from app.api.v1.auth import router as auth_router
@@ -34,10 +55,11 @@ app = FastAPI(
 
 # CORS - Orígenes desde variable de entorno o defaults
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
+logger.info(f"CORS orígenes configurados: {cors_origins}")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -71,10 +93,21 @@ def read_root():
     return {"message": "Bienvenido al SGI de Grupo Corban"}
 
 @app.get("/health")
-def health_check():
-    """Endpoint de verificación de salud del servidor"""
+async def health_check():
+    """Endpoint de verificación de salud del servidor con ping a la base de datos."""
+    from app.database.db_connection import engine
+
+    db_status = "healthy"
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception as e:
+        db_status = f"unhealthy: {e}"
+        logger.error(f"Health check DB falló: {e}")
+
     return {
-        "status": "healthy",
+        "status": "healthy" if db_status == "healthy" else "degraded",
+        "database": db_status,
         "timestamp": datetime.now().isoformat(),
         "version": "1.0.0"
     }

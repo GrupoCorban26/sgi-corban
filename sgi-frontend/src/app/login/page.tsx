@@ -16,7 +16,6 @@ export default function Page() {
   // Limpiar caché al montar el login (cuando se cierra sesión y se redirige aquí)
   useEffect(() => {
     queryClient.removeQueries();
-    console.log('Caché de aplicación limpiada al ingresar a Login');
   }, [queryClient]);
 
   return (

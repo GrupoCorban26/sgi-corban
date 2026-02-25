@@ -3,9 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
 from app.database.db_connection import get_db
-from app.core.security import get_current_active_auth
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from app.core.dependencies import get_current_user_obj
 from app.models.seguridad import Usuario
 from app.schemas.comercial.chat import (
     ChatMessageResponse, 
@@ -18,17 +16,6 @@ from app.services.comercial.chat_service import ChatService
 from app.services.comercial.whatsapp_service import WhatsAppService
 
 router = APIRouter()
-
-async def get_current_user_obj(
-    db: AsyncSession = Depends(get_db),
-    payload: dict = Depends(get_current_active_auth)
-) -> Usuario:
-    user_id = int(payload.get("sub"))
-    result = await db.execute(select(Usuario).options(selectinload(Usuario.roles)).where(Usuario.id == user_id))
-    user = result.scalar_one_or_none()
-    if not user:
-        raise HTTPException(status_code=401, detail="Usuario no encontrado")
-    return user
 
 @router.get("/conversations", response_model=List[ChatConversationPreview])
 async def get_conversations(

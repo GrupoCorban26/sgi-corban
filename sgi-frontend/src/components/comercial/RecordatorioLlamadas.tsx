@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import axios from 'axios';
-import Cookies from 'js-cookie';
+import api from '@/lib/axios';
 import { Loader2, Phone, Calendar, AlertTriangle, User } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -17,7 +16,7 @@ interface ClientReminder {
     comercial_id?: number;
 }
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+
 
 export default function RecordatorioLlamadas() {
     const { user, isJefeComercial, isAdmin } = useCurrentUser();
@@ -34,17 +33,10 @@ export default function RecordatorioLlamadas() {
 
     const fetchReminders = async () => {
         try {
-            const token = Cookies.get('token');
-            // Si es jefe, quizas queramos pasar un param para ver TODOS, o el backend ya lo sabe por el rol?
-            // Asumiremos que el backend filtra por "mis clientes" por defecto.
-            // Si soy jefe, el backend deberia devolver todos o aceptar un flag.
-            // Por ahora llamamos igual, y ajustaremos el backend si hace falta.
-            const response = await axios.get(`${API_URL}/clientes/recordatorios?days=5`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const response = await api.get('/clientes/recordatorios', { params: { days: 5 } });
             setReminders(response.data);
         } catch (error) {
-            console.error('Error fetching reminders:', error);
+            console.error('Error obteniendo recordatorios:', error);
         } finally {
             setIsLoading(false);
         }

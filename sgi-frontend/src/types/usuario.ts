@@ -1,3 +1,10 @@
+// Datos del usuario almacenados en la cookie (usada por middleware y DashboardLayout)
+export interface UserData {
+    nombre: string;
+    roles: string[];
+    area: string;
+}
+
 // Tipos para Usuarios
 
 export interface Usuario {

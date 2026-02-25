@@ -1,9 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
-import axios from 'axios';
+import api from '@/lib/axios';
 import { DepartamentoGeo, Provincia, Distrito } from '@/types/core/ubigeo';
-
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
-const UBIGEO_URL = `${API_BASE_URL}/ubigeo`;
 
 // ============================================
 // HOOK PARA DEPARTAMENTOS GEOGRÁFICOS
@@ -12,7 +9,7 @@ export const useDepartamentosGeo = () => {
     return useQuery({
         queryKey: ['ubigeo', 'departamentos'],
         queryFn: async () => {
-            const { data } = await axios.get<DepartamentoGeo[]>(`${UBIGEO_URL}/departamentos`);
+            const { data } = await api.get<DepartamentoGeo[]>('/ubigeo/departamentos');
             return data;
         },
         staleTime: 1000 * 60 * 30, // 30 minutos - datos estáticos
@@ -27,10 +24,10 @@ export const useProvincias = (departamentoId: number | null) => {
         queryKey: ['ubigeo', 'provincias', departamentoId],
         queryFn: async () => {
             const params = departamentoId ? { departamento_id: departamentoId } : {};
-            const { data } = await axios.get<Provincia[]>(`${UBIGEO_URL}/provincias`, { params });
+            const { data } = await api.get<Provincia[]>('/ubigeo/provincias', { params });
             return data;
         },
-        enabled: !!departamentoId, // Solo ejecuta si hay departamentoId
+        enabled: !!departamentoId,
         staleTime: 1000 * 60 * 30,
     });
 };
@@ -43,10 +40,10 @@ export const useDistritos = (provinciaId: number | null) => {
         queryKey: ['ubigeo', 'distritos', provinciaId],
         queryFn: async () => {
             const params = provinciaId ? { provincia_id: provinciaId } : {};
-            const { data } = await axios.get<Distrito[]>(`${UBIGEO_URL}/distritos`, { params });
+            const { data } = await api.get<Distrito[]>('/ubigeo/distritos', { params });
             return data;
         },
-        enabled: !!provinciaId, // Solo ejecuta si hay provinciaId
+        enabled: !!provinciaId,
         staleTime: 1000 * 60 * 30,
     });
 };
