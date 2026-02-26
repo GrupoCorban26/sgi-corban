@@ -1,31 +1,18 @@
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
-from datetime import date
 from decimal import Decimal
 
 class ImportacionBase(BaseModel):
     id: Optional[int] = None
     ruc: Optional[str] = None
-    anio: Optional[str] = None
     razon_social: Optional[str] = None
-    aduanas: Optional[str] = None
-    via_transporte: Optional[str] = None
+    fob_datasur_mundo: Optional[Decimal] = None
+    fob_sunat_china: Optional[Decimal] = None
+    fob_total_real: Optional[Decimal] = None
+    transacciones_datasur: Optional[int] = None
     paises_origen: Optional[str] = None
-    puertos_embarque: Optional[str] = None
-    embarcadores: Optional[str] = None
-    agente_aduanas: Optional[str] = None
-    partida_arancelaria_cod: Optional[str] = None
-    partida_arancelaria_descripcion: Optional[str] = None
-    fob_min: Optional[Decimal] = None
-    fob_max: Optional[Decimal] = None
-    fob_prom: Optional[Decimal] = None
-    fob_anual: Optional[Decimal] = None
-    total_operaciones: Optional[int] = None
-    cantidad_agentes: Optional[int] = None
-    cantidad_paises: Optional[int] = None
-    cantidad_partidas: Optional[int] = None
-    primera_importacion: Optional[date] = None
-    ultima_importacion: Optional[date] = None
+    partidas_arancelarias: Optional[str] = None
+    importa_de_china: Optional[str] = None
 
 class ImportacionResponse(ImportacionBase):
     model_config = ConfigDict(from_attributes=True)
