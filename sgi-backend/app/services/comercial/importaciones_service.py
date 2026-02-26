@@ -73,16 +73,23 @@ class ImportacionesService:
             if 'ruc' in df.columns:
                 df['ruc'] = df['ruc'].apply(lambda x: str(int(x)) if pd.notna(x) and x != '' else None)
             
+            # Limpiar columnas numéricas (convertir strings vacías y valores inválidos a None)
+            numeric_columns = ['fob_datasur_mundo', 'fob_sunat_china', 'fob_total_real', 'transacciones_datasur']
+            for col in numeric_columns:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                    df[col] = df[col].where(pd.notnull(df[col]), None)
+            
             # Convertir transacciones a int
             if 'transacciones_datasur' in df.columns:
                 df['transacciones_datasur'] = df['transacciones_datasur'].apply(
-                    lambda x: int(x) if pd.notna(x) else None
+                    lambda x: int(x) if pd.notna(x) and x is not None else None
                 )
             
             # Convertir importa_de_china a string limpio
             if 'importa_de_china' in df.columns:
                 df['importa_de_china'] = df['importa_de_china'].apply(
-                    lambda x: str(x).strip() if pd.notna(x) else None
+                    lambda x: str(x).strip() if pd.notna(x) and x is not None else None
                 )
             
             # 1. Truncate
@@ -90,6 +97,12 @@ class ImportacionesService:
             
             # 2. Bulk Insert
             records = df.to_dict(orient='records')
+            
+            # Sanitizar: convertir cualquier string vacía restante a None
+            for record in records:
+                for key, value in record.items():
+                    if value == '' or (isinstance(value, float) and pd.isna(value)):
+                        record[key] = None
             
             if records:
                 columns = valid_columns
