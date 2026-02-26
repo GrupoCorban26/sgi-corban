@@ -27,7 +27,7 @@ class CasosLlamadaService:
         nuevo_caso = CasoLlamada(
             nombre=data["nombre"],
             contestado=data.get("contestado", False),
-            is_positive=data.get("is_positive", False)
+            gestionable=data.get("gestionable", False)
         )
         db.add(nuevo_caso)
         await db.commit()
@@ -47,8 +47,8 @@ class CasosLlamadaService:
              caso.nombre = data["nombre"]
         if "contestado" in data:
              caso.contestado = data["contestado"]
-        if "is_positive" in data:
-             caso.is_positive = data["is_positive"]
+        if "gestionable" in data:
+             caso.gestionable = data["gestionable"]
              
         await db.commit()
         return True
