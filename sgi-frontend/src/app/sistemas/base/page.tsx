@@ -1,7 +1,7 @@
 /**
  * Base Page (Sistemas)
  * Merge entre Transacciones (importaciones) y Contactos
- * Filtros: RUC >= 2040..., fob_max <= 300,000
+ * Merge entre Transacciones (importaciones) y Contactos
  */
 'use client';
 
@@ -51,7 +51,7 @@ export default function BasePage() {
             <div>
                 <h1 className="text-2xl font-bold text-gray-900">Base Comercial</h1>
                 <p className="text-gray-500">
-                    Merge entre Transacciones y Contactos. RUC ≥ 2040, FOB máx ≤ $300,000
+                    Merge entre Transacciones y Contactos
                 </p>
             </div>
 
@@ -120,22 +120,23 @@ export default function BasePage() {
                                 <th className="px-4 py-3 text-left font-medium text-gray-600">Razón Social</th>
                                 <th className="px-4 py-3 text-left font-medium text-gray-600">Teléfono</th>
                                 <th className="px-4 py-3 text-left font-medium text-gray-600">Correo</th>
-                                <th className="px-4 py-3 text-right font-medium text-gray-600">FOB Anual</th>
-                                <th className="px-4 py-3 text-center font-medium text-gray-600">Operaciones</th>
+                                <th className="px-4 py-3 text-right font-medium text-gray-600">FOB Total</th>
+                                <th className="px-4 py-3 text-center font-medium text-gray-600">Transacciones</th>
+                                <th className="px-4 py-3 text-center font-medium text-gray-600">China</th>
                                 <th className="px-4 py-3 text-center font-medium text-gray-600">Estado</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y">
                             {loading && data.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                                    <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                                         <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                                         Cargando...
                                     </td>
                                 </tr>
                             ) : data.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                                    <td colSpan={8} className="px-4 py-8 text-center text-gray-500">
                                         No hay registros que coincidan con los criterios.
                                     </td>
                                 </tr>
@@ -149,9 +150,16 @@ export default function BasePage() {
                                         <td className="px-4 py-3">{item.telefono}</td>
                                         <td className="px-4 py-3 text-xs text-gray-500">{item.correo || '-'}</td>
                                         <td className="px-4 py-3 text-right font-medium">
-                                            {item.fob_anual?.toLocaleString('es-PE', { style: 'currency', currency: 'USD' }) || '-'}
+                                            {item.fob_total_real?.toLocaleString('es-PE', { style: 'currency', currency: 'USD' }) || '-'}
                                         </td>
-                                        <td className="px-4 py-3 text-center">{item.total_operaciones || '-'}</td>
+                                        <td className="px-4 py-3 text-center">{item.transacciones_datasur?.toLocaleString() || '-'}</td>
+                                        <td className="px-4 py-3 text-center">
+                                            {item.importa_de_china === 'SÍ' || item.importa_de_china === 'SI' ? (
+                                                <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-semibold">SÍ</span>
+                                            ) : (
+                                                <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs">NO</span>
+                                            )}
+                                        </td>
                                         <td className="px-4 py-3 text-center">
                                             <span className={`px-2 py-0.5 rounded text-xs font-medium
                                                 ${item.estado === 'DISPONIBLE' ? 'bg-green-100 text-green-700' : ''}

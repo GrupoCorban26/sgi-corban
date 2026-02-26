@@ -5,10 +5,9 @@ export interface BaseContacto {
     telefono: string;
     correo?: string;
     estado: string;
-    fob_max?: number;
-    fob_anual?: number;
-    total_operaciones?: number;
-    ultima_importacion?: string;
+    fob_total_real?: number;
+    transacciones_datasur?: number;
+    importa_de_china?: string;
 }
 
 export interface BaseStats {

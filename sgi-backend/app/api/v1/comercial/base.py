@@ -39,10 +39,9 @@ async def get_base_comercial(
                 cc.telefono,
                 cc.correo,
                 cc.estado,
-                ri.fob_max,
-                ri.fob_anual,
-                ri.total_operaciones,
-                ri.ultima_importacion
+                ri.fob_total_real,
+                ri.transacciones_datasur,
+                ri.importa_de_china
             FROM comercial.cliente_contactos cc
             INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
             WHERE cc.is_active = 1
@@ -80,17 +79,16 @@ async def get_base_comercial(
             cc.telefono,
             cc.correo,
             cc.estado,
-            ri.fob_max,
-            ri.fob_anual,
-            ri.total_operaciones,
-            ri.ultima_importacion
+            ri.fob_total_real,
+            ri.transacciones_datasur,
+            ri.importa_de_china
         FROM comercial.cliente_contactos cc
         INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
         WHERE cc.is_active = 1
           AND cc.estado = 'DISPONIBLE'
           AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)
           AND (:search IS NULL OR ri.ruc LIKE '%' + :search + '%' OR ri.razon_social LIKE '%' + :search + '%')
-        ORDER BY ri.fob_anual DESC, ri.total_operaciones DESC
+        ORDER BY ri.fob_total_real DESC, ri.transacciones_datasur DESC
         OFFSET :offset ROWS FETCH NEXT :page_size ROWS ONLY
     """)
     
