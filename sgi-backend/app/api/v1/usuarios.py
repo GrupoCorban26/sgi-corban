@@ -5,8 +5,9 @@ from typing import Optional
 
 from app.database.db_connection import get_db
 from app.core.security import get_current_user_id, get_current_active_auth
-from app.core.dependencies import require_permission
+from app.core.dependencies import require_permission, get_current_user_obj
 from app.services.usuarios import UsuarioService
+from app.models.seguridad import Usuario
 from app.schemas.usuario import (
     UsuarioCreate,
     UsuarioUpdate,
@@ -174,3 +175,32 @@ async def cambiar_password(
     if result.get("success") == 0:
         raise HTTPException(status_code=400, detail=result.get("message"))
     return result
+
+
+# ===========================================
+# DISPONIBILIDAD BUZÓN
+# ===========================================
+
+@router.get("/disponibilidad-buzon/estado")
+async def obtener_disponibilidad_buzon(
+    current_user: Usuario = Depends(get_current_user_obj),
+    db: AsyncSession = Depends(get_db)
+):
+    """Obtiene el estado de disponibilidad del buzón del usuario actual."""
+    return {"disponible_buzon": current_user.disponible_buzon}
+
+
+@router.patch("/disponibilidad-buzon/toggle")
+async def toggle_disponibilidad_buzon(
+    current_user: Usuario = Depends(get_current_user_obj),
+    db: AsyncSession = Depends(get_db)
+):
+    """Cambia el estado de disponibilidad del buzón del usuario actual."""
+    current_user.disponible_buzon = not current_user.disponible_buzon
+    await db.commit()
+    await db.refresh(current_user)
+    return {
+        "disponible_buzon": current_user.disponible_buzon,
+        "message": "Ahora estás disponible para recibir leads" if current_user.disponible_buzon
+                   else "No recibirás leads hasta que te pongas disponible"
+    }

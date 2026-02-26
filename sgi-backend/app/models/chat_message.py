@@ -14,6 +14,8 @@ class ChatMessage(Base):
     remitente_tipo = Column(String(20), nullable=False) # 'CLIENTE' | 'COMERCIAL' | 'BOT'
     remitente_id = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=True)
     contenido = Column(Text, nullable=False)
+    tipo_contenido = Column(String(20), default="text") # 'text' | 'image' | 'document' | 'audio' | 'video' | 'sticker'
+    media_url = Column(String(500), nullable=True) # Ruta relativa al archivo descargado
     whatsapp_msg_id = Column(String(100), nullable=True)
     estado_envio = Column(String(20), default="ENVIADO")
     leido = Column(Boolean, default=False)

@@ -6,6 +6,8 @@ export interface ChatMessage {
     remitente_tipo: 'CLIENTE' | 'COMERCIAL' | 'BOT';
     remitente_id: number | null;
     contenido: string;
+    tipo_contenido: 'text' | 'image' | 'document' | 'audio' | 'video' | 'sticker';
+    media_url: string | null;
     whatsapp_msg_id: string | null;
     estado_envio: string | null;
     leido: boolean;

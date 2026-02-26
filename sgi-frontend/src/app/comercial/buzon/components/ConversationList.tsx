@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useChatConversations } from '@/hooks/comercial/useChat';
+import { useDisponibilidadBuzon } from '@/hooks/comercial/useDisponibilidad';
 import { ChatConversationPreview } from '@/types/chat';
 import ConversationItem from './ConversationItem';
 import { Loader2, MessageSquare, Search } from 'lucide-react';
@@ -18,6 +19,7 @@ const TABS = [
 
 export default function ConversationList({ selectedId, onSelect }: Props) {
     const { data: conversations = [], isLoading } = useChatConversations();
+    const { disponible, toggle, isToggling } = useDisponibilidadBuzon();
     const [activeTab, setActiveTab] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
 
@@ -32,9 +34,34 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
 
     return (
         <div className="flex flex-col h-full bg-white border-r border-gray-200">
-            {/* Header & Search */}
-            <div className="p-4 border-b border-gray-100 flex flex-col gap-4">
-                <h2 className="text-xl font-bold text-gray-800">Chats</h2>
+            {/* Header, Search & Toggle */}
+            <div className="p-4 border-b border-gray-100 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-xl font-bold text-gray-800">Chats</h2>
+
+                    {/* Toggle Disponibilidad */}
+                    <button
+                        onClick={() => toggle()}
+                        disabled={isToggling}
+                        className={`
+                            flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold
+                            transition-all duration-200 border
+                            ${disponible
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
+                                : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'
+                            }
+                            ${isToggling ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}
+                        `}
+                        title={disponible ? 'Estás recibiendo leads' : 'No estás recibiendo leads'}
+                    >
+                        <span className={`
+                            w-2 h-2 rounded-full transition-colors duration-200
+                            ${disponible ? 'bg-emerald-500 animate-pulse' : 'bg-gray-400'}
+                        `} />
+                        {disponible ? 'Disponible' : 'No disponible'}
+                    </button>
+                </div>
+
                 <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
                     <input
@@ -54,8 +81,8 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
                         className={`px-4 py-2 text-sm font-medium whitespace-nowrap rounded-lg transition-colors ${activeTab === tab.id
-                                ? 'text-emerald-700 bg-emerald-50'
-                                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                            ? 'text-emerald-700 bg-emerald-50'
+                            : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
                             }`}
                     >
                         {tab.label}

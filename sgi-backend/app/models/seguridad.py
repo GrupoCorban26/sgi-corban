@@ -59,6 +59,7 @@ class Usuario(Base):
     reset_token_expira = Column(DateTime(timezone=True))
     ultimo_acceso = Column(DateTime(timezone=True))
     debe_cambiar_pass = Column(Boolean, default=False, nullable=False)
+    disponible_buzon = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

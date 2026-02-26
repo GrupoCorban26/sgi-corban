@@ -46,7 +46,15 @@ class ChatService:
             unread = sum(1 for m in ibx.mensajes if m.direccion == 'ENTRANTE' and not m.leido)
             # Latest message
             sorted_msgs = sorted(ibx.mensajes, key=lambda x: x.created_at, reverse=True)
-            latest_msg = sorted_msgs[0].contenido if sorted_msgs else ibx.mensaje_inicial
+            latest = sorted_msgs[0] if sorted_msgs else None
+            if latest and latest.tipo_contenido == 'image':
+                latest_msg = '📷 Imagen'
+            elif latest and latest.tipo_contenido in ('document', 'audio', 'video'):
+                latest_msg = f'📎 {latest.tipo_contenido.capitalize()}'
+            elif latest:
+                latest_msg = latest.contenido
+            else:
+                latest_msg = ibx.mensaje_inicial
             
             previews.append({
                 "inbox_id": ibx.id,
@@ -116,6 +124,8 @@ class ChatService:
             remitente_tipo=msg_in.remitente_tipo,
             remitente_id=msg_in.remitente_id,
             contenido=msg_in.contenido,
+            tipo_contenido=msg_in.tipo_contenido,
+            media_url=msg_in.media_url,
             whatsapp_msg_id=msg_in.whatsapp_msg_id,
             estado_envio=msg_in.estado_envio,
             leido=False if msg_in.direccion == 'ENTRANTE' else True

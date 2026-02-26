@@ -1,10 +1,13 @@
+import asyncio
 import logging
 import os
 import sys
+from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from datetime import datetime
 from sqlalchemy import text
 
@@ -51,11 +54,37 @@ from app.api.v1.comercial.whatsapp import router as whatsapp_router
 from app.api.v1.comercial.chat import router as chat_router
 from app.api.v1.comercial.gestiones import router as gestiones_router
 
+# Lifespan: tareas de inicio y cierre del servidor
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: iniciar scheduler de disponibilidad
+    from app.services.scheduler import iniciar_scheduler
+    scheduler_task = asyncio.create_task(iniciar_scheduler())
+    logger.info("✅ Scheduler de disponibilidad buzón iniciado")
+    
+    # Crear directorio de uploads si no existe
+    os.makedirs("uploads/media", exist_ok=True)
+    
+    yield
+    
+    # Shutdown: cancelar scheduler
+    scheduler_task.cancel()
+    try:
+        await scheduler_task
+    except asyncio.CancelledError:
+        pass
+    logger.info("⏹️ Scheduler detenido")
+
+
 app = FastAPI(
     title="SGI Grupo Corban",
     description="Sistema de Gestión Integral - API Backend",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
+
+# Servir archivos estáticos (imágenes de WhatsApp)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # CORS - Orígenes desde variable de entorno o defaults
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")

@@ -95,6 +95,38 @@ async def receive_webhook_message(
                         incoming.latitude = location.get("latitude")
                         incoming.longitude = location.get("longitude")
                         incoming.message_text = location.get("name", "")
+
+                    # ==========================================
+                    # Manejo de archivos multimedia (imagen, documento, audio, video, sticker)
+                    # ==========================================
+                    media_url = None
+                    tipo_contenido = "text"
+                    
+                    if msg_type in ("image", "document", "video", "audio", "sticker"):
+                        tipo_contenido = msg_type
+                        media_data = msg.get(msg_type, {})
+                        media_id = media_data.get("id")
+                        caption = media_data.get("caption", "")
+                        
+                        if media_id:
+                            from app.services.comercial.media_service import MediaService
+                            resultado_media = await MediaService.descargar_media(media_id)
+                            if resultado_media:
+                                media_url = resultado_media["ruta_relativa"]
+                        
+                        # Usar caption como texto del mensaje, o un placeholder descriptivo
+                        if caption:
+                            incoming.message_text = caption
+                        else:
+                            labels = {
+                                "image": "📷 Imagen",
+                                "document": "📄 Documento", 
+                                "video": "🎥 Video",
+                                "audio": "🎵 Audio",
+                                "sticker": "🪄 Sticker"
+                            }
+                            incoming.message_text = labels.get(msg_type, "📎 Archivo")
+                    
                     # Extraer parámetros 
                     from app.services.comercial.chat_service import ChatService
                     from app.schemas.comercial.chat import ChatMessageCreate
@@ -119,7 +151,7 @@ async def receive_webhook_message(
                     
                     # If it's a new interaction and no inbox exists, create one in NUEVO state
                     # This guarantees we capture all conversation history before it's assigned to a commercial
-                    if not inbox and msg_type in ("text", "interactive", "location"):
+                    if not inbox and msg_type in ("text", "interactive", "location", "image", "document", "video", "audio", "sticker"):
                         new_inbox = Inbox(
                             telefono=from_number,
                             mensaje_inicial=incoming.message_text if msg_type == "text" else "Interacción inicial",
@@ -142,6 +174,8 @@ async def receive_webhook_message(
                             direccion='ENTRANTE',
                             remitente_tipo='CLIENTE',
                             contenido=incoming.message_text,
+                            tipo_contenido=tipo_contenido,
+                            media_url=media_url,
                             whatsapp_msg_id=msg_id
                         ))
 

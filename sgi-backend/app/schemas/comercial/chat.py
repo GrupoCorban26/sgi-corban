@@ -8,6 +8,8 @@ class ChatMessageBase(BaseModel):
     direccion: str  # 'ENTRANTE' | 'SALIENTE'
     remitente_tipo: str  # 'CLIENTE' | 'COMERCIAL' | 'BOT'
     contenido: str
+    tipo_contenido: str = "text"  # 'text' | 'image' | 'document' | 'audio' | 'video' | 'sticker'
+    media_url: Optional[str] = None
 
 class ChatMessageCreate(ChatMessageBase):
     remitente_id: Optional[int] = None
@@ -21,6 +23,8 @@ class ChatMessageResponse(ChatMessageBase):
     estado_envio: Optional[str] = None
     leido: bool
     created_at: datetime
+    tipo_contenido: str = "text"
+    media_url: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 
