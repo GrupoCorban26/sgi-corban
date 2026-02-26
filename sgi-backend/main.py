@@ -62,9 +62,6 @@ async def lifespan(app: FastAPI):
     scheduler_task = asyncio.create_task(iniciar_scheduler())
     logger.info("✅ Scheduler de disponibilidad buzón iniciado")
     
-    # Crear directorio de uploads si no existe
-    os.makedirs("uploads/media", exist_ok=True)
-    
     yield
     
     # Shutdown: cancelar scheduler
@@ -83,7 +80,8 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Servir archivos estáticos (imágenes de WhatsApp)
+# Crear directorio de uploads si no existe y servir archivos estáticos (imágenes de WhatsApp)
+os.makedirs("uploads/media", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # CORS - Orígenes desde variable de entorno o defaults
