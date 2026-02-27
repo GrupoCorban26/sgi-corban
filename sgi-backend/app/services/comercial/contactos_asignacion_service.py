@@ -107,7 +107,7 @@ class ContactosAsignacionService:
                 conditions = [RegistroImportacion.paises_origen.like(f"%{p}%") for p in pais_origen]
                 stmt_rucs = stmt_rucs.where(or_(*conditions))
             if partida_arancelaria:
-                conditions_partida = [RegistroImportacion.partida_arancelaria_cod.like(f"%{p}%") for p in partida_arancelaria]
+                conditions_partida = [RegistroImportacion.partidas_arancelarias.like(f"%{p}%") for p in partida_arancelaria]
                 stmt_rucs = stmt_rucs.where(or_(*conditions_partida))
                 
             stmt_rucs = stmt_rucs.group_by(ClienteContacto.ruc).order_by(func.newid()).limit(50)
@@ -270,7 +270,7 @@ class ContactosAsignacionService:
                 TRIM(value) as pais,
                 COUNT(*) as cantidad
             FROM comercial.registro_importaciones
-            CROSS APPLY STRING_SPLIT(REPLACE(paises_origen, '|', ','), ',')
+            CROSS APPLY STRING_SPLIT(paises_origen, ' - ')
             WHERE TRIM(value) != ''
             GROUP BY TRIM(value)
             ORDER BY COUNT(*) DESC
@@ -282,8 +282,8 @@ class ContactosAsignacionService:
                 LEFT(TRIM(value), 4) as partida,
                 COUNT(*) as cantidad
             FROM comercial.registro_importaciones
-            CROSS APPLY STRING_SPLIT(partida_arancelaria_cod, ',')
-            WHERE TRIM(value) != ''
+            CROSS APPLY STRING_SPLIT(partidas_arancelarias, ',')
+            WHERE TRIM(value) != '' AND partidas_arancelarias IS NOT NULL
             GROUP BY LEFT(TRIM(value), 4)
             ORDER BY COUNT(*) DESC
         """))
