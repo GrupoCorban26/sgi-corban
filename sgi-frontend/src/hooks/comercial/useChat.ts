@@ -90,11 +90,22 @@ export const useChatActions = () => {
         }
     });
 
+    const descartarLead = useMutation({
+        mutationFn: async ({ inboxId, request }: { inboxId: number; request: { motivo_descarte: string; comentario_descarte: string } }) => {
+            const { data } = await api.post(`/comercial/inbox/${inboxId}/descartar`, request);
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['chat-conversations'] });
+        }
+    });
+
     return {
         sendMessage,
         takeChat,
         releaseChat,
         changeEstado,
-        markAsRead
+        markAsRead,
+        descartarLead
     };
 };

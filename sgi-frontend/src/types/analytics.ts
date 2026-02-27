@@ -56,4 +56,12 @@ export interface DashboardAnalytics {
     };
     operativo: OperativoStats;
     gestion: GestionStats;
+    actividad?: {
+        gestion_cartera: number;
+        llamadas_base: number;
+        leads_convertidos: number;
+        leads_descartados: number;
+        leads_total: number;
+        gestion_total: number;
+    };
 }

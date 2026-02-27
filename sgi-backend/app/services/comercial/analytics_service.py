@@ -33,6 +33,7 @@ class AnalyticsService:
         origenes = await self._get_origenes_stats(dt_inicio, dt_fin)
         operativo = await self._get_operativo_stats(dt_inicio, dt_fin)
         gestion = await self._get_gestion_stats(dt_inicio, dt_fin)
+        actividad = await self._get_actividad_stats(dt_inicio, dt_fin)
 
         return {
             "fecha_inicio": fecha_inicio.isoformat(),
@@ -41,7 +42,8 @@ class AnalyticsService:
             "comerciales": comerciales,
             "origenes": origenes,
             "operativo": operativo,
-            "gestion": gestion
+            "gestion": gestion,
+            "actividad": actividad
         }
 
     # =========================================================================
@@ -375,3 +377,59 @@ class AnalyticsService:
             "tasa_contactabilidad": tasa_contactabilidad,
             "clientes_sin_gestion_30d": clientes_sin_gestion
         }
+
+    # =========================================================================
+    # F. Actividad Consolidada
+    # =========================================================================
+
+    async def _get_actividad_stats(self, dt_inicio: datetime, dt_fin: datetime) -> dict:
+        """Suma de actividad del equipo comercial desde 3 fuentes."""
+        # 1. Gestión Cartera
+        stmt_cartera = select(func.count()).select_from(ClienteGestion).where(
+            and_(
+                ClienteGestion.created_at >= dt_inicio,
+                ClienteGestion.created_at <= dt_fin
+            )
+        )
+        gestion_cartera = (await self.db.execute(stmt_cartera)).scalar() or 0
+
+        # 2. Llamadas Base (prospección fría)
+        stmt_base = select(func.count()).select_from(ClienteContacto).where(
+            and_(
+                ClienteContacto.fecha_llamada >= dt_inicio,
+                ClienteContacto.fecha_llamada <= dt_fin
+            )
+        )
+        llamadas_base = (await self.db.execute(stmt_base)).scalar() or 0
+
+        # 3. Leads Atendidos (Inbox)
+        stmt_inbox = select(
+            Inbox.estado,
+            func.count().label("total")
+        ).where(
+            and_(
+                Inbox.estado.in_(['CONVERTIDO', 'DESCARTADO']),
+                Inbox.fecha_recepcion >= dt_inicio,
+                Inbox.fecha_recepcion <= dt_fin
+            )
+        ).group_by(Inbox.estado)
+        
+        result_inbox = await self.db.execute(stmt_inbox)
+        estados_inbox = {row.estado: row.total for row in result_inbox.all()}
+        
+        leads_convertidos = estados_inbox.get("CONVERTIDO", 0)
+        leads_descartados = estados_inbox.get("DESCARTADO", 0)
+        leads_total = leads_convertidos + leads_descartados
+
+        # 4. Gestión Total
+        gestion_total = gestion_cartera + llamadas_base + leads_total
+
+        return {
+            "gestion_cartera": gestion_cartera,
+            "llamadas_base": llamadas_base,
+            "leads_convertidos": leads_convertidos,
+            "leads_descartados": leads_descartados,
+            "leads_total": leads_total,
+            "gestion_total": gestion_total
+        }
+

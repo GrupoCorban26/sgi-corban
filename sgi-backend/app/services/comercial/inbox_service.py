@@ -245,12 +245,17 @@ class InboxService:
             return True
         return False
 
-    async def discard_lead(self, lead_id: int):
+    async def discard_lead(self, lead_id: int, request_data: dict = None):
         lead = await self.db.get(Inbox, lead_id)
         if lead:
             lead.estado = 'DESCARTADO'
             lead.modo = 'BOT'
             lead.fecha_gestion = datetime.now()
+            
+            if request_data:
+                lead.motivo_descarte = request_data.get('motivo_descarte')
+                lead.comentario_descarte = request_data.get('comentario_descarte')
+                
             await self.db.commit()
             return True
         return False

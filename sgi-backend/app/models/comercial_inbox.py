@@ -20,6 +20,10 @@ class Inbox(Base):
     modo = Column(String(10), default="BOT", nullable=False) # BOT, ASESOR
     ultimo_mensaje_at = Column(DateTime(timezone=True), nullable=True)
     
+    # Descarte
+    motivo_descarte = Column(String(100), nullable=True)
+    comentario_descarte = Column(Text, nullable=True)
+    
     # Tracking de tiempos
     tiempo_respuesta_segundos = Column(Integer, nullable=True)  # Segundos hasta primera respuesta
     fecha_primera_respuesta = Column(DateTime(timezone=True), nullable=True)

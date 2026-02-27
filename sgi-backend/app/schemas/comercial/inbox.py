@@ -34,3 +34,8 @@ class InboxResponse(InboxBase):
 class InboxDistributionResponse(BaseModel):
     lead_id: int
     assigned_to: dict # { id, nombre, whatsapp }
+
+class InboxDescartarRequest(BaseModel):
+    motivo_descarte: str
+    comentario_descarte: str
+

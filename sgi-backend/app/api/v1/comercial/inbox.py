@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from app.database.db_connection import get_db
 from app.services.comercial.inbox_service import InboxService
-from app.schemas.comercial.inbox import InboxDistribute, InboxDistributionResponse, InboxResponse
+from app.schemas.comercial.inbox import InboxDistribute, InboxDistributionResponse, InboxResponse, InboxDescartarRequest
 from app.core.dependencies import get_current_user_obj
 from app.models.seguridad import Usuario
 
@@ -81,11 +81,12 @@ async def convert_lead(
 @router.post("/{id}/descartar")
 async def discard_lead(
     id: int,
+    request: InboxDescartarRequest,
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(get_current_user_obj)
 ):
     service = InboxService(db)
-    success = await service.discard_lead(id)
+    success = await service.discard_lead(id, request.model_dump())
     if not success:
         raise HTTPException(status_code=404, detail="Lead not found")
     return {"message": "Lead discarded"}

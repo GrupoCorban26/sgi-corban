@@ -258,6 +258,61 @@ export default function ReportesDashboard() {
                         </div>
                     )}
 
+                    {/* KPIs de Actividad Comercial Consolidada (Nuevo) */}
+                    {data.actividad && (
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col">
+                                <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                    <TrendingUp size={16} /> Gestión Total
+                                </span>
+                                <div className="text-3xl font-bold text-violet-600">
+                                    {data.actividad.gestion_total}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-2 font-medium">
+                                    Todas las interacciones
+                                </p>
+                            </div>
+
+                            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col">
+                                <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                    <ClipboardList size={16} /> Mantenimiento Cartera
+                                </span>
+                                <div className="text-3xl font-bold text-indigo-600">
+                                    {data.actividad.gestion_cartera}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-2 font-medium">
+                                    A clientes actuales
+                                </p>
+                            </div>
+
+                            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col">
+                                <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                    <Phone size={16} /> Llamadas Base (Fría)
+                                </span>
+                                <div className="text-3xl font-bold text-blue-600">
+                                    {data.actividad.llamadas_base}
+                                </div>
+                                <p className="text-xs text-gray-500 mt-2 font-medium">
+                                    Prospección desde Base
+                                </p>
+                            </div>
+
+                            <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex flex-col">
+                                <span className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 flex items-center gap-2">
+                                    <Users size={16} /> Leads Atendidos
+                                </span>
+                                <div className="text-3xl font-bold text-emerald-600">
+                                    {data.actividad.leads_total}
+                                </div>
+                                <p className="text-xs text-emerald-600 mt-2 font-medium flex gap-2">
+                                    <span>✓ {data.actividad.leads_convertidos} Conv.</span>
+                                    <span className="text-gray-400">|</span>
+                                    <span className="text-red-500">✗ {data.actividad.leads_descartados} Desc.</span>
+                                </p>
+                            </div>
+                        </div>
+                    )}
+
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                         {/* Rendimiento Comerciales */}
                         <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
