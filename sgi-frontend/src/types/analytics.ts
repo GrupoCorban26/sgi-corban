@@ -1,69 +1,42 @@
-export interface ComericalStats {
+export interface BaseDatosComercial {
     usuario_id: number;
     nombre: string;
-    leads_atendidos: number;
-    tiempo_respuesta_promedio_seg: number | null;
-    clientes_convertidos: number;
-    llamadas_realizadas: number;
-    gestiones_realizadas: number;
-    clientes_unicos_gestionados: number;
-    tasa_conversion: number;
+    total_llamadas: number;
+    llamadas_contestadas: number;
+    llamadas_efectivas: number;
 }
 
-export interface EmbudoStats {
-    [estado: string]: number;
-}
-
-export interface PipelineStats {
-    embudo: EmbudoStats;
-    tasa_conversion: number;
-    tasa_perdida: number;
-    tiempo_promedio_por_etapa: {
-        [etapa: string]: number;
+export interface BaseDatosStats {
+    totales: {
+        total_llamadas: number;
+        llamadas_contestadas: number;
+        llamadas_efectivas: number;
+        pct_contestadas: number;
+        pct_efectivas: number;
     };
-    reactivaciones_exitosas: number;
+    por_comercial: BaseDatosComercial[];
 }
 
-export interface OrigenStats {
-    total: number;
-    convertidos: number;
-    tasa_conversion: number;
+export interface CarteraComercial {
+    usuario_id: number;
+    nombre: string;
+    seguimiento_carga: number;
+    fidelizacion: number;
+    dudas_cliente: number;
+    quiere_cotizacion: number;
 }
 
-export interface OperativoStats {
-    citas_cumplimiento: number;
-    citas_total: number;
-    citas_terminadas: number;
-    leads_pendientes: number;
-    clientes_nuevos_periodo: number;
-    tendencia_semanal: number[];
-}
-
-export interface GestionStats {
-    total_gestiones: number;
-    por_tipo: { [tipo: string]: number };
-    por_resultado: { [resultado: string]: number };
-    tasa_contactabilidad: number;
-    clientes_sin_gestion_30d: number;
+export interface CarteraStats {
+    totales: {
+        total_llamadas: number;
+        total_clientes_gestionados: number;
+    };
+    por_comercial: CarteraComercial[];
 }
 
 export interface DashboardAnalytics {
     fecha_inicio: string;
     fecha_fin: string;
-    pipeline: PipelineStats;
-    comerciales: ComericalStats[];
-    origenes: {
-        [origen: string]: OrigenStats;
-    };
-    operativo: OperativoStats;
-    gestion: GestionStats;
-    actividad?: {
-        gestion_cartera: number;
-        clientes_unicos_cartera: number;
-        llamadas_base: number;
-        leads_convertidos: number;
-        leads_descartados: number;
-        leads_total: number;
-        gestion_total: number;
-    };
+    base_datos: BaseDatosStats;
+    cartera: CarteraStats;
 }
