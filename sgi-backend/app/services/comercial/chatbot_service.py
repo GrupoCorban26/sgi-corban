@@ -709,7 +709,7 @@ class ChatbotService:
                     tipo_cita=datos["tipo_visita"],
                     direccion=datos.get("direccion", "Centro Aéreo Comercial, módulo E, oficina 507"),
                     motivo=f"Cita agendada via WhatsApp - RUC: {datos['ruc']}",
-                    estado="PENDIENTE_APROBACION",
+                    estado="PENDIENTE",
                     created_by=comercial_id,
                 )
                 self.db.add(nueva_cita)
@@ -881,7 +881,7 @@ class ChatbotService:
             query = select(Cita.hora).where(
                 and_(
                     Cita.fecha == fecha,
-                    Cita.estado.in_(["PENDIENTE_APROBACION", "APROBADA"])
+                    Cita.estado.in_(["PENDIENTE", "APROBADO"])
                 )
             )
             result = await self.db.execute(query)
