@@ -16,6 +16,8 @@ from app.models.seguridad import Usuario, Rol
 from app.schemas.comercial.whatsapp import WhatsAppIncoming, WhatsAppResponse, BotMessage
 from app.schemas.comercial.inbox import InboxDistribute
 from app.services.comercial.inbox_service import InboxService
+from app.services.comercial.chat_service import ChatService
+from app.schemas.comercial.chat import ChatMessageCreate
 
 logger = logging.getLogger(__name__)
 
@@ -45,6 +47,7 @@ CONFIRM_BUTTONS = [
 ]
 
 SESSION_TIMEOUT_MINUTES = 30
+ATENDIDO_TIMEOUT_MINUTES = 5
 COTIZAR_VENTANA_GRACIA_SEGUNDOS = 60
 
 DIAS_SEMANA = {
@@ -182,6 +185,8 @@ class ChatbotService:
         try:
             if state == "MENU":
                 return await self._handle_menu(session, data, phone)
+            elif state == "ATENDIDO":
+                return await self._handle_atendido(session, data, phone)
             elif state == "COTIZAR_REQUERIMIENTOS":
                 return await self._handle_cotizar_requerimientos(session, data, phone)
             elif state == "COTIZAR_PROCESANDO":
@@ -252,7 +257,9 @@ class ChatbotService:
             user = result_user.scalar_one_or_none()
             nombre_comercial = self._get_user_name(user)
 
-            await self._delete_session(session)
+            # Mantener sesión en ATENDIDO con cooldown corto
+            datos_atendido = {"asesor_nombre": nombre_comercial, "inbox_id": existing_lead.id}
+            await self._update_session_corta(session, "ATENDIDO", datos_atendido)
             return WhatsAppResponse(
                 action="send_text",
                 messages=[BotMessage(type="text", content=f"Su asesor *{nombre_comercial}* le atenderá en unos minutos. 👋")]
@@ -267,12 +274,53 @@ class ChatbotService:
             )
             result = await inbox_service.distribute_lead(distribute_data)
             nombre_comercial = result["assigned_to"]["nombre"]
+            inbox_id = result.get("inbox_id")
 
-            await self._delete_session(session)
+            # Mantener sesión en ATENDIDO con cooldown corto
+            datos_atendido = {"asesor_nombre": nombre_comercial, "inbox_id": inbox_id}
+            await self._update_session_corta(session, "ATENDIDO", datos_atendido)
             return WhatsAppResponse(
                 action="send_text",
                 messages=[BotMessage(type="text", content=f"¡Perfecto! El asesor *{nombre_comercial}* se pondrá en contacto contigo en breve. 🚀")]
             )
+
+    # ===================== ATENDIDO HANDLER =====================
+
+    async def _handle_atendido(self, session, data, phone):
+        """Mensajes post-asignación. Reenviar al chat del inbox y responder contextualmente."""
+        datos = self._get_session_data(session)
+        asesor = datos.get("asesor_nombre", "su asesor")
+        inbox_id = datos.get("inbox_id")
+        texto = data.message_text.strip()
+
+        # Si el cliente quiere volver al menú, eliminar sesión
+        text_lower = texto.lower()
+        if text_lower in ("menu", "menú", "inicio"):
+            await self._delete_session(session)
+            return self._send_menu()
+
+        # Guardar mensaje en el chat del inbox para que el asesor lo vea
+        if inbox_id and texto:
+            try:
+                chat_svc = ChatService(self.db)
+                await chat_svc.save_message(ChatMessageCreate(
+                    inbox_id=inbox_id,
+                    telefono=data.from_number,
+                    direccion='ENTRANTE',
+                    remitente_tipo='CLIENTE',
+                    contenido=texto,
+                    estado_envio='RECIBIDO'
+                ))
+            except Exception as e:
+                logger.warning(f"No se pudo guardar mensaje post-asignación: {e}")
+
+        return WhatsAppResponse(
+            action="send_text",
+            messages=[BotMessage(
+                type="text",
+                content=f"✅ Mensaje recibido. *{asesor}* podrá ver tu mensaje. Si necesitas algo más, escribe *menu*. 😊"
+            )]
+        )
 
     # ===================== COTIZAR HANDLER =====================
 
@@ -770,6 +818,15 @@ class ChatbotService:
             session.datos = json.dumps(datos)
         session.updated_at = datetime.now()
         session.expires_at = datetime.now() + timedelta(minutes=SESSION_TIMEOUT_MINUTES)
+        await self.db.commit()
+
+    async def _update_session_corta(self, session, estado: str, datos: dict = None):
+        """Actualiza sesión con timeout corto (para estado ATENDIDO)."""
+        session.estado = estado
+        if datos is not None:
+            session.datos = json.dumps(datos)
+        session.updated_at = datetime.now()
+        session.expires_at = datetime.now() + timedelta(minutes=ATENDIDO_TIMEOUT_MINUTES)
         await self.db.commit()
 
     async def _delete_session(self, session):

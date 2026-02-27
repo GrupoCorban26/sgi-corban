@@ -6,7 +6,7 @@ nuevos mensajes antes de responder y derivar al asesor. Este módulo maneja esa 
 import asyncio
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import and_, or_
 from sqlalchemy.future import select
@@ -15,7 +15,10 @@ from app.database.db_connection import AsyncSessionLocal
 from app.models.comercial_session import ConversationSession
 from app.models.comercial_inbox import Inbox
 from app.services.comercial.whatsapp_service import WhatsAppService
-from app.services.comercial.chatbot_service import COTIZAR_VENTANA_GRACIA_SEGUNDOS
+from app.services.comercial.chatbot_service import (
+    COTIZAR_VENTANA_GRACIA_SEGUNDOS,
+    ATENDIDO_TIMEOUT_MINUTES
+)
 from app.services.comercial.inbox_service import InboxService
 from app.schemas.comercial.inbox import InboxDistribute
 from app.schemas.comercial.chat import ChatMessageCreate
@@ -128,8 +131,19 @@ async def _ejecutar_ventana_gracia(phone: str, from_number: str, contact_name: s
                         estado_envio='ENVIADO'
                     ))
 
-                # Eliminar la sesión del bot
-                await db.delete(session)
+                # Obtener inbox_id para poder enlazar mensajes posteriores
+                inbox_id = result_lead.get("inbox_id") if result_lead else None
+                if not inbox_id and inbox:
+                    inbox_id = inbox.id
+
+                # En lugar de eliminar, pasar a ATENDIDO por 5 minutos
+                session.estado = "ATENDIDO"
+                session.datos = json.dumps({
+                    "asesor_nombre": nombre_comercial,
+                    "inbox_id": inbox_id
+                })
+                session.updated_at = datetime.now()
+                session.expires_at = datetime.now() + timedelta(minutes=ATENDIDO_TIMEOUT_MINUTES)
                 await db.commit()
                 break
 
