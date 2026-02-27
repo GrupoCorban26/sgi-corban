@@ -194,6 +194,16 @@ class AnalyticsService:
             )
             gestiones = (await self.db.execute(stmt_gestiones)).scalar() or 0
 
+            # Clientes únicos gestionados
+            stmt_unicos = select(func.count(func.distinct(ClienteGestion.cliente_id))).where(
+                and_(
+                    ClienteGestion.comercial_id == uid,
+                    ClienteGestion.created_at >= dt_inicio,
+                    ClienteGestion.created_at <= dt_fin
+                )
+            )
+            clientes_unicos = (await self.db.execute(stmt_unicos)).scalar() or 0
+
             tasa = round((convertidos / leads * 100), 1) if leads > 0 else 0
 
             result.append({
@@ -204,6 +214,7 @@ class AnalyticsService:
                 "clientes_convertidos": convertidos,
                 "llamadas_realizadas": llamadas,
                 "gestiones_realizadas": gestiones,
+                "clientes_unicos_gestionados": clientes_unicos,
                 "tasa_conversion": tasa
             })
 
@@ -393,6 +404,14 @@ class AnalyticsService:
         )
         gestion_cartera = (await self.db.execute(stmt_cartera)).scalar() or 0
 
+        stmt_cartera_unicos = select(func.count(func.distinct(ClienteGestion.cliente_id))).where(
+            and_(
+                ClienteGestion.created_at >= dt_inicio,
+                ClienteGestion.created_at <= dt_fin
+            )
+        )
+        clientes_unicos_cartera = (await self.db.execute(stmt_cartera_unicos)).scalar() or 0
+
         # 2. Llamadas Base (prospección fría)
         stmt_base = select(func.count()).select_from(ClienteContacto).where(
             and_(
@@ -430,6 +449,7 @@ class AnalyticsService:
             "leads_convertidos": leads_convertidos,
             "leads_descartados": leads_descartados,
             "leads_total": leads_total,
-            "gestion_total": gestion_total
+            "gestion_total": gestion_total,
+            "clientes_unicos_cartera": clientes_unicos_cartera
         }
 

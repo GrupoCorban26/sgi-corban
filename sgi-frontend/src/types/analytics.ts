@@ -6,6 +6,7 @@ export interface ComericalStats {
     clientes_convertidos: number;
     llamadas_realizadas: number;
     gestiones_realizadas: number;
+    clientes_unicos_gestionados: number;
     tasa_conversion: number;
 }
 
@@ -58,6 +59,7 @@ export interface DashboardAnalytics {
     gestion: GestionStats;
     actividad?: {
         gestion_cartera: number;
+        clientes_unicos_cartera: number;
         llamadas_base: number;
         leads_convertidos: number;
         leads_descartados: number;

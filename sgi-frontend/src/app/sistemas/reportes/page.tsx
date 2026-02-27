@@ -45,6 +45,8 @@ export default function ReportesDashboard() {
                 'Leads Atendidos': c.leads_atendidos,
                 'Convertidos': c.clientes_convertidos,
                 'Llamadas Realizadas': c.llamadas_realizadas,
+                'Gestiones Realizadas': c.gestiones_realizadas,
+                'Clientes Únicos Gestionados': c.clientes_unicos_gestionados,
                 'Tasa Conversión (%)': c.tasa_conversion,
                 'Tiempo Resp. Prom.': formatDuration(c.tiempo_respuesta_promedio_seg)
             })));
@@ -281,7 +283,7 @@ export default function ReportesDashboard() {
                                     {data.actividad.gestion_cartera}
                                 </div>
                                 <p className="text-xs text-gray-500 mt-2 font-medium">
-                                    A clientes actuales
+                                    A {data.actividad.clientes_unicos_cartera || 0} clientes únicos
                                 </p>
                             </div>
 
@@ -413,7 +415,10 @@ export default function ReportesDashboard() {
                                                 </span>
                                             </td>
                                             <td className="px-6 py-4 text-center">{agente.llamadas_realizadas}</td>
-                                            <td className="px-6 py-4 text-center font-semibold text-indigo-600">{agente.gestiones_realizadas || 0}</td>
+                                            <td className="px-6 py-4 text-center">
+                                                <span className="font-semibold text-indigo-600 block">{agente.gestiones_realizadas || 0}</span>
+                                                <span className="text-[10px] text-gray-400 font-normal">({agente.clientes_unicos_gestionados || 0} únicos)</span>
+                                            </td>
                                             <td className="px-6 py-4 text-center text-gray-500">
                                                 {formatDuration(agente.tiempo_respuesta_promedio_seg)}
                                             </td>
