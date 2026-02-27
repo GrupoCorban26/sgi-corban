@@ -27,6 +27,7 @@ logger = logging.getLogger(__name__)
 # ==========================================
 
 MENSAJE_BIENVENIDA = "Hola, soy Corby🤖, tu asistente virtual del Grupo Corban. ¿En qué puedo ayudarte hoy?🤗"
+MENSAJE_MENU_REGRESO = "¿En qué más puedo ayudarte? 😊"
 
 MENU_BUTTONS = [
     {"id": "btn_asesor", "title": "Hablar con un asesor"},
@@ -158,9 +159,10 @@ class ChatbotService:
         button_id = data.button_id
 
         if text_lower in ("menu", "menú", "inicio") or button_id == "btn_menu":
+            es_regreso = session is not None
             if session:
                 await self._delete_session(session)
-            return self._send_menu()
+            return self._send_menu(es_regreso=es_regreso)
 
         if text_lower in ("cancelar", "salir") or button_id == "btn_cancelar":
             if session:
@@ -537,9 +539,11 @@ class ChatbotService:
 
     async def _handle_agendar_fecha(self, session, data):
         button_id = data.button_id
+        text_lower = data.message_text.strip().lower()
         datos = self._get_session_data(session)
 
-        if button_id == "fecha_volver":
+        # Volver al paso anterior (texto o botón)
+        if text_lower == "volver" or button_id == "fecha_volver":
             tipo = datos.get("tipo_visita")
             if tipo == "VISITA_CLIENTE":
                 await self._update_session(session, "AGENDAR_UBICACION", datos)
@@ -561,6 +565,26 @@ class ChatbotService:
                         buttons=VISIT_TYPE_BUTTONS
                     )]
                 )
+
+        # Detectar cambio de intención: cliente cambia tipo de visita mid-flow
+        tipo_detectado = self._detectar_tipo_visita_texto(data.message_text)
+        if tipo_detectado:
+            datos["tipo_visita"] = tipo_detectado
+            if tipo_detectado == "VISITA_CLIENTE":
+                await self._update_session(session, "AGENDAR_UBICACION", datos)
+                return WhatsAppResponse(
+                    action="send_text",
+                    messages=[BotMessage(type="text", content=(
+                        "👍 Entendido, cambiaremos a visita a tu ubicación.\n\n"
+                        "📍 Por favor, ingresa la *dirección* donde debemos visitarlos.\n\n"
+                        "También puedes *enviar tu ubicación* desde WhatsApp (📎 > Ubicación).\n\n"
+                        "_Escribe *volver* para regresar._"
+                    ))]
+                )
+            else:
+                await self._update_session(session, "AGENDAR_FECHA", datos)
+                return await self._show_date_list(session, datos,
+                    prefix="👍 Entendido, te esperamos en nuestras oficinas.\n\n📍 Nuestra dirección:\n*Centro Aéreo Comercial, módulo E, oficina 507*\n\n")
 
         if button_id == "fecha_mas":
             pagina_actual = datos.get("fecha_pagina", 0)
@@ -618,9 +642,11 @@ class ChatbotService:
 
     async def _handle_agendar_hora(self, session, data):
         button_id = data.button_id
+        text_lower = data.message_text.strip().lower()
         datos = self._get_session_data(session)
 
-        if button_id == "hora_volver":
+        # Volver al paso anterior (texto o botón)
+        if text_lower == "volver" or button_id == "hora_volver":
             await self._update_session(session, "AGENDAR_FECHA", datos)
             return await self._show_date_list(session, datos)
 
@@ -723,13 +749,14 @@ class ChatbotService:
 
     # ===================== HELPERS =====================
 
-    def _send_menu(self) -> WhatsAppResponse:
-        """Envía el mensaje de bienvenida universal con los 3 botones principales."""
+    def _send_menu(self, es_regreso=False) -> WhatsAppResponse:
+        """Envía el menú principal. Si es_regreso=True, usa mensaje corto en vez de bienvenida completa."""
+        mensaje = MENSAJE_MENU_REGRESO if es_regreso else MENSAJE_BIENVENIDA
         return WhatsAppResponse(
             action="send_buttons",
             messages=[BotMessage(
                 type="buttons",
-                body=MENSAJE_BIENVENIDA,
+                body=mensaje,
                 buttons=MENU_BUTTONS
             )]
         )
@@ -740,6 +767,20 @@ class ChatbotService:
         elif user:
             return user.correo_corp
         return "Un asesor"
+
+    def _detectar_tipo_visita_texto(self, texto: str):
+        """Detecta intención de tipo de visita desde texto libre del cliente."""
+        texto_lower = texto.strip().lower()
+        patrones_nos_visita = ["los visito", "los visitaré", "los visitare", "iré a", "ire a", "voy a ir", "yo voy"]
+        patrones_visitenme = ["visítenme", "visitenme", "que me visiten", "vengan", "nos visiten", "visitenos", "visítenos"]
+
+        for patron in patrones_visitenme:
+            if patron in texto_lower:
+                return "VISITA_CLIENTE"
+        for patron in patrones_nos_visita:
+            if patron in texto_lower:
+                return "VISITA_OFICINA"
+        return None
 
     def _get_session_data(self, session) -> dict:
         if session.datos:
