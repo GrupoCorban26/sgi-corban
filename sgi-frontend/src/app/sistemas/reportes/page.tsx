@@ -357,6 +357,27 @@ export default function ReportesDashboard() {
                         </div>
                     </div>
 
+                    {/* Gestión Total por Comercial */}
+                    <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm mt-6">
+                        <h3 className="text-lg font-bold text-gray-800 mb-6 flex items-center gap-2">
+                            <TrendingUp size={20} className="text-indigo-500" />
+                            Gestión Total por Comercial
+                        </h3>
+                        <div className="h-[300px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={data.comerciales} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                    <XAxis dataKey="nombre" tick={{ fontSize: 12, fill: '#4B5563' }} />
+                                    <YAxis />
+                                    <Tooltip cursor={{ fill: '#F3F4F6' }} contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                                    <Legend />
+                                    <Bar dataKey="gestiones_realizadas" name="Gestiones (Llamadas, Visitas, WPP)" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="llamadas_realizadas" name="Llamadas Base" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </div>
+
                     {/* Detalle Operativo de los Agentes */}
                     <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                         <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50">

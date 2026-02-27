@@ -15,17 +15,13 @@ const TIPOS_GESTION = [
     { value: 'LLAMADA', label: 'Llamada', icon: Phone },
     { value: 'EMAIL', label: 'Email', icon: Mail },
     { value: 'WHATSAPP', label: 'WhatsApp', icon: MessageSquare },
-    { value: 'VISITA', label: 'Visita', icon: MapPin },
-    { value: 'OTRO', label: 'Otro', icon: FileText },
 ];
 
 const RESULTADOS = [
-    { value: 'CONTESTO', label: '✅ Contestó' },
-    { value: 'NO_CONTESTO', label: '❌ No contestó' },
-    { value: 'INTERESADO', label: '🟢 Interesado' },
-    { value: 'COTIZACION_ENVIADA', label: '📄 Cotización enviada' },
-    { value: 'NO_LE_INTERESA', label: '🔴 No le interesa' },
-    { value: 'LLAMAR_DESPUES', label: '🕐 Llamar después' },
+    { value: 'SEGUIMIENTO_CARGA', label: '📦 Seguimiento de carga' },
+    { value: 'FIDELIZACION', label: '🤝 Fidelización' },
+    { value: 'DUDAS_CLIENTE', label: '❓ Dudas del cliente' },
+    { value: 'QUIERE_COTIZACION', label: '📄 Quiere cotización' },
 ];
 
 export default function ModalRegistrarGestion({ clienteId, clienteNombre, isOpen, onClose }: Props) {
@@ -76,7 +72,7 @@ export default function ModalRegistrarGestion({ clienteId, clienteNombre, isOpen
                     {/* Tipo de Gestión */}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de gestión</label>
-                        <div className="grid grid-cols-5 gap-2">
+                        <div className="grid grid-cols-3 gap-2">
                             {TIPOS_GESTION.map(t => {
                                 const Icon = t.icon;
                                 return (
@@ -98,9 +94,9 @@ export default function ModalRegistrarGestion({ clienteId, clienteNombre, isOpen
                         </div>
                     </div>
 
-                    {/* Resultado */}
+                    {/* Motivo (antes Resultado) */}
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Resultado *</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Motivo *</label>
                         <div className="grid grid-cols-2 gap-2">
                             {RESULTADOS.map(r => (
                                 <button
