@@ -4,7 +4,7 @@ Responsabilidad única: asignar leads a comerciales, gestionar feedback y crear 
 """
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import text, func, or_, update
+from sqlalchemy import func, or_, update
 from fastapi import HTTPException
 from app.models.comercial import ClienteContacto, Cliente, CasoLlamada, RegistroImportacion
 
@@ -264,30 +264,44 @@ class ContactosAsignacionService:
     
     async def get_filtros_base(self):
         """Obtiene países y partidas disponibles para filtrar."""
-        # Queries for distinct values using raw SQL for STRING_SPLIT (MSSQL specific)
-        paises_result = await self.db.execute(text("""
-            SELECT TOP 50 
-                TRIM(value) as pais,
-                COUNT(*) as cantidad
-            FROM comercial.registro_importaciones
-            CROSS APPLY STRING_SPLIT(paises_origen, ' - ')
-            WHERE TRIM(value) != ''
-            GROUP BY TRIM(value)
-            ORDER BY COUNT(*) DESC
-        """))
-        paises = [{"pais": row[0], "cantidad": row[1]} for row in paises_result.fetchall()]
+        from collections import Counter
         
-        partidas_result = await self.db.execute(text("""
-            SELECT TOP 50 
-                LEFT(TRIM(value), 4) as partida,
-                COUNT(*) as cantidad
-            FROM comercial.registro_importaciones
-            CROSS APPLY STRING_SPLIT(partidas_arancelarias, ',')
-            WHERE TRIM(value) != '' AND partidas_arancelarias IS NOT NULL
-            GROUP BY LEFT(TRIM(value), 4)
-            ORDER BY COUNT(*) DESC
-        """))
-        partidas = [{"partida": row[0], "cantidad": row[1]} for row in partidas_result.fetchall()]
+        # Obtener todos los valores de paises_origen y partidas_arancelarias
+        resultado = await self.db.execute(
+            select(
+                RegistroImportacion.paises_origen,
+                RegistroImportacion.partidas_arancelarias
+            ).where(RegistroImportacion.paises_origen.isnot(None))
+        )
+        filas = resultado.all()
+        
+        # Procesar países: separador ' - '
+        contador_paises = Counter()
+        for fila in filas:
+            if fila.paises_origen:
+                for pais in fila.paises_origen.split(' - '):
+                    pais_limpio = pais.strip()
+                    if pais_limpio:
+                        contador_paises[pais_limpio] += 1
+        
+        paises = [
+            {"pais": pais, "cantidad": cantidad}
+            for pais, cantidad in contador_paises.most_common()
+        ]
+        
+        # Procesar partidas arancelarias: separador ','
+        contador_partidas = Counter()
+        for fila in filas:
+            if fila.partidas_arancelarias:
+                for partida in fila.partidas_arancelarias.split(','):
+                    partida_limpia = partida.strip()[:4]  # Solo los primeros 4 dígitos
+                    if partida_limpia:
+                        contador_partidas[partida_limpia] += 1
+        
+        partidas = [
+            {"partida": partida, "cantidad": cantidad}
+            for partida, cantidad in contador_partidas.most_common()
+        ]
         
         return {"paises": paises, "partidas": partidas}
 
