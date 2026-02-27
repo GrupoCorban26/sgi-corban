@@ -283,7 +283,7 @@ export default function ReportesDashboard() {
                                     {data.actividad.gestion_cartera}
                                 </div>
                                 <p className="text-xs text-gray-500 mt-2 font-medium">
-                                    A {data.actividad.clientes_unicos_cartera || 0} clientes únicos
+                                    A {data.actividad.clientes_unicos_cartera || 0} clientes diferentes
                                 </p>
                             </div>
 
