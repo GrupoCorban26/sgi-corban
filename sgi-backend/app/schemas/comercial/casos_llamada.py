@@ -5,6 +5,7 @@ from datetime import datetime
 class CasoLlamadaBase(BaseModel):
     nombre: str = Field(..., max_length=100)
     contestado: bool = Field(False)
+    gestionable: bool = Field(False)
 
 class CasoLlamadaCreate(CasoLlamadaBase):
     pass
@@ -12,6 +13,7 @@ class CasoLlamadaCreate(CasoLlamadaBase):
 class CasoLlamadaUpdate(BaseModel):
     nombre: Optional[str] = Field(None, max_length=100)
     contestado: Optional[bool] = None
+    gestionable: Optional[bool] = None
 
 class CasoLlamadaResponse(CasoLlamadaBase):
     id: int
