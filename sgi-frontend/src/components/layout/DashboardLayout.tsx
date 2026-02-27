@@ -48,6 +48,7 @@ function getRoleFromCookie(): Role {
 
 export function DashboardLayout({ children }: DashboardLayoutProps) {
     const [role, setRole] = useState<Role | null>(null);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
     useEffect(() => {
         setRole(getRoleFromCookie());
@@ -63,11 +64,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
     }
 
     return (
-        <div className="flex h-screen overflow-hidden bg-slate-50">
-            <NavLateral role={role} />
+        <div className="flex h-screen bg-slate-50">
+            <NavLateral role={role} isOpen={isSidebarOpen} setIsOpen={setIsSidebarOpen} />
 
-            <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-                <Header />
+            <div className="flex flex-col flex-1 min-w-0 overflow-hidden w-full">
+                <Header onMenuToggle={() => setIsSidebarOpen(true)} />
 
                 <main className="flex-1 relative overflow-y-auto focus:outline-none p-6 lg:p-10">
                     <div className="max-w-7xl mx-auto">

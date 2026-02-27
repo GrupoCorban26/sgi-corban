@@ -2,8 +2,12 @@
 
 import { jwtDecode } from 'jwt-decode';
 import Cookies from 'js-cookie';
-import { UserRoundCog, Bell, LogOut } from 'lucide-react';
+import { UserRoundCog, Bell, LogOut, Menu } from 'lucide-react';
 import { handleLogoutAction } from '@/app/login/process';
+
+interface HeaderProps {
+    onMenuToggle?: () => void;
+}
 
 interface TokenPayload {
     sub?: string;
@@ -25,14 +29,22 @@ function getUserFromToken(): string {
     }
 }
 
-export function Header() {
+export function Header({ onMenuToggle }: HeaderProps = {}) {
     const userName = getUserFromToken();
 
     return (
         <header className="flex items-center justify-between bg-naranja-500 text-white gap-4 px-6 py-3 shadow-md">
-            {/* Left side - Breadcrumb or title could go here */}
+            {/* Left side - Menu toggle for mobile */}
             <div className="flex items-center gap-2">
-                {/* Space for future breadcrumbs */}
+                {onMenuToggle && (
+                    <button
+                        onClick={onMenuToggle}
+                        className="p-2 md:hidden hover:bg-naranja-600 rounded-lg transition-colors mr-2"
+                        aria-label="Toggle menu"
+                    >
+                        <Menu size={24} />
+                    </button>
+                )}
             </div>
 
             {/* Right side - User info */}
