@@ -21,9 +21,21 @@ import { useComerciales } from '@/hooks/organizacion/useComerciales';
 import ModalCliente from '../cartera/components/modal-cliente';
 
 const ESTADO_COLORS: Record<string, string> = {
-    'PROSPECTO': 'bg-yellow-100 text-yellow-700',
-    'CLIENTE': 'bg-green-100 text-green-700',
+    'PROSPECTO': 'bg-sky-100 text-sky-700',
+    'EN_NEGOCIACION': 'bg-amber-100 text-amber-700',
+    'CERRADA': 'bg-green-100 text-green-700',
+    'CARGA_ENTREGADA': 'bg-emerald-100 text-emerald-700',
+    'PERDIDO': 'bg-red-100 text-red-700',
     'INACTIVO': 'bg-gray-100 text-gray-500',
+};
+
+const ESTADO_LABELS: Record<string, string> = {
+    'PROSPECTO': 'Prospecto',
+    'EN_NEGOCIACION': 'En negociación',
+    'CERRADA': 'Cerrada',
+    'CARGA_ENTREGADA': 'Carga entregada',
+    'PERDIDO': 'Perdido',
+    'INACTIVO': 'Inactivo',
 };
 
 // Helper para formatear fechas evitando problemas de zona horaria
@@ -127,9 +139,9 @@ export default function CarteraGlobalPage() {
                     <div className="bg-gradient-to-br from-green-500 to-green-600 p-4 rounded-xl text-white shadow-lg shadow-green-200">
                         <div className="flex items-center gap-2 mb-1">
                             <UserCheck className="w-5 h-5 opacity-80" />
-                            <span className="text-sm opacity-80">Clientes</span>
+                            <span className="text-sm opacity-80">Cerradas</span>
                         </div>
-                        <span className="text-2xl font-bold">{(stats.clientes_activos ?? 0).toLocaleString()}</span>
+                        <span className="text-2xl font-bold">{(stats.cerradas ?? 0).toLocaleString()}</span>
                     </div>
                     <div className="bg-gradient-to-br from-gray-500 to-gray-600 p-4 rounded-xl text-white shadow-lg shadow-gray-200">
                         <div className="flex items-center gap-2 mb-1">
@@ -169,7 +181,10 @@ export default function CarteraGlobalPage() {
                         >
                             <option value="">Todos los estados</option>
                             <option value="PROSPECTO">Prospectos</option>
-                            <option value="CLIENTE">Clientes</option>
+                            <option value="EN_NEGOCIACION">En Negociación</option>
+                            <option value="CERRADA">Cerradas</option>
+                            <option value="CARGA_ENTREGADA">Carga Entregada</option>
+                            <option value="PERDIDO">Perdidos</option>
                             <option value="INACTIVO">Inactivos</option>
                         </select>
 
@@ -249,7 +264,7 @@ export default function CarteraGlobalPage() {
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${ESTADO_COLORS[cliente.tipo_estado] || 'bg-gray-100'}`}>
-                                                {cliente.tipo_estado}
+                                                {ESTADO_LABELS[cliente.tipo_estado] || cliente.tipo_estado}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">

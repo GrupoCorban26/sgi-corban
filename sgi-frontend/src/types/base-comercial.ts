@@ -43,6 +43,8 @@ export interface CargarBaseResponse {
     success: boolean;
     contactos: ContactoAsignado[];
     cantidad: number;
+    contactos_liberados?: number;
+    rucs_excluidos?: Record<string, number>; // { "PERDIDO": 5, "INACTIVO": 12 }
 }
 
 export interface FeedbackPayload {

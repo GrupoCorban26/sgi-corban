@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, case, and_, extract
 from app.models.comercial import Cliente, ClienteContacto, Cita, CasoLlamada
+from app.models.historial_llamadas import HistorialLlamada
 from app.models.comercial_inbox import Inbox
 from app.models.cliente_historial import ClienteHistorial
 from app.models.cliente_gestion import ClienteGestion
@@ -56,21 +57,21 @@ class AnalyticsService:
             uid = com.id
             nombre = com.nombres.split()[0] if com.nombres else 'Sin Nombre'
             
-            # Total llamadas (ClienteContacto con fecha_llamada)
-            stmt_llamadas = select(func.count()).select_from(ClienteContacto).where(
-                and_(ClienteContacto.asignado_a == uid, ClienteContacto.fecha_llamada >= dt_inicio, ClienteContacto.fecha_llamada <= dt_fin)
+            # Total llamadas (HistorialLlamada con fecha_llamada)
+            stmt_llamadas = select(func.count()).select_from(HistorialLlamada).where(
+                and_(HistorialLlamada.comercial_id == uid, HistorialLlamada.fecha_llamada >= dt_inicio, HistorialLlamada.fecha_llamada <= dt_fin)
             )
             total_llamadas = (await self.db.execute(stmt_llamadas)).scalar() or 0
             
             # Llamadas contestadas
-            stmt_contestadas = select(func.count()).select_from(ClienteContacto).join(CasoLlamada).where(
-                and_(ClienteContacto.asignado_a == uid, ClienteContacto.fecha_llamada >= dt_inicio, ClienteContacto.fecha_llamada <= dt_fin, CasoLlamada.contestado == True)
+            stmt_contestadas = select(func.count()).select_from(HistorialLlamada).join(CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id).where(
+                and_(HistorialLlamada.comercial_id == uid, HistorialLlamada.fecha_llamada >= dt_inicio, HistorialLlamada.fecha_llamada <= dt_fin, CasoLlamada.contestado == True)
             )
             llamadas_contestadas = (await self.db.execute(stmt_contestadas)).scalar() or 0
             
             # Llamadas efectivas
-            stmt_efectivas = select(func.count()).select_from(ClienteContacto).join(CasoLlamada).where(
-                and_(ClienteContacto.asignado_a == uid, ClienteContacto.fecha_llamada >= dt_inicio, ClienteContacto.fecha_llamada <= dt_fin, CasoLlamada.gestionable == True)
+            stmt_efectivas = select(func.count()).select_from(HistorialLlamada).join(CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id).where(
+                and_(HistorialLlamada.comercial_id == uid, HistorialLlamada.fecha_llamada >= dt_inicio, HistorialLlamada.fecha_llamada <= dt_fin, CasoLlamada.gestionable == True)
             )
             llamadas_efectivas = (await self.db.execute(stmt_efectivas)).scalar() or 0
             

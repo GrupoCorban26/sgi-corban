@@ -14,11 +14,12 @@ logger = logging.getLogger(__name__)
 
 # Transiciones válidas del pipeline de ventas
 TRANSICIONES_VALIDAS: dict[str, list[str]] = {
-    "PROSPECTO":       ["EN_NEGOCIACION", "PERDIDO"],
-    "EN_NEGOCIACION":  ["CLIENTE", "PERDIDO", "PROSPECTO"],
-    "CLIENTE":         ["PERDIDO"],
-    "PERDIDO":         ["PROSPECTO"],
-    "INACTIVO":        ["PROSPECTO"],
+    "PROSPECTO":          ["EN_NEGOCIACION", "PERDIDO"],
+    "EN_NEGOCIACION":     ["CERRADA", "PERDIDO", "PROSPECTO"],
+    "CERRADA":            ["CARGA_ENTREGADA", "PERDIDO"],
+    "CARGA_ENTREGADA":    ["PROSPECTO"],  # Ciclo: puede volver a ser prospecto para nueva operación
+    "PERDIDO":            ["PROSPECTO"],
+    "INACTIVO":           ["PROSPECTO"],
 }
 
 
@@ -113,7 +114,8 @@ class ClientesService:
             func.count().label('total'),
             func.sum(case((Cliente.tipo_estado == 'PROSPECTO', 1), else_=0)).label('prospectos'),
             func.sum(case((Cliente.tipo_estado == 'EN_NEGOCIACION', 1), else_=0)).label('en_negociacion'),
-            func.sum(case((Cliente.tipo_estado == 'CLIENTE', 1), else_=0)).label('clientes_activos'),
+            func.sum(case((Cliente.tipo_estado == 'CERRADA', 1), else_=0)).label('cerradas'),
+            func.sum(case((Cliente.tipo_estado == 'CARGA_ENTREGADA', 1), else_=0)).label('carga_entregada'),
             func.sum(case((Cliente.tipo_estado == 'PERDIDO', 1), else_=0)).label('perdidos'),
             func.sum(case((Cliente.tipo_estado == 'INACTIVO', 1), else_=0)).label('inactivos')
         ).where(base_filter)
@@ -123,11 +125,11 @@ class ClientesService:
             
         row = (await self.db.execute(stmt)).first()
         
-        # Stats por origen
+        # Stats por origen — "convertidos" = CERRADA + CARGA_ENTREGADA
         stmt_origen = select(
             Cliente.origen,
             func.count().label('total'),
-            func.sum(case((Cliente.tipo_estado == 'CLIENTE', 1), else_=0)).label('convertidos')
+            func.sum(case((Cliente.tipo_estado.in_(['CERRADA', 'CARGA_ENTREGADA']), 1), else_=0)).label('convertidos')
         ).where(base_filter).group_by(Cliente.origen)
         
         if comercial_ids:
@@ -149,7 +151,8 @@ class ClientesService:
             "total": row.total or 0,
             "prospectos": row.prospectos or 0,
             "en_negociacion": row.en_negociacion or 0,
-            "clientes_activos": row.clientes_activos or 0,
+            "cerradas": row.cerradas or 0,
+            "carga_entregada": row.carga_entregada or 0,
             "perdidos": row.perdidos or 0,
             "inactivos": row.inactivos or 0,
             "por_origen": origenes
@@ -356,8 +359,8 @@ class ClientesService:
             cliente.updated_by = updated_by
             cliente.updated_at = datetime.now()
             
-            # Auto-poblar fecha_conversion_cliente cuando pasa a CLIENTE
-            if nuevo_estado == "CLIENTE" and not cliente.fecha_conversion_cliente:
+            # Auto-poblar fecha_conversion_cliente cuando pasa a CERRADA
+            if nuevo_estado == "CERRADA" and not cliente.fecha_conversion_cliente:
                 cliente.fecha_conversion_cliente = datetime.now()
             
             # Registrar en historial
@@ -499,11 +502,18 @@ class ClientesService:
             return {"success": 0, "message": f"Error al archivar: {str(e)}"}
 
     async def _cascade_contactos(self, ruc: str, activate: bool):
-        """Activa o desactiva contactos según el RUC."""
+        """Activa o desactiva contactos según el RUC.
+        Al desactivar, protege contactos ASIGNADO a un comercial para no afectar su bandeja."""
         stmt = select(ClienteContacto).where(ClienteContacto.ruc == ruc)
         result = await self.db.execute(stmt)
         contactos = result.scalars().all()
         for c in contactos:
+            if not activate and c.estado == 'ASIGNADO':
+                # No desactivar contactos que están en la bandeja de un comercial
+                logger.warning(
+                    f"Contacto {c.id} (RUC: {ruc}) no desactivado: está ASIGNADO al comercial {c.asignado_a}"
+                )
+                continue
             c.is_active = activate
 
     # =========================================================================

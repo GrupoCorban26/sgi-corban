@@ -19,6 +19,7 @@ export interface GestionCreate {
     resultado: string;
     comentario?: string;
     proxima_fecha_contacto?: string;
+    nuevo_estado?: string;
 }
 
 // ============================================

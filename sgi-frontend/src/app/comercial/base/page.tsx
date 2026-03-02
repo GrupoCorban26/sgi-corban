@@ -76,7 +76,24 @@ export default function BaseComercialPage() {
         paisOrigen: paisSeleccionado.length > 0 ? paisSeleccionado : undefined,
         partidaArancelaria: partidaSeleccionada.length > 0 ? partidaSeleccionada : undefined
       });
-      toast.success(`¡${result.cantidad} contactos cargados!`);
+
+      // Construir mensaje informativo
+      let mensaje = `¡${result.cantidad} contactos cargados!`;
+
+      if (result.contactos_liberados && result.contactos_liberados > 0) {
+        mensaje += ` (${result.contactos_liberados} liberados por inactividad)`;
+      }
+
+      // Mostrar info de RUCs excluidos si hay
+      const excluidos = result.rucs_excluidos;
+      if (excluidos && (excluidos.PERDIDO || excluidos.INACTIVO)) {
+        const partes = [];
+        if (excluidos.PERDIDO) partes.push(`${excluidos.PERDIDO} perdidos`);
+        if (excluidos.INACTIVO) partes.push(`${excluidos.INACTIVO} inactivos`);
+        toast.info(`RUCs excluidos: ${partes.join(', ')}`, { duration: 5000 });
+      }
+
+      toast.success(mensaje);
       setShowFiltros(false);
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } } };

@@ -24,6 +24,7 @@ class GestionCreate(BaseModel):
     resultado: ResultadoGestion
     comentario: Optional[str] = None
     proxima_fecha_contacto: Optional[date] = None
+    nuevo_estado: Optional[str] = None  # Cambio de estado opcional del cliente
 
 
 class GestionResponse(BaseModel):

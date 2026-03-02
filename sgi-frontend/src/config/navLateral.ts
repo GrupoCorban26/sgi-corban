@@ -1,4 +1,4 @@
-import { LucideIcon, Home, BarChart3, ArrowRightLeft, Users, Database, UserCog, Building2, Package, Cable, Clock } from 'lucide-react';
+import { LucideIcon, Home, BarChart3, ArrowRightLeft, Users, Database, UserCog, Building2, Package, Cable, Clock, Phone } from 'lucide-react';
 
 export interface MenuItem {
   label: string;
@@ -36,6 +36,7 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
   sistemas: [
     { label: 'Inicio', href: '/sistemas', icon: Home },
     { label: 'Reportes', href: '/sistemas/reportes', icon: BarChart3 },
+    { label: 'Hist. Llamadas', href: '/sistemas/reportes-llamadas', icon: Phone },
     { label: 'Transacciones', href: '/sistemas/transacciones', icon: ArrowRightLeft },
     { label: 'Contactos', href: '/sistemas/contactos', icon: Users },
     { label: 'Base', href: '/sistemas/base', icon: Database },

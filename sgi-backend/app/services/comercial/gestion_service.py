@@ -18,7 +18,7 @@ class GestionService:
         self.db = db
 
     async def registrar_gestion(self, cliente_id: int, data: GestionCreate, comercial_id: int) -> dict:
-        """Registra una gestión y actualiza los campos del cliente."""
+        """Registra una gestión y actualiza los campos del cliente. Opcionalmente cambia el estado."""
         try:
             # Verificar que el cliente existe
             cliente = await self.db.get(Cliente, cliente_id)
@@ -44,10 +44,27 @@ class GestionService:
             cliente.updated_at = datetime.now()
             cliente.updated_by = comercial_id
 
+            # Cambiar estado del cliente si se solicita
+            estado_cambiado = None
+            if data.nuevo_estado and data.nuevo_estado != cliente.tipo_estado:
+                from app.services.comercial.clientes_service import ClientesService
+                clientes_svc = ClientesService(self.db)
+                result_estado = await clientes_svc.cambiar_estado(
+                    cliente_id, data.nuevo_estado, updated_by=comercial_id,
+                    motivo=f"Cambio desde gestión: {data.resultado}"
+                )
+                if result_estado.get("success") == 0:
+                    return result_estado  # Retorna error si la transición no es válida
+                estado_cambiado = data.nuevo_estado
+
             await self.db.commit()
             await self.db.refresh(gestion)
 
-            return {"success": 1, "message": "Gestión registrada exitosamente", "id": gestion.id}
+            mensaje = "Gestión registrada exitosamente"
+            if estado_cambiado:
+                mensaje += f" • Estado: {cliente.tipo_estado} → {estado_cambiado}"
+
+            return {"success": 1, "message": mensaje, "id": gestion.id}
         except Exception as e:
             logger.error(f"Error registrando gestión: {e}", exc_info=True)
             await self.db.rollback()

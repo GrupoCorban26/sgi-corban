@@ -2,11 +2,21 @@
 ContactosAsignacionService - Lógica de asignación de leads y feedback.
 Responsabilidad única: asignar leads a comerciales, gestionar feedback y crear clientes.
 """
+import asyncio
+import logging
+from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, or_, update
 from fastapi import HTTPException
 from app.models.comercial import ClienteContacto, Cliente, CasoLlamada, RegistroImportacion
+from app.models.historial_llamadas import HistorialLlamada
+
+logger = logging.getLogger(__name__)
+
+DIAS_ABANDONO = 7  # Días sin feedback para liberar contactos automáticamente
+
+_lock_cargar_base = asyncio.Lock()
 
 
 class ContactosAsignacionService:
@@ -54,100 +64,169 @@ class ContactosAsignacionService:
             })
         return data
     
-    async def cargar_base(self, user_id: int, pais_origen: list = None, partida_arancelaria: list = None):
-        """
-        Lógica de asignación de lotes con TRANSACCIÓN EXPLÍCITA.
-        1. Verifica que no haya leads sin guardar.
-        2. Marca gestionados.
-        3. Selecciona nuevas empresas.
-        4. Asigna.
-        """
-        # 1. Verificar leads sin guardar
-        stmt_check = select(func.count()).where(
-            ClienteContacto.asignado_a == user_id,
+    async def liberar_contactos_abandonados(self):
+        """Libera contactos ASIGNADO sin feedback después de DIAS_ABANDONO días.
+        También libera los contactos EN_GESTION asociados al mismo RUC."""
+        fecha_limite = datetime.now() - timedelta(days=DIAS_ABANDONO)
+        
+        # Buscar contactos abandonados
+        stmt_abandonados = select(ClienteContacto).where(
             ClienteContacto.estado == 'ASIGNADO',
             ClienteContacto.is_active == True,
-            ClienteContacto.fecha_llamada.is_(None)
+            ClienteContacto.fecha_llamada.is_(None),
+            ClienteContacto.fecha_asignacion <= fecha_limite
         )
-        leads_sin_guardar = (await self.db.execute(stmt_check)).scalar()
+        result = await self.db.execute(stmt_abandonados)
+        abandonados = result.scalars().all()
         
-        if leads_sin_guardar > 0:
-            raise HTTPException(400, f"Tienes {leads_sin_guardar} contactos sin guardar. Guarda todos los registros primero.")
+        if not abandonados:
+            return 0
         
-        # TRANSACCIÓN EXPLÍCITA para garantizar atomicidad
-        async with self.db.begin_nested():
-            # 2. Marcar contactos anteriores como GESTIONADO
-            stmt_update_prev = update(ClienteContacto).where(
+        rucs_liberados = set()
+        for contacto in abandonados:
+            contacto.estado = 'DISPONIBLE'
+            contacto.asignado_a = None
+            contacto.fecha_asignacion = None
+            contacto.lote_asignacion = None
+            rucs_liberados.add(contacto.ruc)
+        
+        # Liberar también los contactos EN_GESTION de esos RUCs
+        if rucs_liberados:
+            await self.db.execute(update(ClienteContacto).where(
+                ClienteContacto.ruc.in_(list(rucs_liberados)),
+                ClienteContacto.estado == 'EN_GESTION',
+                ClienteContacto.is_active == True
+            ).values(estado='DISPONIBLE'))
+        
+        await self.db.commit()
+        logger.info(f"Liberados {len(abandonados)} contactos abandonados de {len(rucs_liberados)} RUCs")
+        return len(abandonados)
+
+    async def cargar_base(self, user_id: int, pais_origen: list = None, partida_arancelaria: list = None):
+        """
+        Lógica de asignación de lotes con TRANSACCIÓN EXPLÍCITA. Protegida con candado de concurrencia.
+        1. Libera contactos abandonados (>7 días sin feedback).
+        2. Verifica que no haya leads sin guardar.
+        3. Marca gestionados.
+        4. Selecciona nuevas empresas.
+        5. Asigna.
+        """
+        if _lock_cargar_base.locked():
+             raise HTTPException(409, "Carga de base en curso. Espere un momento e intente de nuevo.")
+
+        async with _lock_cargar_base:
+            # 0. Liberar contactos abandonados antes de procesar
+            liberados = await self.liberar_contactos_abandonados()
+            
+            # 1. Verificar leads sin guardar
+            stmt_check = select(func.count()).where(
                 ClienteContacto.asignado_a == user_id,
                 ClienteContacto.estado == 'ASIGNADO',
                 ClienteContacto.is_active == True,
-                ClienteContacto.fecha_llamada.isnot(None)
-            ).values(estado='GESTIONADO')
-            await self.db.execute(stmt_update_prev)
-            
-            # 3. Obtener RUCs disponibles
-            stmt_excluded = select(ClienteContacto.ruc).where(
-                ClienteContacto.estado.in_(['EN_GESTION', 'ASIGNADO']),
-                ClienteContacto.is_active == True
-            ).distinct()
-            
-            stmt_clients = select(Cliente.ruc).where(Cliente.ruc.isnot(None))
-            
-            stmt_rucs = select(ClienteContacto.ruc).join(
-                RegistroImportacion, ClienteContacto.ruc == RegistroImportacion.ruc
-            ).where(
-                ClienteContacto.is_client == False,
-                ClienteContacto.is_active == True,
-                ClienteContacto.estado == 'DISPONIBLE',
-                ClienteContacto.ruc.notin_(stmt_excluded),
-                ClienteContacto.ruc.notin_(stmt_clients)
+                ClienteContacto.fecha_llamada.is_(None)
             )
-                
-            if pais_origen:
-                conditions = [RegistroImportacion.paises_origen.like(f"%{p}%") for p in pais_origen]
-                stmt_rucs = stmt_rucs.where(or_(*conditions))
-            if partida_arancelaria:
-                conditions_partida = [RegistroImportacion.partidas_arancelarias.like(f"%{p}%") for p in partida_arancelaria]
-                stmt_rucs = stmt_rucs.where(or_(*conditions_partida))
-                
-            stmt_rucs = stmt_rucs.group_by(ClienteContacto.ruc).order_by(func.newid()).limit(50)
+            leads_sin_guardar = (await self.db.execute(stmt_check)).scalar()
             
-            rucs_disponibles = (await self.db.execute(stmt_rucs)).scalars().all()
+            if leads_sin_guardar > 0:
+                raise HTTPException(400, f"Tienes {leads_sin_guardar} contactos sin guardar. Guarda todos los registros primero.")
             
-            if not rucs_disponibles:
-                return {"success": True, "contactos": [], "cantidad": 0, "message": "No hay más leads disponibles con esos filtros."}
+            # TRANSACCIÓN EXPLÍCITA para garantizar atomicidad
+            async with self.db.begin_nested():
+                # 2. Marcar contactos anteriores como GESTIONADO
+                stmt_update_prev = update(ClienteContacto).where(
+                    ClienteContacto.asignado_a == user_id,
+                    ClienteContacto.estado == 'ASIGNADO',
+                    ClienteContacto.is_active == True,
+                    ClienteContacto.fecha_llamada.isnot(None)
+                ).values(estado='GESTIONADO')
+                await self.db.execute(stmt_update_prev)
                 
-            # 4. Asignar UN contacto por RUC
-            for ruc in rucs_disponibles:
-                stmt_one = select(ClienteContacto).where(
-                    ClienteContacto.ruc == ruc, 
-                    ClienteContacto.estado == 'DISPONIBLE',
+                # 3. Obtener RUCs excluidos por estado EN_GESTION/ASIGNADO
+                stmt_excluded = select(ClienteContacto.ruc).where(
+                    ClienteContacto.estado.in_(['EN_GESTION', 'ASIGNADO']),
                     ClienteContacto.is_active == True
-                ).limit(1)
-                contact = (await self.db.execute(stmt_one)).scalars().first()
+                ).distinct()
                 
-                if contact:
-                    contact.asignado_a = user_id
-                    contact.fecha_asignacion = func.now()
-                    contact.lote_asignacion = (contact.lote_asignacion or 0) + 1
-                    contact.estado = 'ASIGNADO'
-                    contact.caso_id = None
-                    contact.comentario = None
-                    contact.fecha_llamada = None
+                # 3b. Obtener RUCs excluidos por tener un Cliente existente
+                stmt_clients = select(Cliente.ruc).where(Cliente.ruc.isnot(None))
+                
+                # 3c. Contar cuántos RUCs están excluidos por clientes PERDIDO/INACTIVO
+                stmt_excluidos_pipeline = select(
+                    Cliente.tipo_estado,
+                    func.count(func.distinct(Cliente.ruc)).label('total')
+                ).where(
+                    Cliente.ruc.isnot(None),
+                    Cliente.tipo_estado.in_(['PERDIDO', 'INACTIVO'])
+                ).group_by(Cliente.tipo_estado)
+                resultado_excluidos = (await self.db.execute(stmt_excluidos_pipeline)).all()
+                rucs_excluidos_info = {row.tipo_estado: row.total for row in resultado_excluidos}
+                
+                # 4. Seleccionar RUCs disponibles
+                stmt_rucs = select(ClienteContacto.ruc).join(
+                    RegistroImportacion, ClienteContacto.ruc == RegistroImportacion.ruc
+                ).where(
+                    ClienteContacto.is_client == False,
+                    ClienteContacto.is_active == True,
+                    ClienteContacto.estado == 'DISPONIBLE',
+                    ClienteContacto.ruc.notin_(stmt_excluded),
+                    ClienteContacto.ruc.notin_(stmt_clients)
+                )
                     
-                # 5. Marcar otros de ese RUC como EN_GESTION
-                stmt_others = update(ClienteContacto).where(
-                    ClienteContacto.ruc == ruc,
-                    ClienteContacto.estado == 'DISPONIBLE',
-                    ClienteContacto.is_active == True
-                ).values(estado='EN_GESTION')
-                await self.db.execute(stmt_others)
-        
-        await self.db.commit()
-        
-        # Obtener contactos asignados y devolver con cantidad
-        contactos = await self.get_mis_contactos_asignados(user_id)
-        return {"contactos": contactos, "cantidad": len(contactos)}
+                if pais_origen:
+                    conditions = [RegistroImportacion.paises_origen.like(f"%{p}%") for p in pais_origen]
+                    stmt_rucs = stmt_rucs.where(or_(*conditions))
+                if partida_arancelaria:
+                    conditions_partida = [RegistroImportacion.partidas_arancelarias.like(f"%{p}%") for p in partida_arancelaria]
+                    stmt_rucs = stmt_rucs.where(or_(*conditions_partida))
+                    
+                stmt_rucs = stmt_rucs.group_by(ClienteContacto.ruc).order_by(func.newid()).limit(50)
+                
+                rucs_disponibles = (await self.db.execute(stmt_rucs)).scalars().all()
+                
+                if not rucs_disponibles:
+                    return {
+                        "success": True, "contactos": [], "cantidad": 0,
+                        "message": "No hay más leads disponibles con esos filtros.",
+                        "contactos_liberados": liberados,
+                        "rucs_excluidos": rucs_excluidos_info
+                    }
+                    
+                # 5. Asignar UN contacto por RUC
+                for ruc in rucs_disponibles:
+                    stmt_one = select(ClienteContacto).where(
+                        ClienteContacto.ruc == ruc, 
+                        ClienteContacto.estado == 'DISPONIBLE',
+                        ClienteContacto.is_active == True
+                    ).limit(1)
+                    contact = (await self.db.execute(stmt_one)).scalars().first()
+                    
+                    if contact:
+                        contact.asignado_a = user_id
+                        contact.fecha_asignacion = func.now()
+                        contact.lote_asignacion = (contact.lote_asignacion or 0) + 1
+                        contact.estado = 'ASIGNADO'
+                        contact.caso_id = None
+                        contact.comentario = None
+                        contact.fecha_llamada = None
+                        
+                    # 6. Marcar otros de ese RUC como EN_GESTION
+                    stmt_others = update(ClienteContacto).where(
+                        ClienteContacto.ruc == ruc,
+                        ClienteContacto.estado == 'DISPONIBLE',
+                        ClienteContacto.is_active == True
+                    ).values(estado='EN_GESTION')
+                    await self.db.execute(stmt_others)
+                
+                await self.db.commit()
+            
+            # Obtener contactos asignados y devolver con cantidad e info adicional
+            contactos = await self.get_mis_contactos_asignados(user_id)
+            return {
+                "contactos": contactos,
+                "cantidad": len(contactos),
+                "contactos_liberados": liberados,
+                "rucs_excluidos": rucs_excluidos_info
+            }
 
     async def assign_leads_batch(self, user_id: int):
         """Asigna contactos a un comercial siguiendo la lógica de lotes y empresas únicas."""
@@ -185,6 +264,16 @@ class ContactosAsignacionService:
             if is_positive or cliente_existe:
                 contact.is_client = True
                  
+            # Guardar en Historial
+            historial = HistorialLlamada(
+                contacto_id=contact.id,
+                ruc=contact.ruc,
+                comercial_id=user_id or contact.asignado_a,
+                caso_id=caso_id,
+                comentario=comentario
+            )
+            self.db.add(historial)
+            
             if cliente_existe:
                 mensaje = f"Nota: Este cliente ya está siendo gestionado (ID: {cliente_existe.id})"
             
