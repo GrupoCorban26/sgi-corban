@@ -1,12 +1,11 @@
 import React, { useState } from 'react';
 import { ChatMessage } from '@/types/chat';
-import { Check, CheckCheck, Download, FileText, Headphones, Video } from 'lucide-react';
+import { Check, CheckCheck, Download, FileText, Headphones, Bot } from 'lucide-react';
 
 interface Props {
     msg: ChatMessage;
 }
 
-// URL base del backend para servir archivos
 const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:8000';
 
 export default function MessageBubble({ msg }: Props) {
@@ -15,9 +14,9 @@ export default function MessageBubble({ msg }: Props) {
     const [imgError, setImgError] = useState(false);
 
     const getBubbleClass = () => {
-        if (!isOut) return 'bg-white rounded-tr-xl rounded-bl-xl rounded-br-xl rounded-tl-sm'; // Client message
-        if (isBot) return 'bg-blue-50/90 rounded-tl-xl rounded-bl-xl rounded-br-sm rounded-tr-xl border border-blue-100'; // Bot message
-        return 'bg-[#dcf8c6] rounded-tl-xl rounded-bl-xl rounded-br-sm rounded-tr-xl'; // Commercial message (WhatsApp green)
+        if (!isOut) return 'bg-white shadow-sm';
+        if (isBot) return 'bg-blue-50/90 border border-blue-100/60 shadow-sm';
+        return 'bg-[#d9fdd3] shadow-sm';
     };
 
     const getAlignment = () => {
@@ -32,9 +31,7 @@ export default function MessageBubble({ msg }: Props) {
 
     const getMediaUrl = () => {
         if (!msg.media_url) return null;
-        // Si ya es URL absoluta, usarla directamente
         if (msg.media_url.startsWith('http')) return msg.media_url;
-        // Si es ruta relativa, construir URL completa
         return `${API_BASE}${msg.media_url}`;
     };
 
@@ -45,7 +42,7 @@ export default function MessageBubble({ msg }: Props) {
             case 'image':
                 if (!mediaUrl || imgError) {
                     return (
-                        <div className="flex items-center gap-2 py-2 px-3 bg-gray-100 rounded-lg text-gray-500 text-sm">
+                        <div className="flex items-center gap-2 py-2 px-3 bg-slate-50 rounded-lg text-slate-500 text-sm">
                             <FileText size={16} />
                             <span>📷 Imagen no disponible</span>
                         </div>
@@ -82,7 +79,7 @@ export default function MessageBubble({ msg }: Props) {
                 if (!mediaUrl) return null;
                 return (
                     <div className="flex items-center gap-2 min-w-[200px]">
-                        <Headphones size={18} className="text-gray-500 shrink-0" />
+                        <Headphones size={18} className="text-slate-500 shrink-0" />
                         <audio src={mediaUrl} controls className="w-full h-8" preload="metadata" />
                     </div>
                 );
@@ -93,13 +90,15 @@ export default function MessageBubble({ msg }: Props) {
                         href={mediaUrl || '#'}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-3 py-2 px-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors border border-gray-200"
+                        className="flex items-center gap-3 py-2.5 px-3 bg-slate-50 rounded-lg hover:bg-slate-100 transition-colors border border-slate-200"
                     >
-                        <FileText size={20} className="text-blue-500 shrink-0" />
-                        <span className="text-sm text-gray-700 truncate flex-1">
+                        <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <FileText size={16} className="text-blue-600" />
+                        </div>
+                        <span className="text-sm text-slate-700 truncate flex-1">
                             {msg.contenido || 'Documento'}
                         </span>
-                        <Download size={16} className="text-gray-400 shrink-0" />
+                        <Download size={14} className="text-slate-400 shrink-0" />
                     </a>
                 );
 
@@ -124,38 +123,51 @@ export default function MessageBubble({ msg }: Props) {
     const hasCaption = hasMedia && msg.contenido && !['📷 Imagen', '🎥 Video', '🎵 Audio', '📄 Documento', '🪄 Sticker'].includes(msg.contenido);
 
     return (
-        <div className={`flex w-full mb-3 ${getAlignment()}`}>
-            <div className={`relative max-w-[85%] md:max-w-[70%] px-3 pt-2 pb-1 shadow-sm ${getBubbleClass()}`}>
+        <div className={`flex w-full mb-1.5 ${getAlignment()}`}>
+            <div className={`
+                relative max-w-[85%] md:max-w-[65%] px-3 pt-2 pb-1 rounded-2xl
+                ${getBubbleClass()}
+                ${!isOut ? 'rounded-tl-md' : 'rounded-tr-md'}
+            `}>
 
-                {/* Identifier for bot */}
+                {/* Identificador del bot */}
                 {isBot && (
-                    <div className="text-[10px] font-bold text-blue-800 mb-0.5 uppercase tracking-wider flex items-center gap-1">
-                        🤖 Bot Corban
+                    <div className="flex items-center gap-1 mb-0.5">
+                        <Bot size={10} className="text-blue-500" />
+                        <span className="text-[10px] font-bold text-blue-600 uppercase tracking-wider">
+                            Corby Bot
+                        </span>
                     </div>
                 )}
 
-                {/* Media content */}
+                {/* Contenido multimedia */}
                 {hasMedia && (
-                    <div className="mb-1">
+                    <div className="mb-1.5">
                         {renderMediaContent()}
                     </div>
                 )}
 
-                {/* Text content - show caption for media or regular text */}
+                {/* Contenido de texto */}
                 {(!hasMedia || hasCaption) && (
-                    <p className="text-[14px] text-gray-800 whitespace-pre-wrap leading-relaxed">
+                    <p className="text-[14px] text-slate-800 whitespace-pre-wrap leading-relaxed">
                         {msg.contenido}
                     </p>
                 )}
 
-                {/* Footer with time and read receipt */}
-                <div className={`flex items-center justify-end gap-1 mt-1 -mr-1 ${!hasMedia && msg.contenido.length < 20 ? 'absolute bottom-1 right-2' : ''}`}>
-                    <span className="text-[10px] text-gray-500 font-medium select-none">
+                {/* Footer con hora y estado de lectura */}
+                <div className={`
+                    flex items-center justify-end gap-1 mt-0.5 -mr-1
+                    ${!hasMedia && msg.contenido.length < 25 ? 'float-right ml-3 -mb-0.5 relative top-1' : ''}
+                `}>
+                    <span className="text-[10px] text-slate-400 font-medium select-none">
                         {formatTime(msg.created_at)}
                     </span>
                     {isOut && (
-                        <span className={`text-[12px] flex items-center ${msg.leido ? 'text-blue-500' : 'text-gray-400'}`}>
-                            {msg.leido ? <CheckCheck size={14} strokeWidth={2.5} /> : <Check size={14} strokeWidth={2.5} />}
+                        <span className={`flex items-center ${msg.leido ? 'text-blue-500' : 'text-slate-400'}`}>
+                            {msg.leido
+                                ? <CheckCheck size={14} strokeWidth={2.5} />
+                                : <Check size={14} strokeWidth={2.5} />
+                            }
                         </span>
                     )}
                 </div>
