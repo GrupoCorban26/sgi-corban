@@ -190,7 +190,7 @@ class ChatbotService:
                         Inbox.telefono.like(f"%{phone}%"),
                         Inbox.estado.in_(['PENDIENTE', 'EN_GESTION'])
                     )
-                )
+                ).order_by(Inbox.id.desc())
                 result_inbox_activo = await self.db.execute(query_inbox_activo)
                 lead_activo = result_inbox_activo.scalars().first()
 
@@ -296,7 +296,7 @@ class ChatbotService:
         """Verifica si el cliente ya tiene un lead/comercial asignado, si no, asigna uno por Round Robin."""
         query_inbox = select(Inbox).where(
             and_(Inbox.telefono.like(f"%{phone}%"), Inbox.estado == 'PENDIENTE')
-        )
+        ).order_by(Inbox.id.desc())
         result = await self.db.execute(query_inbox)
         existing_lead = result.scalars().first()
 

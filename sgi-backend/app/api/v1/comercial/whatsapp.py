@@ -142,7 +142,7 @@ async def receive_webhook_message(
                             Inbox.telefono.like(f"%{from_num_norm}%"),
                             Inbox.estado.not_in(['CIERRE', 'DESCARTADO', 'CONVERTIDO'])
                         )
-                    )
+                    ).order_by(Inbox.id.desc())
                     result_inbox = await db.execute(query_inbox)
                     inbox = result_inbox.scalars().first()
                     
@@ -152,7 +152,7 @@ async def receive_webhook_message(
                     # This guarantees we capture all conversation history before it's assigned to a commercial
                     if not inbox and msg_type in ("text", "interactive", "location", "image", "document", "video", "audio", "sticker"):
                         new_inbox = Inbox(
-                            telefono=from_number,
+                            telefono=from_num_norm,
                             mensaje_inicial=incoming.message_text if msg_type == "text" else "Interacción inicial",
                             nombre_whatsapp=contact_name,
                             estado="NUEVO",

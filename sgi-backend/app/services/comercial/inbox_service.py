@@ -30,7 +30,7 @@ class InboxService:
                 Inbox.telefono.like(f"%{phone}%"), 
                 Inbox.estado.in_(['PENDIENTE', 'NUEVO'])
             )
-        )
+        ).order_by(Inbox.id.desc())
         result_inbox = await self.db.execute(query_inbox)
         existing_inbox = result_inbox.scalars().first()
         
