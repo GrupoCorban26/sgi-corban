@@ -146,15 +146,26 @@ class ChatService:
                     # el bot responderá según configuramos (SILENCIO, a menos que envíe Menú)
                     pass
             
-            # Registrar primera respuesta del asesor si es SALIENTE
-            if msg_in.direccion == 'SALIENTE' and not inbox.fecha_primera_respuesta:
-                inbox.fecha_primera_respuesta = datetime.now()
-                base_date = inbox.fecha_asignacion or inbox.fecha_recepcion
-                if base_date:
-                    base_date_naive = base_date.replace(tzinfo=None) if base_date.tzinfo else base_date
-                    inbox.tiempo_respuesta_segundos = int(
-                        (datetime.now() - base_date_naive).total_seconds()
-                    )
+            if msg_in.direccion == 'SALIENTE' and msg_in.remitente_tipo == 'COMERCIAL':
+                inbox.modo = 'ASESOR'
+                if inbox.estado in ['NUEVO', 'PENDIENTE']:
+                    inbox.estado = 'EN_GESTION'
+                    
+                if not inbox.fecha_primera_respuesta:
+                    inbox.fecha_primera_respuesta = datetime.now()
+                    base_date = inbox.fecha_asignacion or inbox.fecha_recepcion
+                    if base_date:
+                        base_date_naive = base_date.replace(tzinfo=None) if base_date.tzinfo else base_date
+                        inbox.tiempo_respuesta_segundos = int(
+                            (datetime.now() - base_date_naive).total_seconds()
+                        )
+                
+                # Destruir sesión activa del bot para que el bot no se entrometa
+                from app.services.comercial.chatbot_service import ChatbotService
+                bot_svc = ChatbotService(self.db)
+                session = await bot_svc._get_active_session(inbox.telefono)
+                if session:
+                    await bot_svc._delete_session(session)
         
         await self.db.commit()
         await self.db.refresh(db_msg)
