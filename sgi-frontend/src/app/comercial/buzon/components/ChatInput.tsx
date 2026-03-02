@@ -24,18 +24,28 @@ export default function ChatInput({ inboxId, disabled = false }: Props) {
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const quickRef = useRef<HTMLDivElement>(null);
 
-    const handleSend = async () => {
-        if (!message.trim() || disabled) return;
+    const handleSend = () => {
+        if (!message.trim() || disabled || sendMessage.isPending) return;
 
-        try {
-            await sendMessage.mutateAsync({ inboxId, contenido: message.trim() });
-            setMessage('');
-            if (inputRef.current) {
-                inputRef.current.style.height = 'auto';
-            }
-        } catch {
-            toast.error('Error al enviar mensaje');
+        const contenido = message.trim();
+
+        // Limpiar UI instantaneamente (Optimistic Update en useChat se hará cargo)
+        setMessage('');
+        if (inputRef.current) {
+            inputRef.current.style.height = 'auto';
+            inputRef.current.focus();
         }
+
+        // Ejecutar mutación sin await para evitar bloquear el ref de React
+        sendMessage.mutate(
+            { inboxId, contenido },
+            {
+                onError: () => {
+                    toast.error('Error al enviar mensaje');
+                    setMessage(contenido); // Restaurar contenido si falló
+                }
+            }
+        );
     };
 
     const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -138,9 +148,9 @@ export default function ChatInput({ inboxId, disabled = false }: Props) {
                         value={message}
                         onChange={handleInput}
                         onKeyDown={handleKeyDown}
-                        disabled={disabled}
+                        disabled={disabled || sendMessage.isPending}
                         placeholder={disabled ? "Chat bloqueado..." : "Escribe un mensaje..."}
-                        className="flex-1 py-3 px-1 bg-transparent focus:outline-none resize-none min-h-[44px] max-h-[120px] text-slate-800 text-sm placeholder:text-slate-400"
+                        className="flex-1 py-3 px-1 bg-transparent focus:outline-none resize-none min-h-[44px] max-h-[120px] text-slate-800 text-sm placeholder:text-slate-400 disabled:opacity-50"
                         rows={1}
                     />
                 </div>
@@ -149,10 +159,10 @@ export default function ChatInput({ inboxId, disabled = false }: Props) {
             {/* Botón enviar */}
             <button
                 onClick={handleSend}
-                disabled={disabled || !message.trim()}
+                disabled={disabled || !message.trim() || sendMessage.isPending}
                 className={`
                     p-2.5 rounded-xl mb-0.5 flex items-center justify-center transition-all duration-200
-                    ${message.trim() && !disabled
+                    ${message.trim() && !disabled && !sendMessage.isPending
                         ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-md shadow-emerald-200 hover:shadow-lg hover:shadow-emerald-300 scale-100 active:scale-95'
                         : 'bg-transparent text-slate-300'
                     }

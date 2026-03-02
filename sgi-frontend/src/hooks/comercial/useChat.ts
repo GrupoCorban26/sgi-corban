@@ -42,7 +42,37 @@ export const useChatActions = () => {
             const { data } = await api.post(`${CHAT_URL}/${inboxId}/send`, req);
             return data;
         },
-        onSuccess: (_, variables) => {
+        onMutate: async (newMsg) => {
+            await queryClient.cancelQueries({ queryKey: ['chat-messages', newMsg.inboxId] });
+            const previousMessages = queryClient.getQueryData<ChatMessage[]>(['chat-messages', newMsg.inboxId]);
+
+            // Añadir mensaje fake optimista
+            const optimisticMsg: ChatMessage = {
+                id: Date.now(),
+                inbox_id: newMsg.inboxId,
+                telefono: '...',
+                direccion: 'SALIENTE',
+                remitente_tipo: 'COMERCIAL',
+                remitente_id: null,
+                contenido: newMsg.contenido,
+                tipo_contenido: 'text',
+                media_url: null,
+                whatsapp_msg_id: null,
+                estado_envio: 'ENVIANDO',
+                leido: false,
+                created_at: new Date().toISOString()
+            };
+
+            queryClient.setQueryData<ChatMessage[]>(['chat-messages', newMsg.inboxId], old => [...(old || []), optimisticMsg]);
+
+            return { previousMessages };
+        },
+        onError: (err, newMsg, context) => {
+            if (context?.previousMessages) {
+                queryClient.setQueryData(['chat-messages', newMsg.inboxId], context.previousMessages);
+            }
+        },
+        onSettled: (_, __, variables) => {
             queryClient.invalidateQueries({ queryKey: ['chat-messages', variables.inboxId] });
             queryClient.invalidateQueries({ queryKey: ['chat-conversations'] });
         },
