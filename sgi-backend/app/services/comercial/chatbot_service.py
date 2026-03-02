@@ -57,6 +57,11 @@ SESSION_TIMEOUT_MINUTES = 30
 ATENDIDO_TIMEOUT_MINUTES = 5
 COTIZAR_VENTANA_GRACIA_SEGUNDOS = 60
 
+POST_ATENCION_CONFIRM_BUTTONS = [
+    {"id": "btn_otra_consulta", "title": "📬 Nueva consulta"},
+    {"id": "btn_finalizar", "title": "👋 Finalizar chat"}
+]
+
 DIAS_SEMANA = {
     0: "Lunes", 1: "Martes", 2: "Miércoles",
     3: "Jueves", 4: "Viernes",
@@ -145,6 +150,18 @@ def _sanitizar_razon_social(texto: str) -> str:
 class ChatbotService:
     def __init__(self, db: AsyncSession):
         self.db = db
+
+    def _is_working_hours(self) -> bool:
+        """Verifica si la hora actual está dentro del horario laboral (L-V 8am-6pm, Sáb 8am-11am)."""
+        import pytz
+        lima_tz = pytz.timezone('America/Lima')
+        now = datetime.now(lima_tz)
+        if now.weekday() < 5:  # Lunes a Viernes (0-4)
+            return 8 <= now.hour < 18
+        elif now.weekday() == 5:  # Sábado (5)
+            return 8 <= now.hour < 11
+        return False  # Domingo u horario fuera de rango
+
 
     async def process_message(self, data: WhatsAppIncoming) -> WhatsAppResponse:
         """Punto de entrada principal: procesa un mensaje entrante y retorna la respuesta del bot."""
@@ -239,17 +256,10 @@ class ChatbotService:
                 return await self._handle_agendar_hora(session, data)
             elif state == "AGENDAR_CONFIRMAR":
                 return await self._handle_agendar_confirmar(session, data, phone)
+            elif state == "POST_ATENCION_CONFIRMAR":
+                return await self._handle_post_atencion_confirmar(session, data, phone)
             elif state == "SILENCIO_POST_ATENCION":
-                # Ignorar palabras cortas de cortesía post-cierre.
-                text_lower = data.message_text.strip().lower()
-                cortesia = ["gracias", "ok", "vale", "entendido", "listo", "muy bien", "muchas gracias", "hasta luego", "adios", "chau", "perfecto"]
-                
-                # Si manda una palabra de cortesía, simplemente ignoramos (ni visto ni mensaje).
-                if any(p in text_lower for p in cortesia) and len(text_lower) < 25:
-                    return WhatsAppResponse(action="ignore", messages=[])
-                
-                # Si manda cualquier otra cosa (ej. "hola de nuevo, quisiera cotizar X"), 
-                # borramos la sesión silenciosa y reactivamos mandándolo al menú con saludo de regreso.
+                # Fallback para sesiones antiguas abandonadas
                 await self._delete_session(session)
                 return self._send_menu(es_regreso=True)
             else:
@@ -298,23 +308,38 @@ class ChatbotService:
             and_(Inbox.telefono.like(f"%{phone}%"), Inbox.estado == 'PENDIENTE')
         ).order_by(Inbox.id.desc())
         result = await self.db.execute(query_inbox)
-        existing_lead = result.scalars().first()
+        lead_reciente = result.scalars().first()
+        
+        # Validar horario laboral
+        en_horario = self._is_working_hours()
+        msg_horario = ""
+        if not en_horario:
+            msg_horario = (
+                "\n\n*Nota:* 🕐 Nuestro horario de atención por asesores es de Lunes a Viernes de 8am a 6pm y Sábados de 8am a 11am. "
+                "Tu solicitud ha sido guardada y un asesor se comunicará contigo el próximo día hábil."
+            )
 
-        if existing_lead and existing_lead.asignado_a:
-            query_user = select(Usuario).options(selectinload(Usuario.empleado)).where(Usuario.id == existing_lead.asignado_a)
+        if lead_reciente and lead_reciente.asignado_a:
+            query_user = select(Usuario).options(selectinload(Usuario.empleado)).where(Usuario.id == lead_reciente.asignado_a)
             result_user = await self.db.execute(query_user)
             user = result_user.scalar_one_or_none()
             nombre_comercial = self._get_user_name(user)
 
             # Mantener sesión en ATENDIDO con cooldown corto
-            datos_atendido = {"asesor_nombre": nombre_comercial, "inbox_id": existing_lead.id}
+            datos_atendido = {"asesor_nombre": nombre_comercial, "inbox_id": lead_reciente.id}
             await self._update_session_corta(session, "ATENDIDO", datos_atendido)
+            
+            texto_respuesta = f"Su asesor *{nombre_comercial}* le atenderá en unos minutos. 👋{msg_horario}"
+            if not en_horario:
+                texto_respuesta = f"Su asesor *{nombre_comercial}* continuará con su atención el próximo día hábil.{msg_horario}"
+
             return WhatsAppResponse(
                 action="send_text",
-                messages=[BotMessage(type="text", content=f"Su asesor *{nombre_comercial}* le atenderá en unos minutos. 👋")]
+                messages=[BotMessage(type="text", content=texto_respuesta)]
             )
         else:
             inbox_service = InboxService(self.db)
+            from app.schemas.comercial.inbox import InboxDistribute
             distribute_data = InboxDistribute(
                 telefono=data.from_number,
                 mensaje=mensaje_contexto or "Solicita hablar con un asesor",
@@ -328,9 +353,14 @@ class ChatbotService:
             # Mantener sesión en ATENDIDO con cooldown corto
             datos_atendido = {"asesor_nombre": nombre_comercial, "inbox_id": inbox_id}
             await self._update_session_corta(session, "ATENDIDO", datos_atendido)
+            
+            texto_respuesta = f"¡Perfecto! El asesor *{nombre_comercial}* se pondrá en contacto contigo en breve. 🚀{msg_horario}"
+            if not en_horario:
+                texto_respuesta = f"¡Perfecto! Hemos asignado al asesor *{nombre_comercial}* a tu consulta.{msg_horario}"
+
             return WhatsAppResponse(
                 action="send_text",
-                messages=[BotMessage(type="text", content=f"¡Perfecto! El asesor *{nombre_comercial}* se pondrá en contacto contigo en breve. 🚀")]
+                messages=[BotMessage(type="text", content=texto_respuesta)]
             )
 
     # ===================== ATENDIDO HANDLER =====================
@@ -925,6 +955,63 @@ class ChatbotService:
         except Exception as e:
             logger.error(f"Error en geocodificación inversa: {e}")
             return f"Lat: {lat}, Lon: {lon}"
+
+    async def _handle_post_atencion_confirmar(self, session, data, phone):
+        """Maneja la confirmación después de que un asesor desecha o devuelve un lead."""
+        button_id = data.button_id
+        text_lower = data.message_text.strip().lower()
+        cortesia = ["gracias", "ok", "vale", "entendido", "listo", "muy bien", "muchas gracias", "hasta luego", "adios", "chau", "perfecto"]
+
+        # Si escoge nueva consulta o escribe algo que no es cortesía
+        if button_id == "btn_otra_consulta":
+            await self._delete_session(session)
+            return self._send_menu(es_regreso=True)
+            
+        if button_id == "btn_finalizar" or (any(p in text_lower for p in cortesia) and len(text_lower) < 25):
+            await self._delete_session(session)
+            return WhatsAppResponse(
+                action="send_text",
+                messages=[BotMessage(type="text", content="¡Gracias por comunicarte con Grupo Corban! Que tengas un excelente día. 🤗")]
+            )
+            
+        # Si escribe cualquier otra cosa, asumimos que quiere una nueva consulta
+        await self._delete_session(session)
+        return self._send_menu(es_regreso=True)
+
+    async def initiate_post_atencion(self, phone: str, inbox_id: int):
+        """Inicia el flujo interactivo para despedirse del cliente o reabrir el menú tras la atención."""
+        from app.services.comercial.whatsapp_service import WhatsAppService
+        from app.services.comercial.chat_service import ChatService
+        from app.schemas.comercial.chat import ChatMessageCreate
+
+        # Eliminar cualquier sesión que tenga
+        session = await self._get_active_session(phone)
+        if session:
+            await self._delete_session(session)
+            
+        # Creamos sesión de espera para confirmación
+        await self._create_session(phone, "POST_ATENCION_CONFIRMAR")
+
+        mensaje_cierre = "✅ El asesor ha finalizado la atención.\n\n¿Tienes alguna otra consulta o deseas finalizar el chat?"
+        try:
+            await WhatsAppService.send_interactive_buttons(
+                to=phone,
+                body_text=mensaje_cierre,
+                buttons=POST_ATENCION_CONFIRM_BUTTONS
+            )
+            
+            chat_svc = ChatService(self.db)
+            await chat_svc.save_message(ChatMessageCreate(
+                inbox_id=inbox_id,
+                telefono=phone,
+                direccion='SALIENTE',
+                remitente_tipo='BOT',
+                contenido=mensaje_cierre,
+                estado_envio='ENVIADO',
+                tipo_contenido='text'
+            ))
+        except Exception as e:
+            logger.error(f"Error enviando mensaje de cierre post-atención: {e}")
 
     async def _get_active_session(self, phone: str):
         query = select(ConversationSession).where(

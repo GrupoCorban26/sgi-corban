@@ -256,13 +256,10 @@ class InboxService:
                 lead.motivo_descarte = request_data.get('motivo_descarte')
                 lead.comentario_descarte = request_data.get('comentario_descarte')
                 
-            # Silenciar al bot para que no reaccione automáticamente si el usuario envía "ok"
+            # Iniciar flujo interactivo de despedida
             from app.services.comercial.chatbot_service import ChatbotService
             bot_svc = ChatbotService(self.db)
-            session = await bot_svc._get_active_session(lead.telefono)
-            if session:
-                await bot_svc._delete_session(session)
-            await bot_svc._create_session(lead.telefono, "SILENCIO_POST_ATENCION")
+            await bot_svc.initiate_post_atencion(lead.telefono, lead.id)
                 
             await self.db.commit()
             return True
