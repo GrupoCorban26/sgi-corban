@@ -47,6 +47,12 @@ CONFIRM_BUTTONS = [
     {"id": "btn_volver", "title": "⬅️ Volver"},
 ]
 
+COTIZAR_CONFIRM_BUTTONS = [
+    {"id": "btn_cotizar_listo", "title": "✅ Eso es todo"},
+    {"id": "btn_cotizar_mas", "title": "📝 Agregar más"},
+    {"id": "btn_volver", "title": "⬅️ Volver"},
+]
+
 SESSION_TIMEOUT_MINUTES = 30
 ATENDIDO_TIMEOUT_MINUTES = 5
 COTIZAR_VENTANA_GRACIA_SEGUNDOS = 60
@@ -172,13 +178,38 @@ class ChatbotService:
                 messages=[BotMessage(type="text", content="Operación cancelada. Escribe *menu* cuando quieras volver a empezar. 👋")]
             )
 
-        # 5. Si no hay sesión activa → mensaje de bienvenida con botones
+        # 5. Si no hay sesión activa
         if not session:
             # Si presionó un botón del menú principal, crear sesión y procesar
             if button_id in ("btn_asesor", "btn_cotizar", "btn_agendar"):
                 session = await self._create_session(phone, "MENU")
             else:
-                # Cualquier otro mensaje (texto, imagen, audio, lo que sea) → bienvenida
+                # Verificar si tiene un lead activo con asesor asignado
+                query_inbox_activo = select(Inbox).where(
+                    and_(
+                        Inbox.telefono.like(f"%{phone}%"),
+                        Inbox.estado.in_(['PENDIENTE', 'EN_GESTION'])
+                    )
+                )
+                result_inbox_activo = await self.db.execute(query_inbox_activo)
+                lead_activo = result_inbox_activo.scalars().first()
+
+                if lead_activo and lead_activo.asignado_a:
+                    # Reconectar: recrear sesión ATENDIDO para que el mensaje llegue al asesor
+                    query_user = select(Usuario).options(selectinload(Usuario.empleado)).where(
+                        Usuario.id == lead_activo.asignado_a
+                    )
+                    result_user = await self.db.execute(query_user)
+                    user = result_user.scalar_one_or_none()
+                    nombre_comercial = self._get_user_name(user)
+
+                    datos_atendido = {"asesor_nombre": nombre_comercial, "inbox_id": lead_activo.id}
+                    session = await self._create_session(phone, "ATENDIDO", datos_atendido)
+                    session.expires_at = datetime.now() + timedelta(minutes=ATENDIDO_TIMEOUT_MINUTES)
+                    await self.db.commit()
+                    return await self._handle_atendido(session, data, phone)
+
+                # Sin lead activo → bienvenida con menú
                 return self._send_menu()
 
         # 6. Enrutar según estado actual
@@ -191,8 +222,11 @@ class ChatbotService:
                 return await self._handle_atendido(session, data, phone)
             elif state == "COTIZAR_REQUERIMIENTOS":
                 return await self._handle_cotizar_requerimientos(session, data, phone)
+            elif state == "COTIZAR_CONFIRMAR":
+                return await self._handle_cotizar_confirmar(session, data, phone)
             elif state == "COTIZAR_PROCESANDO":
-                return await self._handle_cotizar_procesando(session, data, phone)
+                # Legacy: sesiones antiguas, redirigir al nuevo flujo
+                return await self._handle_cotizar_confirmar(session, data, phone)
             elif state == "AGENDAR_RUC":
                 return await self._handle_agendar_ruc(session, data)
             elif state == "AGENDAR_TIPO":
@@ -340,28 +374,79 @@ class ChatbotService:
     # ===================== COTIZAR HANDLER =====================
 
     async def _handle_cotizar_requerimientos(self, session, data, phone):
-        """Primer mensaje de requerimientos recibido. Pasar a COTIZAR_PROCESANDO y guardar timestamp."""
+        """Recibe el primer mensaje de requerimientos y pregunta si es todo."""
         text_lower = data.message_text.strip().lower()
         if text_lower == "volver" or data.button_id == "btn_volver":
             await self._delete_session(session)
             return self._send_menu()
 
-        # Guardar timestamp del último mensaje recibido y pasar a PROCESANDO
-        datos = {"ultimo_mensaje_at": datetime.now().isoformat()}
-        await self._update_session(session, "COTIZAR_PROCESANDO", datos)
+        # Guardar los requerimientos del cliente
+        datos = {"requerimientos": [data.message_text.strip()]}
+        await self._update_session(session, "COTIZAR_CONFIRMAR", datos)
 
-        # No respondemos nada aún. La tarea en segundo plano se encargará.
-        return WhatsAppResponse(action="no_action", messages=[])
+        return WhatsAppResponse(
+            action="send_buttons",
+            messages=[BotMessage(
+                type="buttons",
+                body="📝 Recibido. ¿Eso es todo o deseas agregar más detalles?",
+                buttons=COTIZAR_CONFIRM_BUTTONS
+            )]
+        )
 
-    async def _handle_cotizar_procesando(self, session, data, phone):
-        """Cliente sigue enviando mensajes durante la ventana de gracia. Reiniciar el temporizador."""
-        # Solo actualizar el timestamp del último mensaje (reinicia el temporizador)
+    async def _handle_cotizar_confirmar(self, session, data, phone):
+        """Maneja la confirmación de requerimientos o la recepción de más detalles."""
+        button_id = data.button_id
         datos = self._get_session_data(session)
-        datos["ultimo_mensaje_at"] = datetime.now().isoformat()
-        await self._update_session(session, "COTIZAR_PROCESANDO", datos)
 
-        # No respondemos nada, silencio total.
-        return WhatsAppResponse(action="no_action", messages=[])
+        # Volver al menú
+        if button_id == "btn_volver":
+            await self._delete_session(session)
+            return self._send_menu()
+
+        # Cliente confirma que terminó → derivar al asesor
+        if button_id == "btn_cotizar_listo":
+            requerimientos = datos.get("requerimientos", [])
+            resumen = "\n".join(f"• {r}" for r in requerimientos)
+            mensaje_contexto = f"Solicitud de cotización:\n{resumen}"
+            return await self._handle_asesor(
+                session, data, phone,
+                tipo_interes="COTIZACION",
+                mensaje_contexto=mensaje_contexto
+            )
+
+        # Cliente quiere agregar más detalles (botón)
+        if button_id == "btn_cotizar_mas":
+            await self._update_session(session, "COTIZAR_CONFIRMAR", datos)
+            return WhatsAppResponse(
+                action="send_text",
+                messages=[BotMessage(type="text", content="👍 Envíame los detalles adicionales.")]
+            )
+
+        # Texto libre → el cliente envió más requerimientos
+        texto = data.message_text.strip()
+        if texto:
+            requerimientos = datos.get("requerimientos", [])
+            requerimientos.append(texto)
+            datos["requerimientos"] = requerimientos
+            await self._update_session(session, "COTIZAR_CONFIRMAR", datos)
+            return WhatsAppResponse(
+                action="send_buttons",
+                messages=[BotMessage(
+                    type="buttons",
+                    body="📝 Recibido. ¿Eso es todo o deseas agregar más detalles?",
+                    buttons=COTIZAR_CONFIRM_BUTTONS
+                )]
+            )
+
+        # Fallback
+        return WhatsAppResponse(
+            action="send_buttons",
+            messages=[BotMessage(
+                type="buttons",
+                body="¿Deseas agregar más detalles o eso es todo?",
+                buttons=COTIZAR_CONFIRM_BUTTONS
+            )]
+        )
 
     # ===================== AGENDAR: RUC =====================
 
@@ -372,6 +457,17 @@ class ChatbotService:
         if text_lower == "volver" or data.button_id == "btn_volver":
             await self._delete_session(session)
             return self._send_menu()
+
+        # Rechazar archivos multimedia en este paso
+        if data.message_type in ("image", "document", "video", "audio", "sticker"):
+            return WhatsAppResponse(
+                action="send_text",
+                messages=[BotMessage(type="text", content=(
+                    "📎 He recibido tu archivo, pero en este paso necesito tu *RUC* en texto.\n\n"
+                    "Por favor, escribe los 11 dígitos de tu RUC.\n\n"
+                    "_Escribe *volver* para regresar al menú._"
+                ))]
+            )
 
         ruc = _sanitizar_ruc(data.message_text)
 
@@ -474,6 +570,17 @@ class ChatbotService:
             await self._update_session(session, "AGENDAR_FECHA", datos)
             return await self._show_date_list(session, datos,
                 prefix=f"✅ Ubicación registrada:\n📍 *{direccion}*\n\n")
+
+        # Rechazar archivos multimedia (excepto ubicación que ya se maneja arriba)
+        if data.message_type in ("image", "document", "video", "audio", "sticker"):
+            return WhatsAppResponse(
+                action="send_text",
+                messages=[BotMessage(type="text", content=(
+                    "📎 He recibido tu archivo, pero en este paso necesito una *dirección* en texto.\n\n"
+                    "También puedes *enviar tu ubicación* desde WhatsApp (📎 > Ubicación).\n\n"
+                    "_Escribe *volver* para regresar._"
+                ))]
+            )
 
         # Handle text address
         direccion = data.message_text.strip()
