@@ -136,10 +136,15 @@ class ChatService:
         inbox = await self.db.get(Inbox, msg_in.inbox_id)
         if inbox:
             inbox.ultimo_mensaje_at = func.now()
-            # If it's a new incoming message from client in a closed state, reopen it to NUEVO
-            if msg_in.direccion == 'ENTRANTE' and inbox.estado in ['CIERRE', 'DESCARTADO', 'CONVERTIDO']:
-                inbox.estado = 'NUEVO'
-                inbox.modo = 'BOT' # Return to bot when reactivated 
+            # Si it's a new incoming message from client in a closed state
+            if msg_in.direccion == 'ENTRANTE':
+                if inbox.estado in ['CIERRE', 'CONVERTIDO']:
+                    inbox.estado = 'NUEVO'
+                    inbox.modo = 'BOT' # Return to bot when reactivated 
+                elif inbox.estado == 'DESCARTADO':
+                    # Si está descartado, lo dejamos descartado para el comercial pero
+                    # el bot responderá según configuramos (SILENCIO, a menos que envíe Menú)
+                    pass
             
             # Registrar primera respuesta del asesor si es SALIENTE
             if msg_in.direccion == 'SALIENTE' and not inbox.fecha_primera_respuesta:

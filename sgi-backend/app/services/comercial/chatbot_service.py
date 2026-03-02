@@ -205,6 +205,10 @@ class ChatbotService:
                 return await self._handle_agendar_hora(session, data)
             elif state == "AGENDAR_CONFIRMAR":
                 return await self._handle_agendar_confirmar(session, data, phone)
+            elif state == "SILENCIO_POST_ATENCION":
+                # En estado silencioso (post-atención o descartes) ignoramos cualquier cosa (ej. "Gracias").
+                # Solo salimos si mandan un comando global (ya cubierto arriba en la l. 161)
+                return WhatsAppResponse(action="no_action", messages=[])
             else:
                 await self._delete_session(session)
                 return self._send_menu()

@@ -92,9 +92,46 @@ async def release_chat(
     current_user: Usuario = Depends(get_current_user_obj),
     db: AsyncSession = Depends(get_db)
 ):
-    """Devolver el control del chat al bot (cambia modo a BOT)."""
+    """Devolver el control del chat al bot (cambia modo a BOT) y envía despedida."""
     chat_svc = ChatService(db)
+    # 1. Recuperar info antes de liberar
+    from app.models.comercial_inbox import Inbox
+    inbox = await db.get(Inbox, inbox_id)
+    if not inbox:
+        raise HTTPException(status_code=404, detail="Lead no encontrado")
+    
+    telefono = inbox.telefono
+
+    # 2. Hacer release en base de datos
     inbox = await chat_svc.release_chat(inbox_id)
+    
+    # 3. Enviar mensaje de WhatsApp automático informando el cierre
+    mensaje_cierre = "✅ El asesor ha finalizado la atención de esta consulta.\n\n*Gracias por comunicarte con Grupo Corban*. Si deseas realizar una nueva gestión o regresar al Inicio, responde con la palabra *MENU* 🤖"
+    try:
+        await WhatsAppService.send_text(telefono, mensaje_cierre)
+        # Guardar el mensaje en el historial del chat como proveniente del bot
+        msg_create = ChatMessageCreate(
+            inbox_id=inbox_id,
+            telefono=telefono,
+            direccion='SALIENTE',
+            remitente_tipo='BOT',
+            contenido=mensaje_cierre,
+            estado_envio='ENVIADO'
+        )
+        await chat_svc.save_message(msg_create)
+    except Exception as e:
+        print(f"Error enviando mensaje de cierre automático (release): {e}")
+
+    # 4. Crear sesión de bot en STOP para que ignore los "gracias"
+    from app.services.comercial.chatbot_service import ChatbotService
+    bot_svc = ChatbotService(db)
+    # Buscamos y borramos si hay sesiones viejas
+    session = await bot_svc._get_active_session(telefono)
+    if session:
+        await bot_svc._delete_session(session)
+    # Creamos sesión silenciosa
+    await bot_svc._create_session(telefono, "SILENCIO_POST_ATENCION")
+
     return {"status": "success", "modo": inbox.modo}
 
 @router.post("/{inbox_id}/mark-read")
