@@ -153,9 +153,14 @@ class ChatbotService:
 
     def _is_working_hours(self) -> bool:
         """Verifica si la hora actual está dentro del horario laboral (L-V 8am-6pm, Sáb 8am-11am)."""
-        import pytz
-        lima_tz = pytz.timezone('America/Lima')
-        now = datetime.now(lima_tz)
+        try:
+            from zoneinfo import ZoneInfo
+            lima_tz = ZoneInfo('America/Lima')
+            now = datetime.now(lima_tz)
+        except ImportError:
+            # Fallback para versiones de python antiguas o si zoneinfo falla
+            now = datetime.now() - timedelta(hours=5) # UTC-5 (Aproximación para Lima sin daylight saving)
+            
         if now.weekday() < 5:  # Lunes a Viernes (0-4)
             return 8 <= now.hour < 18
         elif now.weekday() == 5:  # Sábado (5)

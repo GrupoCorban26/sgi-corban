@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ChatConversationPreview } from '@/types/chat';
 import { useChatActions } from '@/hooks/comercial/useChat';
 import {
@@ -32,9 +33,14 @@ const MOTIVOS_DESCARTE = [
 
 export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClick, onClose }: Props) {
     const { changeEstado, releaseChat, descartarLead } = useChatActions();
-    const [showDiscardModal, setShowDiscardModal] = React.useState(false);
-    const [discardData, setDiscardData] = React.useState({ motivo_descarte: '', comentario_descarte: '' });
-    const [isDiscarding, setIsDiscarding] = React.useState(false);
+    const [showDiscardModal, setShowDiscardModal] = useState(false);
+    const [discardData, setDiscardData] = useState({ motivo_descarte: '', comentario_descarte: '' });
+    const [isDiscarding, setIsDiscarding] = useState(false);
+    const [isMounted, setIsMounted] = useState(false);
+
+    useEffect(() => {
+        setIsMounted(true);
+    }, []);
 
     const handleEstadoChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
         const nuevo_estado = e.target.value;
@@ -264,9 +270,9 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
             </div>
 
             {/* Modal de descarte */}
-            {showDiscardModal && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            {showDiscardModal && isMounted && createPortal(
+                <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4" style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden transform transition-all">
                         {/* Header */}
                         <div className="bg-red-50 px-6 py-4 flex items-center gap-3 border-b border-red-100">
                             <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center">
@@ -329,7 +335,8 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
                             </button>
                         </div>
                     </div>
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );
