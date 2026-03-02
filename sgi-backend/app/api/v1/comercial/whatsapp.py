@@ -187,6 +187,9 @@ async def receive_webhook_message(
                     # Procesar con el bot
                     response = await service.process_message(incoming)
 
+                    if response.action == "ignore":
+                        continue
+
                     # Si el bot indica "no_action" (ej: ventana de gracia cotizar), iniciar tarea en segundo plano
                     if response.action == "no_action":
                         iniciar_ventana_gracia(from_num_norm, from_number, contact_name)

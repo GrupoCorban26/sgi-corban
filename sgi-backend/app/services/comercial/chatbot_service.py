@@ -206,9 +206,18 @@ class ChatbotService:
             elif state == "AGENDAR_CONFIRMAR":
                 return await self._handle_agendar_confirmar(session, data, phone)
             elif state == "SILENCIO_POST_ATENCION":
-                # En estado silencioso (post-atención o descartes) ignoramos cualquier cosa (ej. "Gracias").
-                # Solo salimos si mandan un comando global (ya cubierto arriba en la l. 161)
-                return WhatsAppResponse(action="no_action", messages=[])
+                # Ignorar palabras cortas de cortesía post-cierre.
+                text_lower = data.message_text.strip().lower()
+                cortesia = ["gracias", "ok", "vale", "entendido", "listo", "muy bien", "muchas gracias", "hasta luego", "adios", "chau", "perfecto"]
+                
+                # Si manda una palabra de cortesía, simplemente ignoramos (ni visto ni mensaje).
+                if any(p in text_lower for p in cortesia) and len(text_lower) < 25:
+                    return WhatsAppResponse(action="ignore", messages=[])
+                
+                # Si manda cualquier otra cosa (ej. "hola de nuevo, quisiera cotizar X"), 
+                # borramos la sesión silenciosa y reactivamos mandándolo al menú con saludo de regreso.
+                await self._delete_session(session)
+                return self._send_menu(es_regreso=True)
             else:
                 await self._delete_session(session)
                 return self._send_menu()
