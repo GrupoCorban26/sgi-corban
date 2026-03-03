@@ -42,6 +42,7 @@ from app.api.v1.organizacion.activos import router as activos_router
 from app.api.v1.organizacion.estado_activo import router as estado_activo_router
 from app.api.v1.organizacion.lineas import router as lineas_router
 from app.api.v1.organizacion.dashboard import router as dashboard_router
+from app.api.v1.organizacion.productos_oficina import router as productos_oficina_router
 from app.api.v1.core.ubigeo import router as ubigeo_router
 from app.api.v1.comercial.importaciones import router as importaciones_router
 from app.api.v1.comercial.contactos import router as contactos_router
@@ -118,6 +119,7 @@ app.include_router(whatsapp_router, prefix="/api/v1/comercial/whatsapp", tags=["
 app.include_router(chat_router, prefix="/api/v1/comercial/chat", tags=["chat"])
 app.include_router(dashboard_router, prefix="/api/v1/organizacion/dashboard", tags=["dashboard"])
 app.include_router(gestiones_router, prefix="/api/v1", tags=["gestiones"])
+app.include_router(productos_oficina_router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():

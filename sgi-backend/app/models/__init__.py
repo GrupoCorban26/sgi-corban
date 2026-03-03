@@ -2,7 +2,8 @@ from .base import Base
 from .administrativo import (
     Departamento, Area, Cargo, Empleado,
     Activo, EmpleadoActivo, EstadoActivo, ActivoHistorial,
-    LineaCorporativa, LineaHistorial
+    LineaCorporativa, LineaHistorial,
+    CategoriaProductoOficina, ProductoOficina
 )
 from .logistica import Vehiculo, AsignacionVehiculo
 from .seguridad import Usuario, Rol, Permiso, Sesion

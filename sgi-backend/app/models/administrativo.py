@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, DateTime, Numeric
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .base import Base
@@ -249,3 +249,41 @@ class LineaHistorial(Base):
     empleado_anterior = relationship("Empleado", foreign_keys=[empleado_anterior_id])
     empleado_nuevo = relationship("Empleado", foreign_keys=[empleado_nuevo_id])
     usuario = relationship("app.models.seguridad.Usuario")
+
+
+class CategoriaProductoOficina(Base):
+    """Categorías para clasificar productos de oficina"""
+    __tablename__ = "categorias_producto_oficina"
+    __table_args__ = {"schema": "adm"}
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(100), nullable=False, unique=True)
+    descripcion = Column(String(300))
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    productos = relationship("ProductoOficina", back_populates="categoria")
+
+
+class ProductoOficina(Base):
+    """Productos consumibles de oficina (lapiceros, cuadernos, merchandising, etc.)"""
+    __tablename__ = "productos_oficina"
+    __table_args__ = {"schema": "adm"}
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(150), nullable=False)
+    categoria_id = Column(Integer, ForeignKey("adm.categorias_producto_oficina.id"), nullable=True)
+    unidad_medida = Column(String(30), default="unidad", nullable=False)
+    stock_actual = Column(Integer, default=0, nullable=False)
+    stock_minimo = Column(Integer, default=0, nullable=False)
+    precio_unitario = Column(Numeric(10, 2), nullable=True)
+    ubicacion = Column(String(100))
+    observaciones = Column(String)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+
+    # Relationships
+    categoria = relationship("CategoriaProductoOficina", back_populates="productos")
+

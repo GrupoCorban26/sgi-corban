@@ -1,4 +1,4 @@
-import { LucideIcon, Home, BarChart3, ArrowRightLeft, Users, Database, UserCog, Building2, Package, Cable, Clock, Phone } from 'lucide-react';
+import { LucideIcon, Home, BarChart3, ArrowRightLeft, Users, Database, UserCog, Building2, Package, Cable, Clock, Phone, ShoppingBag } from 'lucide-react';
 
 export interface MenuItem {
   label: string;
@@ -17,6 +17,7 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
     { label: 'Inicio', href: '/administracion/', icon: Home },
     { label: 'Organización', href: '/administracion/organizacion', icon: Building2 },
     { label: 'Inventario', href: '/administracion/inventario', icon: Package },
+    { label: 'Productos', href: '/administracion/productos-oficina', icon: ShoppingBag },
     { label: 'Líneas', href: '/administracion/lineas', icon: Cable },
     { label: 'Cumpleaños', href: '/administracion/cumpleanos', icon: Users },
     { label: 'Asistencias', href: '/administracion/asistencias', icon: Clock },
@@ -44,6 +45,7 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
     // Secciones administrativas (SISTEMAS = Super Admin)
     { label: 'Organización', href: '/administracion/organizacion', icon: Building2 },
     { label: 'Inventario', href: '/administracion/inventario', icon: Package },
+    { label: 'Productos', href: '/administracion/productos-oficina', icon: ShoppingBag },
     { label: 'Líneas', href: '/administracion/lineas', icon: Cable },
     { label: 'Asistencias', href: '/administracion/asistencias', icon: Clock },
   ],

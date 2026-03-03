@@ -21,30 +21,21 @@ from app.core.security import (
     get_current_token_payload, 
     get_current_active_auth
 )
-from app.core.dependencies import require_permission
+from app.core.dependencies import require_permission, resolver_comercial_ids
 
 router = APIRouter(prefix="/clientes", tags=["Clientes"])
 
-# Lista de roles que pueden ver información de CUALQUIER comercial
-ALLOWED_ALL = ["JEFE_COMERCIAL", "ADMIN", "GERENCIA", "SISTEMAS"]
+# Lista de roles que pueden ver información global (admin/gerencia/sistemas)
+ALLOWED_ALL = ["ADMIN", "GERENCIA", "SISTEMAS", "JEFE_COMERCIAL"]
 
 @router.get("/recordatorios", dependencies=[Depends(require_permission("clientes.listar"))])
 async def get_recordatorios(
     days: int = Query(5, ge=1, le=30, description="Días a futuro para buscar"),
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_token_payload)
+    comercial_ids: list = Depends(resolver_comercial_ids)
 ):
-    """Obtiene recordatorios de llamadas. Jefes ven todo, comerciales solo lo suyo."""
+    """Obtiene recordatorios de llamadas. Filtrado por equipo automáticamente."""
     service = ClientesService(db)
-    roles = current_user.get("roles", [])
-    
-    comercial_ids = None
-    
-    # Si NO es jefe/admin, aplicamos filtro restrictivo por USUARIO
-    if not any(role in roles for role in ALLOWED_ALL):
-        user_id = int(current_user.get("sub"))
-        comercial_ids = [user_id]
-
     return await service.get_recordatorios(comercial_ids=comercial_ids, days=days)
 
 
@@ -52,20 +43,17 @@ async def get_recordatorios(
 async def get_clientes_stats(
     comercial_id: Optional[int] = Query(None),
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_token_payload)
+    comercial_ids: list = Depends(resolver_comercial_ids)
 ):
-    """Estadísticas generales de clientes con filtro de privacidad."""
+    """Estadísticas generales de clientes con filtro por equipo."""
     service = ClientesService(db)
-    roles = current_user.get("roles", [])
     
-    comercial_ids = None
-    
-    # Si no es jefe, forzamos que solo vea sus propias estadísticas (ID Usuario)
-    if not any(role in roles for role in ALLOWED_ALL):
-        user_id = int(current_user.get("sub"))
-        comercial_ids = [user_id]
-    elif comercial_id:
-        comercial_ids = [comercial_id]
+    # Si se especifica un comercial_id explícito Y el usuario puede verlo
+    if comercial_id:
+        # Si comercial_ids es None (ve todo) o el id solicitado está en su equipo
+        if comercial_ids is None or comercial_id in comercial_ids:
+            comercial_ids = [comercial_id]
+        # Si no tiene acceso, se mantiene el filtro de equipo (ignora el param)
 
     return await service.get_stats(comercial_ids=comercial_ids)
 
@@ -98,20 +86,15 @@ async def listar_clientes(
     page: int = Query(1, ge=1),
     page_size: int = Query(15, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_active_auth)
+    comercial_ids: list = Depends(resolver_comercial_ids)
 ):
-    """Lista clientes con paginación. Los comerciales están limitados a su propia base."""
+    """Lista clientes con paginación. Filtrado por equipo automáticamente."""
     service = ClientesService(db)
-    roles = current_user.get("roles", [])
     
-    comercial_ids = None
-    
-    # Seguridad a nivel de fila: Si no es jefe, filtro por SU Usuario ID
-    if not any(role in roles for role in ALLOWED_ALL):
-        user_id = int(current_user.get("sub"))
-        comercial_ids = [user_id]
-    elif comercial_id:
-        comercial_ids = [comercial_id]
+    # Si se especifica un comercial_id explícito Y el usuario puede verlo
+    if comercial_id:
+        if comercial_ids is None or comercial_id in comercial_ids:
+            comercial_ids = [comercial_id]
 
     return await service.get_all(
         busqueda=busqueda,

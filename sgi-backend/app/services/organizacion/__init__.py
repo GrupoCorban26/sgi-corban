@@ -6,6 +6,7 @@ from .empleados import EmpleadoService
 from .activos import ActivoService
 from .estado_activo import EstadoActivoService
 from .activo_historial import ActivoHistorialService
+from .productos_oficina import ProductoOficinaService
 
 __all__ = [
     "DepartamentoService",
@@ -14,5 +15,6 @@ __all__ = [
     "EmpleadoService",
     "ActivoService",
     "EstadoActivoService",
-    "ActivoHistorialService"
+    "ActivoHistorialService",
+    "ProductoOficinaService",
 ]

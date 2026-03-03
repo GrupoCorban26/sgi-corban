@@ -15,7 +15,7 @@ class ReportesLlamadasService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_reporte_llamadas(self, fecha_inicio: date, fecha_fin: date, comercial_id: int = None, page: int = 1, page_size: int = 50):
+    async def get_reporte_llamadas(self, fecha_inicio: date, fecha_fin: date, comercial_id: int = None, page: int = 1, page_size: int = 50, comercial_ids: list = None):
         dt_inicio = datetime.combine(fecha_inicio, datetime.min.time())
         dt_fin = datetime.combine(fecha_fin, datetime.max.time())
         offset = (page - 1) * page_size
@@ -46,8 +46,11 @@ class ReportesLlamadasService:
             )
         )
 
+        # Filtros de equipo y comercial individual
         if comercial_id:
             stmt = stmt.where(HistorialLlamada.comercial_id == comercial_id)
+        elif comercial_ids is not None:
+            stmt = stmt.where(HistorialLlamada.comercial_id.in_(comercial_ids))
 
         # Contar total
         count_stmt = select(func.count()).select_from(stmt.subquery())
@@ -78,7 +81,7 @@ class ReportesLlamadasService:
             "data": filas
         }
 
-    async def exportar_reporte_llamadas(self, fecha_inicio: date, fecha_fin: date, comercial_id: int = None):
+    async def exportar_reporte_llamadas(self, fecha_inicio: date, fecha_fin: date, comercial_id: int = None, comercial_ids: list = None):
         dt_inicio = datetime.combine(fecha_inicio, datetime.min.time())
         dt_fin = datetime.combine(fecha_fin, datetime.max.time())
 
@@ -107,8 +110,11 @@ class ReportesLlamadasService:
             .order_by(desc(HistorialLlamada.fecha_llamada))
         )
 
+        # Filtros de equipo y comercial individual
         if comercial_id:
             stmt = stmt.where(HistorialLlamada.comercial_id == comercial_id)
+        elif comercial_ids is not None:
+            stmt = stmt.where(HistorialLlamada.comercial_id.in_(comercial_ids))
 
         result = await self.db.execute(stmt)
         rows = result.mappings().all()

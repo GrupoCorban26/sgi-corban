@@ -9,7 +9,7 @@ export const reportesLlamadasService = {
         page?: number;
         page_size?: number;
     }) => {
-        const { data } = await api.get<ReporteLlamadaPaginated>('/api/v1/comercial/reportes/llamadas', { params });
+        const { data } = await api.get<ReporteLlamadaPaginated>('/comercial/reportes/llamadas', { params });
         return data;
     },
 
