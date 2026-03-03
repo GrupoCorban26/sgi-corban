@@ -63,7 +63,8 @@ async def get_dashboard(
     fecha_inicio: date = Query(..., description="Fecha de inicio del reporte (YYYY-MM-DD)"),
     fecha_fin: date = Query(..., description="Fecha de fin del reporte (YYYY-MM-DD)"),
     db: AsyncSession = Depends(get_db),
-    current_user: dict = Depends(get_current_token_payload)
+    current_user: dict = Depends(get_current_token_payload),
+    comercial_ids: list = Depends(resolver_comercial_ids)
 ):
     """Dashboard completo de métricas. Solo para Sistemas/Gerencia/Jefe Comercial."""
     roles = current_user.get("roles", [])
@@ -74,7 +75,7 @@ async def get_dashboard(
         raise HTTPException(status_code=400, detail="La fecha de inicio no puede ser posterior a la fecha de fin")
     
     service = AnalyticsService(db)
-    return await service.get_dashboard(fecha_inicio, fecha_fin)
+    return await service.get_dashboard(fecha_inicio, fecha_fin, comercial_ids=comercial_ids)
 
 
 @router.get("", dependencies=[Depends(require_permission("clientes.listar"))])

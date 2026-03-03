@@ -23,16 +23,16 @@ class AnalyticsService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_dashboard(self, fecha_inicio: date, fecha_fin: date) -> dict:
+    async def get_dashboard(self, fecha_inicio: date, fecha_fin: date, comercial_ids: list = None) -> dict:
         """Genera el dashboard completo simplificado en dos reportes."""
         dt_inicio = datetime.combine(fecha_inicio, datetime.min.time())
         dt_fin = datetime.combine(fecha_fin, datetime.max.time())
 
         # 1. Reporte de Base de Datos
-        base_datos = await self._get_reporte_base_datos(dt_inicio, dt_fin)
+        base_datos = await self._get_reporte_base_datos(dt_inicio, dt_fin, comercial_ids)
         
         # 2. Reporte de Mantenimiento de Cartera
-        cartera = await self._get_reporte_cartera(dt_inicio, dt_fin)
+        cartera = await self._get_reporte_cartera(dt_inicio, dt_fin, comercial_ids)
 
         return {
             "fecha_inicio": fecha_inicio.isoformat(),
@@ -45,9 +45,11 @@ class AnalyticsService:
     # A. Reporte de Base de Datos
     # =========================================================================
 
-    async def _get_reporte_base_datos(self, dt_inicio: datetime, dt_fin: datetime) -> dict:
-        # Obtener comerciales
+    async def _get_reporte_base_datos(self, dt_inicio: datetime, dt_fin: datetime, comercial_ids: list = None) -> dict:
+        # Obtener comerciales activos y filtrar
         stmt_comerciales = select(Usuario.id, Empleado.nombres).join(Empleado).join(Usuario.roles).where(and_(Usuario.is_active == True, Rol.nombre == "COMERCIAL"))
+        if comercial_ids is not None:
+             stmt_comerciales = stmt_comerciales.where(Usuario.id.in_(comercial_ids))
         comerciales = (await self.db.execute(stmt_comerciales)).all()
         
         comerciales_stats = []
@@ -97,22 +99,25 @@ class AnalyticsService:
     # B. Reporte de Mantenimiento de Cartera
     # =========================================================================
 
-    async def _get_reporte_cartera(self, dt_inicio: datetime, dt_fin: datetime) -> dict:
-        # Obtener comerciales
+    async def _get_reporte_cartera(self, dt_inicio: datetime, dt_fin: datetime, comercial_ids: list = None) -> dict:
+        # Obtener comerciales activos y filtrar
         stmt_comerciales = select(Usuario.id, Empleado.nombres).join(Empleado).join(Usuario.roles).where(and_(Usuario.is_active == True, Rol.nombre == "COMERCIAL"))
+        if comercial_ids is not None:
+             stmt_comerciales = stmt_comerciales.where(Usuario.id.in_(comercial_ids))
         comerciales = (await self.db.execute(stmt_comerciales)).all()
         
         comerciales_stats = []
         
-        # Totales Generales
-        stmt_totales = select(func.count()).select_from(ClienteGestion).where(
-            and_(ClienteGestion.created_at >= dt_inicio, ClienteGestion.created_at <= dt_fin)
-        )
+        # Filtro base para conteos
+        condicion_base = and_(ClienteGestion.created_at >= dt_inicio, ClienteGestion.created_at <= dt_fin)
+        if comercial_ids is not None:
+            condicion_base = and_(condicion_base, ClienteGestion.comercial_id.in_(comercial_ids))
+            
+        # Totales Generales limitados a los comerciales permitidos
+        stmt_totales = select(func.count()).select_from(ClienteGestion).where(condicion_base)
         total_gestiones = (await self.db.execute(stmt_totales)).scalar() or 0
         
-        stmt_unicos = select(func.count(func.distinct(ClienteGestion.cliente_id))).where(
-            and_(ClienteGestion.created_at >= dt_inicio, ClienteGestion.created_at <= dt_fin)
-        )
+        stmt_unicos = select(func.count(func.distinct(ClienteGestion.cliente_id))).where(condicion_base)
         total_unicos = (await self.db.execute(stmt_unicos)).scalar() or 0
 
         for com in comerciales:
