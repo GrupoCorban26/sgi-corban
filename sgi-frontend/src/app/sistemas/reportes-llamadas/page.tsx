@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 export default function HistorialLlamadasPage() {
     const [fechaInicio, setFechaInicio] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
@@ -29,12 +30,21 @@ export default function HistorialLlamadasPage() {
         page_size: pageSize
     });
 
-    const handleExportar = () => {
-        const url = reportesLlamadasService.exportarUrl({
-            fecha_inicio: fechaInicio,
-            fecha_fin: fechaFin
-        });
-        window.open(url, '_blank');
+    const [isExporting, setIsExporting] = useState(false);
+    const handleExportar = async () => {
+        try {
+            setIsExporting(true);
+            await reportesLlamadasService.exportarExcel({
+                fecha_inicio: fechaInicio,
+                fecha_fin: fechaFin
+            });
+            toast.success('Reporte exportado exitosamente');
+        } catch (error) {
+            console.error('Error al exportar:', error);
+            toast.error('Ocurrió un error al intentar exportar el reporte');
+        } finally {
+            setIsExporting(false);
+        }
     };
 
     const totalPages = data ? Math.ceil(data.total / pageSize) : 0;
@@ -79,11 +89,16 @@ export default function HistorialLlamadasPage() {
 
                     <button
                         onClick={handleExportar}
-                        disabled={isLoading || !data || data.data.length === 0}
-                        className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300 text-white px-4 py-2.5 rounded-lg text-sm font-medium transition-all shadow-sm"
+                        disabled={isExporting}
+                        className={`flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors ${isExporting ? 'opacity-50 cursor-not-allowed' : ''
+                            }`}
                     >
-                        <Download size={16} />
-                        Exportar Excel
+                        {isExporting ? (
+                            <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                        ) : (
+                            <Download size={18} />
+                        )}
+                        Exportar a Excel
                     </button>
                 </div>
             </div>

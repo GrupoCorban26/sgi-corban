@@ -13,13 +13,33 @@ export const reportesLlamadasService = {
         return data;
     },
 
-    exportarUrl: (params: { fecha_inicio: string; fecha_fin: string; comercial_id?: number }) => {
-        // Generar la URL de descarga para ser usada en un <a> o windows.open()
-        const query = new URLSearchParams();
-        query.append('fecha_inicio', params.fecha_inicio);
-        query.append('fecha_fin', params.fecha_fin);
-        if (params.comercial_id) query.append('comercial_id', params.comercial_id.toString());
+    exportarExcel: async (params: { fecha_inicio: string; fecha_fin: string; comercial_id?: number }) => {
+        const response = await api.get('/comercial/reportes/llamadas/exportar', {
+            params,
+            responseType: 'blob' // Importante para recibir archivos binarios
+        });
 
-        return `/api/v1/comercial/reportes/llamadas/exportar?${query.toString()}`;
+        // Crear un objeto URL para el blob y forzar la descarga
+        const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+
+        // Extraer nombre del archivo desde los headers si es posible, sino usar default
+        let filename = `Reporte_Llamadas.xlsx`;
+        const disposition = response.headers['content-disposition'];
+        if (disposition && disposition.indexOf('attachment') !== -1) {
+            const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+            const matches = filenameRegex.exec(disposition);
+            if (matches != null && matches[1]) {
+                filename = matches[1].replace(/['"]/g, '');
+            }
+        }
+
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
     }
 };
