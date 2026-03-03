@@ -54,6 +54,7 @@ from app.api.v1.comercial.citas import router as citas_router
 from app.api.v1.comercial.whatsapp import router as whatsapp_router
 from app.api.v1.comercial.chat import router as chat_router
 from app.api.v1.comercial.gestiones import router as gestiones_router
+from app.api.v1.comercial.reportes import router as reportes_router
 
 # Lifespan: tareas de inicio y cierre del servidor
 @asynccontextmanager
@@ -120,6 +121,7 @@ app.include_router(chat_router, prefix="/api/v1/comercial/chat", tags=["chat"])
 app.include_router(dashboard_router, prefix="/api/v1/organizacion/dashboard", tags=["dashboard"])
 app.include_router(gestiones_router, prefix="/api/v1", tags=["gestiones"])
 app.include_router(productos_oficina_router, prefix="/api/v1")
+app.include_router(reportes_router, prefix="/api/v1/comercial")
 
 @app.get("/")
 def read_root():
