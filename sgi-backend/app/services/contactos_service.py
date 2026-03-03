@@ -99,3 +99,7 @@ class ContactosService:
     async def get_filtros_base(self):
         """Obtiene países y partidas disponibles para filtrar."""
         return await self._asignacion_service.get_filtros_base()
+
+    async def create_contacto_manual(self, data, user_id: int):
+        """Crea un contacto manual y lo asigna al comercial."""
+        return await self._asignacion_service.create_contacto_manual(data, user_id)
