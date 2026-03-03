@@ -91,6 +91,7 @@ class ReportesLlamadasService:
                 HistorialLlamada.ruc.label("RUC"),
                 RegistroImportacion.razon_social.label("Razón Social"),
                 ClienteContacto.telefono.label("Teléfono"),
+                CasoLlamada.contestado.label("Contestó"),
                 CasoLlamada.nombre.label("Caso"),
                 HistorialLlamada.comentario.label("Comentario"),
                 func.concat(Empleado.nombres, ' ', Empleado.apellido_paterno).label("Comercial"),
@@ -121,7 +122,7 @@ class ReportesLlamadasService:
 
         if not rows:
             # Si no hay datos, crear un excel vacío con cabeceras
-            df = pd.DataFrame(columns=["RUC", "Razón Social", "Teléfono", "Caso", "Comentario", "Comercial", "Fecha y Hora"])
+            df = pd.DataFrame(columns=["RUC", "Razón Social", "Teléfono", "Contestó", "Caso", "Comentario", "Comercial", "Fecha y Hora"])
         else:
             # Construir DataFrame
             data = []
@@ -130,6 +131,7 @@ class ReportesLlamadasService:
                     "RUC": r["RUC"],
                     "Razón Social": r["Razón Social"] or "Sin razón social",
                     "Teléfono": r["Teléfono"],
+                    "Contestó": "Sí" if r["Contestó"] else "No",
                     "Caso": r["Caso"],
                     "Comentario": r["Comentario"] or "",
                     "Comercial": r["Comercial"],
