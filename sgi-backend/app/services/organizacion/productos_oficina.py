@@ -34,14 +34,14 @@ class ProductoOficinaService:
             .where(ProductoOficina.is_active == True)
         )
 
-        # Filtro de búsqueda
+        # Filtro de búsqueda (SQL Server LIKE es case-insensitive)
         if busqueda:
             patron = f"%{busqueda}%"
             query = query.where(
                 or_(
-                    ProductoOficina.nombre.ilike(patron),
-                    ProductoOficina.ubicacion.ilike(patron),
-                    CategoriaProductoOficina.nombre.ilike(patron),
+                    ProductoOficina.nombre.like(patron),
+                    ProductoOficina.ubicacion.like(patron),
+                    CategoriaProductoOficina.nombre.like(patron),
                 )
             )
 
@@ -241,7 +241,13 @@ class ProductoOficinaService:
                 & (ProductoOficina.is_active == True),
             )
             .where(CategoriaProductoOficina.is_active == True)
-            .group_by(CategoriaProductoOficina.id)
+            .group_by(
+                CategoriaProductoOficina.id,
+                CategoriaProductoOficina.nombre,
+                CategoriaProductoOficina.descripcion,
+                CategoriaProductoOficina.is_active,
+                CategoriaProductoOficina.created_at,
+            )
             .order_by(CategoriaProductoOficina.nombre)
         )
         rows = result.all()
