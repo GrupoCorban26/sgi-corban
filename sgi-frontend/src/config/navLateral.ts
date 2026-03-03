@@ -28,6 +28,8 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
     { label: 'Citas', href: '/comercial/citas', icon: Users },
     { label: 'Cartera Global', href: '/comercial/cartera-global', icon: Database },
     { label: 'Buzón', href: '/comercial/buzon', icon: Package },
+    { label: 'Reportes', href: '/sistemas/reportes', icon: BarChart3 },
+    { label: 'Hist. Llamadas', href: '/sistemas/reportes-llamadas', icon: Phone },
   ],
   pricing: [
     { label: 'Inicio', href: '/dashboard', icon: Home },

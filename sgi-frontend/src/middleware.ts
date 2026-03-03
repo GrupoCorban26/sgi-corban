@@ -10,7 +10,7 @@ const ROLE_ALLOWED_PATHS: Record<string, string[]> = {
     'ADMIN': ['/administracion', '/sistemas', '/comercial', '/pricing', '/operaciones'],
     'SISTEMAS': ['/sistemas', '/administracion'],
     'GERENCIA': ['/administracion', '/comercial', '/sistemas'],
-    'JEFE_COMERCIAL': ['/comercial'],
+    'JEFE_COMERCIAL': ['/comercial', '/sistemas/reportes', '/sistemas/reportes-llamadas'],
     'PRICING': ['/pricing', '/comercial'],
     'COMERCIAL': ['/comercial'],
     'OPERACIONES': ['/operaciones'],

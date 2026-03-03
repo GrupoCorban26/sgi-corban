@@ -87,6 +87,25 @@ class InboxService:
                 if not all_commercials:
                     raise Exception("No active commercials found")
                 
+                # Filtrar comerciales por JEFE_COMERCIAL si está configurado en .env
+                import os
+                bot_jefe_id_str = os.getenv("BOT_JEFE_COMERCIAL_ID")
+                if bot_jefe_id_str:
+                    try:
+                        jefe_id_val = int(bot_jefe_id_str)
+                        # Filtrar dejando רק a los comerciales cuyo jefe_id en su Empleado coincida
+                        filtered_commercials = [c for c in all_commercials if c.empleado and c.empleado.jefe_id == jefe_id_val]
+                        
+                        if filtered_commercials:
+                            all_commercials = filtered_commercials
+                        else:
+                            import logging
+                            logging.getLogger(__name__).warning(
+                                f"No se encontraron comerciales activos bajo el jefe_id={jefe_id_val}. Fallback a todos los comerciales."
+                            )
+                    except ValueError:
+                        pass
+                
                 # Filtrar solo los disponibles en buzón
                 disponibles = [c for c in all_commercials if c.disponible_buzon]
                 
