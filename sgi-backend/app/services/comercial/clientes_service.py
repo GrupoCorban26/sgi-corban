@@ -41,7 +41,7 @@ class ClientesService:
         subq_telefono = (
             select(ClienteContacto.telefono)
             .where(ClienteContacto.ruc == Cliente.ruc, ClienteContacto.is_client == True)
-            .order_by(ClienteContacto.fecha_llamada.desc().nulls_last(), ClienteContacto.created_at.desc())
+            .order_by(ClienteContacto.fecha_llamada.desc(), ClienteContacto.created_at.desc())
             .limit(1)
             .scalar_subquery()
             .label("telefono_contacto")
