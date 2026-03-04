@@ -23,13 +23,14 @@ class ImportacionesService:
         'paises_origen': 'paises_origen',
         'partidas_arancelarias': 'partidas_arancelarias',
         'importa_de_china': 'importa_de_china',
+        'cant_agentes_aduana': 'cant_agentes_aduana',
     }
     
     # Columnas válidas de la tabla BD
     VALID_DB_COLUMNS = {
         'ruc', 'razon_social', 'fob_datasur_mundo', 'fob_sunat_china',
         'fob_total_real', 'transacciones_datasur', 'paises_origen',
-        'partidas_arancelarias', 'importa_de_china'
+        'partidas_arancelarias', 'importa_de_china', 'cant_agentes_aduana'
     }
 
     @staticmethod
@@ -81,17 +82,18 @@ class ImportacionesService:
                     df['ruc'] = df['ruc'].apply(lambda x: str(int(x)) if pd.notna(x) and x != '' else None)
                 
                 # Limpiar columnas numéricas (convertir strings vacías y valores inválidos a None)
-                numeric_columns = ['fob_datasur_mundo', 'fob_sunat_china', 'fob_total_real', 'transacciones_datasur']
+                numeric_columns = ['fob_datasur_mundo', 'fob_sunat_china', 'fob_total_real', 'transacciones_datasur', 'cant_agentes_aduana']
                 for col in numeric_columns:
                     if col in df.columns:
                         df[col] = pd.to_numeric(df[col], errors='coerce')
                         df[col] = df[col].where(pd.notnull(df[col]), None)
                 
-                # Convertir transacciones a int
-                if 'transacciones_datasur' in df.columns:
-                    df['transacciones_datasur'] = df['transacciones_datasur'].apply(
-                        lambda x: int(x) if pd.notna(x) and x is not None else None
-                    )
+                # Convertir columnas enteras
+                for col_int in ['transacciones_datasur', 'cant_agentes_aduana']:
+                    if col_int in df.columns:
+                        df[col_int] = df[col_int].apply(
+                            lambda x: int(x) if pd.notna(x) and x is not None else None
+                        )
                 
                 # Convertir importa_de_china a string limpio
                 if 'importa_de_china' in df.columns:

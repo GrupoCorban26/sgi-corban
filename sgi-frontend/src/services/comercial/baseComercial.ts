@@ -70,7 +70,7 @@ export const baseComercialService = {
      */
     async crearContactoManual(data: {
         ruc: string;
-        nombre: string;
+        nombre?: string;
         telefono?: string;
         cargo?: string;
         email?: string;

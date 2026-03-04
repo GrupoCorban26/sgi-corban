@@ -67,9 +67,9 @@ async def get_current_active_auth(
     )
     
     try:
-        # 1. Decodificar y validar tiempo (automático en jwt.decode)
+        # 1. Decodificar (ignorando 'exp' dado que la base de datos gestiona el Sliding Expiration de 30 mins)
         try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
             logger.debug(f"Token decoded successfully. Sub: {payload.get('sub')}")
         except Exception as e:
             logger.warning(f"Token Decode Failed: {e}")

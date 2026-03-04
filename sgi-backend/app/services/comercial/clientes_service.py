@@ -37,11 +37,21 @@ class ClientesService:
         page_size: int = 15
     ) -> dict:
         """Lista clientes con paginación y filtros. Filtra por lista de IDs (usuario o empleado)."""
-        offset = (page - 1) * page_size
+        # Subquery para obtener el teléfono del contacto asociado al cliente
+        subq_telefono = (
+            select(ClienteContacto.telefono)
+            .where(ClienteContacto.ruc == Cliente.ruc, ClienteContacto.is_client == True)
+            .order_by(ClienteContacto.fecha_llamada.desc().nulls_last(), ClienteContacto.created_at.desc())
+            .limit(1)
+            .scalar_subquery()
+            .label("telefono_contacto")
+        )
+
         stmt = select(
             Cliente,
             Area.nombre.label("area_nombre"),
-            func.concat(Empleado.nombres, ' ', Empleado.apellido_paterno).label("comercial_nombre")
+            func.concat(Empleado.nombres, ' ', Empleado.apellido_paterno).label("comercial_nombre"),
+            subq_telefono
         ).outerjoin(Area, Cliente.area_encargada_id == Area.id) \
          .outerjoin(Usuario, Cliente.comercial_encargado_id == Usuario.id) \
          .outerjoin(Empleado, Usuario.empleado_id == Empleado.id) \
@@ -85,6 +95,7 @@ class ClientesService:
                 "area_nombre": row[1],
                 "comercial_encargado_id": c.comercial_encargado_id,
                 "comercial_nombre": row[2],
+                "telefono": row[3], # Inyectando el teléfono
                 "ultimo_contacto": c.ultimo_contacto,
                 "comentario_ultima_llamada": c.comentario_ultima_llamada,
                 "proxima_fecha_contacto": c.proxima_fecha_contacto,

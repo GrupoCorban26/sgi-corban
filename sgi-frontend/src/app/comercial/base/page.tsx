@@ -125,8 +125,8 @@ export default function BaseComercialPage() {
   };
 
   const handleCreateManual = async () => {
-    if (!manualForm.nombre || (!manualForm.telefono && !manualForm.email)) {
-      toast.error('Nombre y al menos un dato de contacto (teléfono o email) son obligatorios');
+    if (!manualForm.telefono && !manualForm.email) {
+      toast.error('Al menos un dato de contacto (teléfono o email) es obligatorio');
       return;
     }
 
@@ -519,7 +519,7 @@ export default function BaseComercialPage() {
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo</label>
                 <input
                   type="text"
                   value={manualForm.nombre}

@@ -309,9 +309,11 @@ export default function CarteraPage() {
                 <tr className="bg-gray-50 text-gray-500 text-[11px] uppercase tracking-wider">
                   <th className="px-6 py-4 font-semibold">RUC</th>
                   <th className="px-6 py-4 font-semibold">Razón Social</th>
+                  <th className="px-6 py-4 font-semibold">Teléfono</th>
                   <th className="px-6 py-4 font-semibold">Estado</th>
                   <th className="px-6 py-4 font-semibold">Últ. Contacto</th>
                   <th className="px-6 py-4 font-semibold">Próx. Contacto</th>
+                  <th className="px-6 py-4 font-semibold min-w-[200px]">Comentario</th>
                   <th className="px-6 py-4 font-semibold text-center">Acciones</th>
                 </tr>
               </thead>
@@ -328,6 +330,12 @@ export default function CarteraPage() {
                       )}
                     </td>
                     <td className="px-6 py-4">
+                      <div className="flex items-center gap-2 text-gray-600">
+                        <Phone size={14} className="text-indigo-400" />
+                        <span className="text-sm">{cliente.telefono || '-'}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${ESTADO_COLORS[cliente.tipo_estado] || 'bg-gray-100 text-gray-500'}`}>
                         {ESTADO_LABELS[cliente.tipo_estado] || cliente.tipo_estado}
                       </span>
@@ -340,6 +348,14 @@ export default function CarteraPage() {
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-xs ${getSemaforoColor(cliente.proxima_fecha_contacto)}`}>
                         {formatDate(cliente.proxima_fecha_contacto)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span
+                        className="text-xs text-gray-500 block max-w-[250px] truncate"
+                        title={cliente.comentario_ultima_llamada || ''}
+                      >
+                        {cliente.comentario_ultima_llamada || '-'}
                       </span>
                     </td>
                     <td className="px-6 py-4">

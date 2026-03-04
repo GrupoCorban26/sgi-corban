@@ -17,6 +17,7 @@ class RegistroImportacion(Base):
     paises_origen = Column(String(2000))
     partidas_arancelarias = Column(Text)
     importa_de_china = Column(String(10))
+    cant_agentes_aduana = Column(Integer, default=0)
 
 class CasoLlamada(Base):
     __tablename__ = "casos_llamada"

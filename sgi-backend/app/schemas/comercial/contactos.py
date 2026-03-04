@@ -15,7 +15,7 @@ class ContactoCreate(ContactoBase):
 
 class ContactoManualCreate(BaseModel):
     ruc: str = Field(..., max_length=11)
-    nombre: str = Field(..., max_length=150)
+    nombre: Optional[str] = Field(None, max_length=150)
     cargo: Optional[str] = Field(None, max_length=100)
     telefono: Optional[str] = Field(None, max_length=20)
     email: Optional[str] = Field(None, max_length=100)

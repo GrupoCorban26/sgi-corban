@@ -7,7 +7,7 @@ import logging
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, or_, update
+from sqlalchemy import func, or_, update, case
 from fastapi import HTTPException
 from app.models.comercial import ClienteContacto, Cliente, CasoLlamada, RegistroImportacion
 from app.models.historial_llamadas import HistorialLlamada
@@ -179,7 +179,13 @@ class ContactosAsignacionService:
                     conditions_partida = [RegistroImportacion.partidas_arancelarias.like(f"%{p}%") for p in partida_arancelaria]
                     stmt_rucs = stmt_rucs.where(or_(*conditions_partida))
                     
-                stmt_rucs = stmt_rucs.group_by(ClienteContacto.ruc).order_by(func.newid()).limit(50)
+                # Priorizar: empresas con cant_agentes_aduana != 1 primero (0 o 2+), luego las de 1 al final
+                # Se usa func.min() porque GROUP BY requiere función de agregación para columnas externas
+                prioridad_agentes = func.min(case(
+                    (RegistroImportacion.cant_agentes_aduana == 1, 1),  # Al final
+                    else_=0  # Primero (0 agentes o 2+)
+                ))
+                stmt_rucs = stmt_rucs.group_by(ClienteContacto.ruc).order_by(prioridad_agentes, func.newid()).limit(50)
                 
                 rucs_disponibles = (await self.db.execute(stmt_rucs)).scalars().all()
                 
@@ -315,17 +321,8 @@ class ContactosAsignacionService:
 
             # Logic: Negative (Not Gestionable) -> Release others
             if not is_positive and not cliente_existe:
-                # Mark current as GESTIONADO (already done implicitly by flow, but state was updated above?) 
-                # Wait, contact state is updated where? Ah, explicitly set to GESTIONADO if created client. 
-                # If NOT created client, current contact should ALSO be GESTIONADO?
-                # The original code only updated contact state if client was created? 
-                # Line 222-226 logic marks 'EN_GESTION' -> 'GESTIONADO'.
-                
-                # Let's ensure current contact is marked GESTIONADO regardless of outcome, 
-                # provided it was the one being acted upon. 
-                # Actually, the requirement says: "los demás registros de ese mismo ruc pasan a disponible".
-                
-                contact.estado = 'GESTIONADO' # Always mark current one as handled
+                # El contacto actual ESTABA cambiando a GESTIONADO aquí (lo que lo ocultaba de la UI).
+                # Ahora conservará su estado actual (ASIGNADO) hasta que se "Cargue Base" nuevamente.
                 
                 await self.db.execute(update(ClienteContacto).where(
                     ClienteContacto.ruc == contact.ruc,
@@ -437,7 +434,7 @@ class ContactosAsignacionService:
             # 2. Crear contacto nuevo
             contacto = ClienteContacto(
                 ruc=data.ruc,
-                nombre=data.nombre,
+                nombre=data.nombre or "Sin nombre",
                 cargo=data.cargo,
                 telefono=data.telefono,
                 correo=data.email,
