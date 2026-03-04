@@ -395,63 +395,145 @@ class ContactosAsignacionService:
         return {"paises": paises, "partidas": partidas}
 
     async def create_contacto_manual(self, data, user_id: int):
-        """Crea un contacto manual y lo asigna inmediatamente al comercial."""
-        # 1. Validar duplicado (RUC + Telefono) para evitar conflictos obvios
-        stmt_dup = select(ClienteContacto).where(
-            ClienteContacto.ruc == data.ruc,
-            ClienteContacto.telefono == data.telefono,
-            ClienteContacto.is_active == True
-        )
-        if (await self.db.execute(stmt_dup)).scalars().first():
-            raise HTTPException(400, "Ya existe un contacto activo con este RUC y teléfono.")
-
-        # 2. Crear contacto asignado
-        nuevo_contacto = ClienteContacto(
-            ruc=data.ruc,
-            nombre=data.nombre,
-            cargo=data.cargo,
-            telefono=data.telefono,
-            correo=data.email,
-            origen='MANUAL',
-            is_client=False,
-            is_active=True,
-            estado='ASIGNADO',
-            asignado_a=user_id,
-            fecha_asignacion=func.now(),
-            lote_asignacion=0 # 0 para manuales
-        )
-        self.db.add(nuevo_contacto)
+        """Crea un contacto manual y lo asigna inmediatamente al comercial.
+        
+        Mejoras:
+        - Duplicado inteligente: si RUC+telefono ya existe, actualiza datos en vez de fallar.
+        - crear_como_prospecto: si es True, crea un Cliente (PROSPECTO) directo a cartera.
+        """
+        contacto_actualizado = False
+        prospecto_creado = False
+        cliente_ya_existia = False
+        
+        # 1. Buscar duplicado (RUC + Teléfono)
+        contacto_existente = None
+        if data.telefono:
+            stmt_dup = select(ClienteContacto).where(
+                ClienteContacto.ruc == data.ruc,
+                ClienteContacto.telefono == data.telefono,
+                ClienteContacto.is_active == True
+            )
+            contacto_existente = (await self.db.execute(stmt_dup)).scalars().first()
+        
+        if contacto_existente:
+            # Actualizar datos del contacto existente en vez de fallar
+            if data.nombre:
+                contacto_existente.nombre = data.nombre
+            if data.cargo:
+                contacto_existente.cargo = data.cargo
+            if data.email:
+                contacto_existente.correo = data.email
+            contacto_existente.updated_at = func.now()
+            
+            # Si no está asignado a nadie, asignar al comercial actual
+            if contacto_existente.estado == 'DISPONIBLE' or contacto_existente.asignado_a is None:
+                contacto_existente.asignado_a = user_id
+                contacto_existente.fecha_asignacion = func.now()
+                contacto_existente.estado = 'ASIGNADO'
+            
+            contacto = contacto_existente
+            contacto_actualizado = True
+        else:
+            # 2. Crear contacto nuevo
+            contacto = ClienteContacto(
+                ruc=data.ruc,
+                nombre=data.nombre,
+                cargo=data.cargo,
+                telefono=data.telefono,
+                correo=data.email,
+                origen='MANUAL',
+                is_client=False,
+                is_active=True,
+                estado='ASIGNADO',
+                asignado_a=user_id,
+                fecha_asignacion=func.now(),
+                lote_asignacion=0  # 0 para manuales
+            )
+            self.db.add(contacto)
+        
+        # 3. Si crear_como_prospecto → crear Cliente automáticamente
+        if getattr(data, 'crear_como_prospecto', False):
+            # Verificar si ya existe un Cliente para este RUC
+            stmt_cl = select(Cliente).where(
+                Cliente.ruc == data.ruc,
+                Cliente.is_active == True
+            )
+            cliente_existente = (await self.db.execute(stmt_cl)).scalars().first()
+            
+            if cliente_existente:
+                cliente_ya_existia = True
+                # Solo marcar contacto como is_client
+                contacto.is_client = True
+            else:
+                # Obtener razón social
+                rs_result = (await self.db.execute(
+                    select(RegistroImportacion.razon_social).where(
+                        RegistroImportacion.ruc == data.ruc
+                    )
+                )).scalar()
+                if not rs_result:
+                    rs_result = data.nombre  # Usar nombre del contacto como fallback
+                
+                nuevo_cliente = Cliente(
+                    ruc=data.ruc,
+                    razon_social=rs_result or "Sin razón social",
+                    comercial_encargado_id=user_id,
+                    tipo_estado='PROSPECTO',
+                    origen='BASE_DATOS',
+                    ultimo_contacto=func.now(),
+                    comentario_ultima_llamada=f"Contacto referido: {data.nombre}",
+                    is_active=True,
+                    created_by=user_id
+                )
+                self.db.add(nuevo_cliente)
+                
+                # Marcar contacto y todos los del mismo RUC como is_client
+                contacto.is_client = True
+                await self.db.execute(
+                    update(ClienteContacto).where(
+                        ClienteContacto.ruc == data.ruc,
+                        ClienteContacto.is_active == True
+                    ).values(is_client=True)
+                )
+                prospecto_creado = True
+            
+            # Marcar contacto como GESTIONADO (ya pasó a cartera)
+            contacto.estado = 'GESTIONADO'
+            contacto.fecha_llamada = func.now()
+        
         await self.db.commit()
-        await self.db.refresh(nuevo_contacto)
+        await self.db.refresh(contacto)
         
-        # Devolver estructura similar a get_mis_contactos_asignados para facilitar frontend
-        # Recuperar Razón Social si existe
-        stmt_rs = select(
-            RegistroImportacion.razon_social,
-            Cliente.razon_social
-        ).outerjoin(Cliente, RegistroImportacion.ruc == Cliente.ruc).where(RegistroImportacion.ruc == data.ruc)
-        
-        # Intentar obtener razon social de alguna fuente
-        # Es mas seguro hacer una query aparte o reusar logica
-        rs_result = (await self.db.execute(select(RegistroImportacion.razon_social).where(RegistroImportacion.ruc == data.ruc))).scalar()
+        # Obtener razón social para respuesta
+        rs_result = (await self.db.execute(
+            select(RegistroImportacion.razon_social).where(
+                RegistroImportacion.ruc == data.ruc
+            )
+        )).scalar()
         if not rs_result:
-             rs_result = (await self.db.execute(select(Cliente.razon_social).where(Cliente.ruc == data.ruc))).scalar()
+            rs_result = (await self.db.execute(
+                select(Cliente.razon_social).where(Cliente.ruc == data.ruc)
+            )).scalar()
         
         return {
-            "id": nuevo_contacto.id,
-            "ruc": nuevo_contacto.ruc,
-            "nombre": nuevo_contacto.nombre,
+            "id": contacto.id,
+            "ruc": contacto.ruc,
+            "nombre": contacto.nombre,
             "razon_social": rs_result or "Sin razón social",
-            "telefono": nuevo_contacto.telefono,
-            "correo": nuevo_contacto.correo,
-            "cargo": nuevo_contacto.cargo,
+            "telefono": contacto.telefono,
+            "correo": contacto.correo,
+            "cargo": contacto.cargo,
             "contesto": 0,
             "caso_id": None,
             "caso_nombre": None,
             "comentario": None,
-            "estado": nuevo_contacto.estado,
-            "fecha_asignacion": nuevo_contacto.fecha_asignacion,
-            "fecha_llamada": None,
-            "is_client": False
+            "estado": contacto.estado,
+            "fecha_asignacion": contacto.fecha_asignacion,
+            "fecha_llamada": contacto.fecha_llamada,
+            "is_client": contacto.is_client,
+            # Flags para el frontend
+            "actualizado": contacto_actualizado,
+            "prospecto_creado": prospecto_creado,
+            "cliente_ya_existia": cliente_ya_existia
         }
 

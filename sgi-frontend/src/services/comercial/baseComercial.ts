@@ -65,9 +65,17 @@ export const baseComercialService = {
     },
 
     /**
-     * Crea un contacto manual asociado a un RUC
+     * Crea un contacto manual asociado a un RUC.
+     * Si crearComoProspecto=true, también crea un Cliente en cartera.
      */
-    async crearContactoManual(data: { ruc: string; nombre: string; telefono: string; cargo?: string; email?: string }): Promise<ContactoAsignado> {
+    async crearContactoManual(data: {
+        ruc: string;
+        nombre: string;
+        telefono: string;
+        cargo?: string;
+        email?: string;
+        crear_como_prospecto?: boolean;
+    }): Promise<ContactoAsignado & { actualizado?: boolean; prospecto_creado?: boolean; cliente_ya_existia?: boolean }> {
         const { data: response } = await api.post('/contactos/manual', data);
         return response;
     }

@@ -212,8 +212,9 @@ function ModalContent({ clienteToEdit, initialData, isOpen, onClienteCreado, sho
                         disabled={isLoading}
                     >
                         <option value="PROSPECTO">Prospecto</option>
-                        <option value="CLIENTE">Cliente</option>
-                        <option value="INACTIVO">Inactivo</option>
+                        <option value="EN_NEGOCIACION">En Negociación</option>
+                        <option value="CERRADA">Cerrada</option>
+                        <option value="CARGA_ENTREGADA">Carga Entregada</option>
                     </select>
                 </div>
 

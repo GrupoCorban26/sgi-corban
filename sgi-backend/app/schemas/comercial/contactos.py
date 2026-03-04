@@ -19,6 +19,7 @@ class ContactoManualCreate(BaseModel):
     cargo: Optional[str] = Field(None, max_length=100)
     telefono: Optional[str] = Field(None, max_length=20)
     email: Optional[str] = Field(None, max_length=100)
+    crear_como_prospecto: bool = Field(False, description="Si True, crea Cliente y va directo a cartera")
 
 class ContactoUpdate(BaseModel):
     cargo: Optional[str] = None

@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import {
   Database, Upload, Loader2, AlertCircle, Phone, Mail,
-  CheckCircle2, RefreshCw, Filter, Save, UserPlus, X, Plus
+  CheckCircle2, RefreshCw, Filter, Save, UserPlus, X, Plus, Briefcase
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBaseComercial } from '@/hooks/comercial/useBaseComercial';
@@ -51,6 +51,7 @@ export default function BaseComercialPage() {
   // Estado para modal de contacto manual
   const [manualModal, setManualModal] = useState<{ isOpen: boolean; ruc: string; razonSocial: string }>({ isOpen: false, ruc: '', razonSocial: '' });
   const [manualForm, setManualForm] = useState({ nombre: '', cargo: '', telefono: '', email: '' });
+  const [crearComoProspecto, setCrearComoProspecto] = useState(false);
 
   // Estado para rastrear filas guardadas (sin cambios pendientes)
   const [savedRows, setSavedRows] = useState<Set<number>>(new Set());
@@ -130,17 +131,33 @@ export default function BaseComercialPage() {
     }
 
     try {
-      await crearContactoManual({
+      const resultado = await crearContactoManual({
         ruc: manualModal.ruc,
         nombre: manualForm.nombre,
         telefono: manualForm.telefono,
         cargo: manualForm.cargo,
-        email: manualForm.email
+        email: manualForm.email,
+        crear_como_prospecto: crearComoProspecto
       });
-      toast.success('Contacto creado y asignado');
+
+      // Toasts diferenciados según resultado
+      if (resultado.prospecto_creado) {
+        toast.success('Prospecto creado y agregado a tu cartera', {
+          description: `${manualForm.nombre} aparecerá en tu cartera como PROSPECTO`,
+          duration: 5000
+        });
+      } else if (resultado.cliente_ya_existia) {
+        toast.info('Este RUC ya tiene un cliente en cartera. Contacto vinculado.', { duration: 4000 });
+      } else if (resultado.actualizado) {
+        toast.warning('Se encontró un contacto existente con ese teléfono. Se actualizaron sus datos.', { duration: 4000 });
+      } else {
+        toast.success('Contacto creado y asignado');
+      }
+
       setManualModal({ isOpen: false, ruc: '', razonSocial: '' });
       setManualForm({ nombre: '', cargo: '', telefono: '', email: '' });
-      refetch(); // Recargar la lista para ver el nuevo contacto (aunque la query se invalida, esto asegura)
+      setCrearComoProspecto(false);
+      refetch();
     } catch (error: any) {
       toast.error(error.response?.data?.detail || 'Error al crear contacto');
     }
@@ -299,6 +316,7 @@ export default function BaseComercialPage() {
                           onClick={() => {
                             setManualModal({ isOpen: true, ruc: contacto.ruc, razonSocial: contacto.razon_social });
                             setManualForm({ nombre: '', cargo: '', telefono: '', email: '' });
+                            setCrearComoProspecto(false);
                           }}
                           className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 mt-1"
                           title="Agregar otro contacto a esta empresa"
@@ -544,7 +562,40 @@ export default function BaseComercialPage() {
               </div>
             </div>
 
-            <div className="flex justify-end gap-3 mt-8">
+            {/* Toggle: Crear como Prospecto en Cartera */}
+            <div
+              onClick={() => setCrearComoProspecto(!crearComoProspecto)}
+              className={`
+                mt-2 flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all duration-200
+                ${crearComoProspecto
+                  ? 'bg-indigo-50 border-indigo-400 shadow-sm'
+                  : 'bg-gray-50 border-gray-200 hover:border-gray-300'
+                }
+              `}
+            >
+              <div className={`
+                mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all
+                ${crearComoProspecto
+                  ? 'bg-indigo-600 border-indigo-600'
+                  : 'bg-white border-gray-300'
+                }
+              `}>
+                {crearComoProspecto && <CheckCircle2 size={14} className="text-white" />}
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <Briefcase size={16} className={crearComoProspecto ? 'text-indigo-600' : 'text-gray-400'} />
+                  <span className={`text-sm font-semibold ${crearComoProspecto ? 'text-indigo-700' : 'text-gray-700'}`}>
+                    Crear como prospecto en cartera
+                  </span>
+                </div>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  El contacto irá directamente a tu cartera para gestión comercial
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-3 mt-6">
               <button
                 onClick={() => setManualModal({ ...manualModal, isOpen: false })}
                 className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
