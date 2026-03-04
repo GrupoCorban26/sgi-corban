@@ -20,6 +20,11 @@ export default function TransaccionesPage() {
         setSinTelefono,
         sortByRuc,
         setSortByRuc,
+        paisOrigen,
+        setPaisOrigen,
+        cantAgentes,
+        setCantAgentes,
+        paisesDropdown,
         pageSize,
         uploadFile,
         refresh  // Agregar refresh para poder actualizar la lista
@@ -127,14 +132,39 @@ export default function TransaccionesPage() {
                             <ArrowDownWideNarrow className="w-4 h-4" />
                             RUC {sortByRuc === 'desc' ? '↓' : ''}
                         </button>
-                        <label className="flex items-center gap-2 cursor-pointer">
+
+                        <div className="flex items-center gap-2">
+                            <select
+                                value={paisOrigen}
+                                onChange={(e) => { setPaisOrigen(e.target.value); setPage(1); }}
+                                className="px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none w-40"
+                            >
+                                <option value="">Todos los países</option>
+                                {paisesDropdown.map(pais => (
+                                    <option key={pais} value={pais}>{pais}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="flex items-center gap-2">
+                            <input
+                                type="number"
+                                min={0}
+                                placeholder="Cant. agentes..."
+                                value={cantAgentes}
+                                onChange={(e) => { setCantAgentes(e.target.value); setPage(1); }}
+                                className="px-3 py-2 border rounded-lg text-sm w-36 focus:ring-2 focus:ring-blue-500 outline-none"
+                            />
+                        </div>
+
+                        <label className="flex items-center gap-2 cursor-pointer ml-2">
                             <input
                                 type="checkbox"
                                 checked={sinTelefono}
                                 onChange={(e) => { setSinTelefono(e.target.checked); setPage(1); }}
                                 className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                             />
-                            <span className="text-sm text-gray-600">Solo sin teléfono</span>
+                            <span className="text-sm text-gray-600 whitespace-nowrap">Solo sin teléfono</span>
                         </label>
                     </div>
                     <div className="flex items-center gap-3">

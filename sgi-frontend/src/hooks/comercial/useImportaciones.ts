@@ -13,6 +13,9 @@ export const useImportaciones = () => {
     const [search, setSearch] = useState('');
     const [sinTelefono, setSinTelefono] = useState(false);
     const [sortByRuc, setSortByRuc] = useState<string | null>(null);
+    const [paisOrigen, setPaisOrigen] = useState<string>('');
+    const [cantAgentes, setCantAgentes] = useState<string>('');
+    const [paisesDropdown, setPaisesDropdown] = useState<string[]>([]);
 
     // Debounce de 500ms para la búsqueda
     const debouncedSearch = useDebounce(search, 500);
@@ -21,12 +24,15 @@ export const useImportaciones = () => {
         setLoading(true);
         setError(null);
         try {
+            const parsedAgentes = cantAgentes ? parseInt(cantAgentes) : null;
             const res = await importacionesService.getImportaciones(
                 page,
                 pageSize,
                 debouncedSearch,
                 sinTelefono,
-                sortByRuc || undefined
+                sortByRuc || undefined,
+                paisOrigen || undefined,
+                parsedAgentes
             );
             setData(res.data);
             setTotal(res.total);
@@ -37,7 +43,20 @@ export const useImportaciones = () => {
         } finally {
             setLoading(false);
         }
-    }, [page, pageSize, debouncedSearch, sinTelefono, sortByRuc]);
+    }, [page, pageSize, debouncedSearch, sinTelefono, sortByRuc, paisOrigen, cantAgentes]);
+
+    const fetchPaises = useCallback(async () => {
+        try {
+            const paises = await importacionesService.getPaisesOrigen();
+            setPaisesDropdown(paises);
+        } catch (err) {
+            console.error('Error fetching paises:', err);
+        }
+    }, []);
+
+    useEffect(() => {
+        fetchPaises();
+    }, [fetchPaises]);
 
     useEffect(() => {
         fetchImportaciones();
@@ -73,6 +92,11 @@ export const useImportaciones = () => {
         setSinTelefono,
         sortByRuc,
         setSortByRuc,
+        paisOrigen,
+        setPaisOrigen,
+        cantAgentes,
+        setCantAgentes,
+        paisesDropdown,
         pageSize,
         uploadFile,
         refresh: fetchImportaciones

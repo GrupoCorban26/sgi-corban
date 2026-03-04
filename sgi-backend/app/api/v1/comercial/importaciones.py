@@ -28,8 +28,14 @@ async def list_importaciones(
     search: str = Query(None),
     sin_telefono: bool = Query(False),
     sort_by_ruc: str = Query(None, description="Ordenar por RUC: 'asc' o 'desc'"),
+    pais_origen: str = Query(None, description="Filtrar por pais de origen exacto"),
+    cant_agentes: int = Query(None, description="Filtrar por cantidad de agentes de aduana"),
     db: AsyncSession = Depends(get_db),
     _: dict = Depends(get_current_active_auth)
 ):
-    return await ImportacionesService.get_importaciones(db, page, page_size, search, sin_telefono, sort_by_ruc)
+    return await ImportacionesService.get_importaciones(db, page, page_size, search, sin_telefono, sort_by_ruc, pais_origen, cant_agentes)
 
+@router.get("/paises/dropdown")
+async def get_paises(db: AsyncSession = Depends(get_db)):
+    """Devuelve listado de países únicos disponibles en importaciones (para filtros)"""
+    return await ImportacionesService.get_paises_dropdown(db)

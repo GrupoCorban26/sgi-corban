@@ -139,7 +139,7 @@ class ImportacionesService:
                 raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
     @staticmethod
-    async def get_importaciones(db: AsyncSession, page: int, page_size: int, search: str = None, sin_telefono: bool = False, sort_by_ruc: str = None):
+    async def get_importaciones(db: AsyncSession, page: int, page_size: int, search: str = None, sin_telefono: bool = False, sort_by_ruc: str = None, pais_origen: str = None, cant_agentes: int = None):
         """Lista importaciones con paginación. Opcionalmente filtra empresas sin teléfono registrado."""
         try:
             offset = (page - 1) * page_size
@@ -163,22 +163,32 @@ class ImportacionesService:
             else:
                 order_by = "ORDER BY ri.fob_total_real DESC"
             
+            # Additional where logic
+            params_dict = {"search": search, "pais_origen": pais_origen, "cant_agentes": cant_agentes}
+            
+            if pais_origen is not None and pais_origen.strip() != '':
+                base_where += " AND ri.paises_origen = :pais_origen "
+                
+            if cant_agentes is not None:
+                base_where += " AND ri.cant_agentes_aduana = :cant_agentes "
+            
             # Count query
             count_query = f"""
                 SELECT COUNT(*) FROM comercial.registro_importaciones ri
                 {base_where}
             """
-            count_result = await db.execute(text(count_query), {"search": search})
+            count_result = await db.execute(text(count_query), params_dict)
             total = count_result.scalar() or 0
             
             # Data query
+            params_dict.update({"offset": offset, "page_size": page_size})
             data_query = f"""
                 SELECT * FROM comercial.registro_importaciones ri
                 {base_where}
                 {order_by}
                 OFFSET :offset ROWS FETCH NEXT :page_size ROWS ONLY
             """
-            result = await db.execute(text(data_query), {"search": search, "offset": offset, "page_size": page_size})
+            result = await db.execute(text(data_query), params_dict)
             rows = result.mappings().all()
             
             return {"total": total, "page": page, "page_size": page_size, "data": rows}
@@ -186,3 +196,21 @@ class ImportacionesService:
         except Exception as e:
             logger.error(f"Error get_importaciones: {e}")
             return {"total": 0, "page": page, "page_size": page_size, "data": []}
+
+    @staticmethod
+    async def get_paises_dropdown(db: AsyncSession):
+        """Devuelve listado de países únicos (valores exactos)"""
+        try:
+            # Selecciona países distintos, descartando vacíos y nulos
+            query = """
+                SELECT DISTINCT paises_origen 
+                FROM comercial.registro_importaciones 
+                WHERE paises_origen IS NOT NULL AND RTRIM(LTRIM(paises_origen)) <> ''
+                ORDER BY paises_origen
+            """
+            result = await db.execute(text(query))
+            rows = result.scalars().all()
+            return [row.strip() for row in rows if row]
+        except Exception as e:
+            logger.error(f"Error get_paises_dropdown: {e}")
+            return []

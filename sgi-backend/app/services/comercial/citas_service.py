@@ -25,9 +25,10 @@ class CitasService:
         estado: str = None,
         tipo_agenda: str = None,
         page: int = 1,
-        page_size: int = 20
+        page_size: int = 20,
+        comercial_ids: list[int] = None
     ):
-        """Lista todas las citas con filtros opcionales"""
+        """Lista todas las citas con filtros opcionales (Aplica restricción de equipo)"""
         offset = (page - 1) * page_size
         
         # Query base con eager loading
@@ -40,6 +41,8 @@ class CitasService:
         # Filtros
         if comercial_id:
             stmt = stmt.where(Cita.comercial_id == comercial_id)
+        if comercial_ids:
+            stmt = stmt.where(Cita.comercial_id.in_(comercial_ids))
         if estado:
             stmt = stmt.where(Cita.estado == estado)
         if tipo_agenda:
@@ -54,6 +57,8 @@ class CitasService:
         count_stmt = select(func.count()).select_from(Cita)
         if comercial_id:
             count_stmt = count_stmt.where(Cita.comercial_id == comercial_id)
+        if comercial_ids:
+            count_stmt = count_stmt.where(Cita.comercial_id.in_(comercial_ids))
         if estado:
             count_stmt = count_stmt.where(Cita.estado == estado)
         if tipo_agenda:

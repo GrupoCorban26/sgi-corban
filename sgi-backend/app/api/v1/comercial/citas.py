@@ -11,6 +11,8 @@ from app.schemas.comercial.cita import (
     SalidaCampoCreate, SalidaCampoUpdate
 )
 
+from app.core.dependencies import resolver_comercial_ids
+
 router = APIRouter(prefix="/citas", tags=["Citas"])
 
 
@@ -26,11 +28,25 @@ async def listar_citas(
     page: int = 1,
     page_size: int = 20,
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(get_current_active_auth)
+    _: dict = Depends(get_current_active_auth),
+    comercial_ids: list = Depends(resolver_comercial_ids)
 ):
-    """Lista todas las citas con filtros opcionales"""
+    """Lista todas las citas con filtros opcionales y filtra por equipo de forma automática"""
     service = CitasService(db)
-    return await service.get_all(comercial_id, estado, tipo_agenda, page, page_size)
+    
+    # Si manda un comercial en específico por filtro de frontend
+    if comercial_id:
+        if comercial_ids is None or comercial_id in comercial_ids:
+            comercial_ids = [comercial_id]
+            
+    return await service.get_all(
+        comercial_id=None, # Ya se delega la lógica a comercial_ids
+        estado=estado, 
+        tipo_agenda=tipo_agenda, 
+        page=page, 
+        page_size=page_size,
+        comercial_ids=comercial_ids
+    )
 
 
 # ============================================================
