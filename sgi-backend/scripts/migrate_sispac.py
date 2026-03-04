@@ -74,15 +74,23 @@ async def migrate_sispac(file_path: str):
                 
             nombre_empresa = str(row.get("NOMBRE", "")).strip()
             telefono = str(row.get("TELEF1", "")).strip()
-            if not telefono or telefono == 'None':
+            if not telefono or telefono in ('None', 'nan'):
                 telefono = "S/N"
+            else:
+                # Si tiene múltiples números (ej: '937 485 936-920 700 279'), tomar solo el primero
+                for sep in ['-', ',', '/', ';']:
+                    if sep in telefono:
+                        telefono = telefono.split(sep)[0].strip()
+                        break
+                # Limitar a 20 caracteres (límite de la columna)
+                telefono = telefono[:20]
                 
             contacto_nombre = str(row.get("CONTACTO", "")).strip()
-            if not contacto_nombre or contacto_nombre == 'None':
+            if not contacto_nombre or contacto_nombre in ('None', 'nan'):
                 contacto_nombre = None
                 
             correo = str(row.get("EMAIL", "")).strip()
-            if not correo or correo == 'None':
+            if not correo or correo in ('None', 'nan'):
                 correo = None
             
             ejecutivo_raw = str(row.get("EJECUTIVO", "")).strip().upper()
@@ -100,7 +108,7 @@ async def migrate_sispac(file_path: str):
                     Cliente(
                         ruc=ruc,
                         razon_social=nombre_empresa,
-                        tipo_estado="CLIENTE",
+                        tipo_estado="CERRADA",
                         origen="CARTERA_PROPIA",
                         comercial_encargado_id=comercial_id,
                         ultimo_contacto=func.now(),
