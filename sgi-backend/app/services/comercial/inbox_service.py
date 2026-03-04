@@ -207,7 +207,7 @@ class InboxService:
         result = await self.db.execute(query)
         return result.scalars().all()
 
-    async def get_all_leads(self):
+    async def get_all_leads(self, comercial_ids: list = None):
         query = select(Inbox).where(
             Inbox.estado == 'PENDIENTE'
         ).options(
@@ -216,7 +216,11 @@ class InboxService:
                 .selectinload(Empleado.activos_asignados)
                 .selectinload(EmpleadoActivo.activo)
                 .selectinload(Activo.linea_instalada)
-        ).order_by(Inbox.fecha_recepcion.desc())
+        )
+        # Filtrar por equipo si comercial_ids no es None
+        if comercial_ids is not None:
+            query = query.where(Inbox.asignado_a.in_(comercial_ids))
+        query = query.order_by(Inbox.fecha_recepcion.desc())
         result = await self.db.execute(query)
         return result.scalars().all()
 
@@ -230,10 +234,13 @@ class InboxService:
         result = await self.db.execute(query)
         return result.scalar() or 0
 
-    async def get_all_pending_count(self) -> int:
+    async def get_all_pending_count(self, comercial_ids: list = None) -> int:
         query = select(func.count()).select_from(Inbox).where(
             Inbox.estado == 'PENDIENTE'
         )
+        # Filtrar por equipo si comercial_ids no es None
+        if comercial_ids is not None:
+            query = query.where(Inbox.asignado_a.in_(comercial_ids))
         result = await self.db.execute(query)
         return result.scalar() or 0
 
