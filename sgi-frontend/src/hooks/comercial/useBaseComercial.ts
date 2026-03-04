@@ -50,7 +50,7 @@ export function useCrearContactoManual() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: (data: { ruc: string; nombre: string; telefono: string; cargo?: string; email?: string; crear_como_prospecto?: boolean }) =>
+        mutationFn: (data: { ruc: string; nombre: string; telefono?: string; cargo?: string; email?: string; crear_como_prospecto?: boolean }) =>
             baseComercialService.crearContactoManual(data),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['mis-contactos'] });

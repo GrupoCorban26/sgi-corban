@@ -71,7 +71,7 @@ export const baseComercialService = {
     async crearContactoManual(data: {
         ruc: string;
         nombre: string;
-        telefono: string;
+        telefono?: string;
         cargo?: string;
         email?: string;
         crear_como_prospecto?: boolean;

@@ -125,8 +125,8 @@ export default function BaseComercialPage() {
   };
 
   const handleCreateManual = async () => {
-    if (!manualForm.nombre || !manualForm.telefono) {
-      toast.error('Nombre y teléfono son obligatorios');
+    if (!manualForm.nombre || (!manualForm.telefono && !manualForm.email)) {
+      toast.error('Nombre y al menos un dato de contacto (teléfono o email) son obligatorios');
       return;
     }
 
@@ -530,7 +530,7 @@ export default function BaseComercialPage() {
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono/Celular *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono/Celular</label>
                   <input
                     type="text"
                     value={manualForm.telefono}
@@ -561,6 +561,7 @@ export default function BaseComercialPage() {
                 />
               </div>
             </div>
+            <p className="text-xs text-gray-400 mt-1">* Al menos un dato de contacto (teléfono o email) es requerido</p>
 
             {/* Toggle: Crear como Prospecto en Cartera */}
             <div
