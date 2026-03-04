@@ -37,6 +37,8 @@ class ClientesService:
         page_size: int = 15
     ) -> dict:
         """Lista clientes con paginación y filtros. Filtra por lista de IDs (usuario o empleado)."""
+        offset = (page - 1) * page_size
+        
         # Subquery para obtener el teléfono del contacto asociado al cliente
         subq_telefono = (
             select(ClienteContacto.telefono)
