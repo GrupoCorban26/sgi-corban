@@ -9,7 +9,6 @@ from typing import List, Optional
 from app.models.chat_message import ChatMessage
 from app.models.comercial_inbox import Inbox
 from app.models.seguridad import Usuario
-from app.models.rrhh import Empleado
 from app.schemas.comercial.chat import ChatMessageCreate
 
 class ChatService:
