@@ -41,5 +41,15 @@ export const reportesLlamadasService = {
         a.click();
         window.URL.revokeObjectURL(url);
         document.body.removeChild(a);
+    },
+
+    getBotAnalytics: async (params: { fecha_inicio: string; fecha_fin: string }) => {
+        const { data } = await api.get('/comercial/reportes/bot-analytics', { params });
+        return data as {
+            por_tipo_interes: { tipo: string; total: number }[];
+            por_hora: { hora: number; total: number }[];
+            motivos_descarte: { motivo: string; total: number }[];
+            por_dia: { fecha: string; total: number }[];
+        };
     }
 };

@@ -8,6 +8,7 @@ from fastapi.responses import StreamingResponse
 
 from app.models.historial_llamadas import HistorialLlamada
 from app.models.comercial import ClienteContacto, RegistroImportacion, CasoLlamada
+from app.models.comercial_inbox import Inbox
 from app.models.seguridad import Usuario
 from app.models.administrativo import Empleado
 
@@ -162,3 +163,56 @@ class ReportesLlamadasService:
                 "Content-Disposition": f"attachment; filename={filename}"
             }
         )
+
+    async def get_bot_analytics(self, fecha_inicio: date, fecha_fin: date) -> dict:
+        """KPIs del bot para decisiones de Sistemas: tipo de interés, leads por hora, motivos de descarte."""
+        from sqlalchemy import extract
+        
+        dt_inicio = datetime.combine(fecha_inicio, datetime.min.time())
+        dt_fin = datetime.combine(fecha_fin, datetime.max.time())
+        condicion_fecha = and_(Inbox.fecha_recepcion >= dt_inicio, Inbox.fecha_recepcion <= dt_fin)
+
+        # 1. Distribución por tipo de interés
+        stmt_tipo = select(
+            Inbox.tipo_interes, func.count().label('total')
+        ).where(
+            and_(condicion_fecha, Inbox.tipo_interes != None)
+        ).group_by(Inbox.tipo_interes)
+        result_tipo = await self.db.execute(stmt_tipo)
+        por_tipo_interes = [{"tipo": row.tipo_interes or "SIN_CLASIFICAR", "total": row.total} for row in result_tipo.all()]
+
+        # 2. Leads por hora del día
+        stmt_hora = select(
+            extract('hour', Inbox.fecha_recepcion).label('hora'),
+            func.count().label('total')
+        ).where(condicion_fecha).group_by(
+            extract('hour', Inbox.fecha_recepcion)
+        ).order_by(extract('hour', Inbox.fecha_recepcion))
+        result_hora = await self.db.execute(stmt_hora)
+        por_hora = [{"hora": int(row.hora), "total": row.total} for row in result_hora.all()]
+
+        # 3. Motivos de descarte
+        stmt_descarte = select(
+            Inbox.motivo_descarte, func.count().label('total')
+        ).where(
+            and_(condicion_fecha, Inbox.estado == 'DESCARTADO', Inbox.motivo_descarte != None)
+        ).group_by(Inbox.motivo_descarte).order_by(func.count().desc())
+        result_descarte = await self.db.execute(stmt_descarte)
+        motivos_descarte = [{"motivo": row.motivo_descarte, "total": row.total} for row in result_descarte.all()]
+
+        # 4. Leads por día (tendencia)
+        stmt_dia = select(
+            func.cast(Inbox.fecha_recepcion, date).label('fecha'),
+            func.count().label('total')
+        ).where(condicion_fecha).group_by(
+            func.cast(Inbox.fecha_recepcion, date)
+        ).order_by(func.cast(Inbox.fecha_recepcion, date))
+        result_dia = await self.db.execute(stmt_dia)
+        por_dia = [{"fecha": row.fecha.isoformat() if row.fecha else None, "total": row.total} for row in result_dia.all()]
+
+        return {
+            "por_tipo_interes": por_tipo_interes,
+            "por_hora": por_hora,
+            "motivos_descarte": motivos_descarte,
+            "por_dia": por_dia
+        }

@@ -10,7 +10,11 @@ import {
     Target,
     ClipboardList,
     Users,
-    TrendingUp
+    TrendingUp,
+    MessageSquare,
+    Clock,
+    UserX,
+    UserCheck
 } from 'lucide-react';
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -50,6 +54,20 @@ export default function ReportesDashboard() {
                 'Quiere cotización': c.quiere_cotizacion
             })));
             XLSX.utils.book_append_sheet(wb, wsCartera, "Cartera");
+
+            // 3. Reporte de Buzón WhatsApp
+            if (data.buzon) {
+                const wsBuzon = XLSX.utils.json_to_sheet(data.buzon.por_comercial.map(c => ({
+                    'Asesor': c.nombre,
+                    'Leads asignados': c.leads_asignados,
+                    'Convertidos': c.convertidos,
+                    'Descartados': c.descartados,
+                    'En gestión': c.en_gestion,
+                    'Tiempo resp. (min)': Math.round(c.avg_tiempo_respuesta_seg / 60),
+                    'Tasa conversión (%)': c.tasa_conversion
+                })));
+                XLSX.utils.book_append_sheet(wb, wsBuzon, "Buzón WhatsApp");
+            }
 
             XLSX.writeFile(wb, `Reporte_General_${format(new Date(), 'yyyyMMdd')}.xlsx`);
             toast.success('Reporte exportado correctamente');
@@ -283,6 +301,131 @@ export default function ReportesDashboard() {
                             </div>
                         </div>
                     </div>
+
+                    {/* ======================================================= */}
+                    {/* SECCIÓN 3: REPORTE DE BUZÓN WHATSAPP                     */}
+                    {/* ======================================================= */}
+                    {data.buzon && (
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2 flex items-center gap-2 mt-8">
+                                <MessageSquare className="text-green-500" size={24} />
+                                Buzón WhatsApp
+                            </h2>
+
+                            {/* KPIs Buzón */}
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                                {/* Total Leads */}
+                                <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
+                                    <div className="p-3 bg-green-50 text-green-600 rounded-lg">
+                                        <MessageSquare size={22} />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-medium text-gray-500 mb-0.5">Total Leads</p>
+                                        <h3 className="text-2xl font-bold text-gray-900">{data.buzon.totales.total_leads}</h3>
+                                    </div>
+                                </div>
+
+                                {/* Tasa Conversión */}
+                                <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
+                                    <div className="p-3 bg-emerald-50 text-emerald-600 rounded-lg">
+                                        <UserCheck size={22} />
+                                    </div>
+                                    <div className="w-full">
+                                        <p className="text-xs font-medium text-gray-500 mb-0.5">Convertidos</p>
+                                        <div className="flex items-end justify-between">
+                                            <h3 className="text-2xl font-bold text-gray-900">{data.buzon.totales.total_convertidos}</h3>
+                                            <span className="text-sm font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-md">
+                                                {data.buzon.totales.tasa_conversion}%
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Tasa Abandono */}
+                                <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
+                                    <div className="p-3 bg-amber-50 text-amber-600 rounded-lg">
+                                        <UserX size={22} />
+                                    </div>
+                                    <div className="w-full">
+                                        <p className="text-xs font-medium text-gray-500 mb-0.5">Sin respuesta</p>
+                                        <div className="flex items-end justify-between">
+                                            <h3 className="text-2xl font-bold text-gray-900">{data.buzon.totales.total_sin_respuesta}</h3>
+                                            <span className="text-sm font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md">
+                                                {data.buzon.totales.tasa_abandono}%
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Tiempo Respuesta */}
+                                <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm flex items-center gap-4">
+                                    <div className="p-3 bg-blue-50 text-blue-600 rounded-lg">
+                                        <Clock size={22} />
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-medium text-gray-500 mb-0.5">Tiempo resp. promedio</p>
+                                        <h3 className="text-2xl font-bold text-gray-900">
+                                            {data.buzon.totales.avg_tiempo_respuesta_seg > 0
+                                                ? `${Math.round(data.buzon.totales.avg_tiempo_respuesta_seg / 60)} min`
+                                                : '—'
+                                            }
+                                        </h3>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Tabla Buzón por Comercial */}
+                            <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-gray-50 border-b">
+                                            <tr className="text-gray-600 text-xs uppercase text-left">
+                                                <th className="px-6 py-4 font-semibold">Asesor</th>
+                                                <th className="px-4 py-4 font-semibold text-center">Asignados</th>
+                                                <th className="px-4 py-4 font-semibold text-center">Convertidos</th>
+                                                <th className="px-4 py-4 font-semibold text-center">Descartados</th>
+                                                <th className="px-4 py-4 font-semibold text-center">En gestión</th>
+                                                <th className="px-4 py-4 font-semibold text-center">Tiempo resp.</th>
+                                                <th className="px-4 py-4 font-semibold text-center">Conversión</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {data.buzon.por_comercial.map((agente, idx) => (
+                                                <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                                                    <td className="px-6 py-4 font-medium text-gray-800">{agente.nombre}</td>
+                                                    <td className="px-4 py-4 text-center font-semibold text-green-600">{agente.leads_asignados}</td>
+                                                    <td className="px-4 py-4 text-center font-semibold text-emerald-600">{agente.convertidos}</td>
+                                                    <td className="px-4 py-4 text-center font-semibold text-red-500">{agente.descartados}</td>
+                                                    <td className="px-4 py-4 text-center font-semibold text-blue-600">{agente.en_gestion}</td>
+                                                    <td className="px-4 py-4 text-center font-medium text-gray-700">
+                                                        {agente.avg_tiempo_respuesta_seg > 0
+                                                            ? `${Math.round(agente.avg_tiempo_respuesta_seg / 60)} min`
+                                                            : '—'
+                                                        }
+                                                    </td>
+                                                    <td className="px-4 py-4 text-center">
+                                                        <span className={`text-sm font-bold px-2.5 py-1 rounded-md ${agente.tasa_conversion >= 15 ? 'text-emerald-700 bg-emerald-50'
+                                                                : agente.tasa_conversion >= 5 ? 'text-amber-700 bg-amber-50'
+                                                                    : 'text-gray-500 bg-gray-50'
+                                                            }`}>
+                                                            {agente.tasa_conversion}%
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {data.buzon.por_comercial.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={7} className="px-6 py-8 text-center text-gray-500 font-medium">
+                                                        No hay actividad en el buzón para el rango seleccionado.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    )}
 
                 </div>
             )}

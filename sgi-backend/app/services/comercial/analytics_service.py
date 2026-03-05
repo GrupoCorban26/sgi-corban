@@ -6,7 +6,7 @@ canales de captación y métricas operativas.
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, case, and_, extract
+from sqlalchemy import func, case, and_, extract, or_
 from app.models.comercial import Cliente, ClienteContacto, Cita, CasoLlamada
 from app.models.historial_llamadas import HistorialLlamada
 from app.models.comercial_inbox import Inbox
@@ -34,11 +34,15 @@ class AnalyticsService:
         # 2. Reporte de Mantenimiento de Cartera
         cartera = await self._get_reporte_cartera(dt_inicio, dt_fin, comercial_ids)
 
+        # 3. Reporte de Buzón WhatsApp
+        buzon = await self._get_reporte_buzon(dt_inicio, dt_fin, comercial_ids)
+
         return {
             "fecha_inicio": fecha_inicio.isoformat(),
             "fecha_fin": fecha_fin.isoformat(),
             "base_datos": base_datos,
-            "cartera": cartera
+            "cartera": cartera,
+            "buzon": buzon
         }
 
     # =========================================================================
@@ -147,3 +151,127 @@ class AnalyticsService:
             },
             "por_comercial": comerciales_stats
         }
+
+    # =========================================================================
+    # C. Reporte de Buzón WhatsApp
+    # =========================================================================
+
+    async def _get_reporte_buzon(self, dt_inicio: datetime, dt_fin: datetime, comercial_ids: list = None) -> dict:
+        """Métricas del Buzón de WhatsApp por comercial."""
+        # Condición base de fechas
+        condicion_fecha = and_(
+            Inbox.fecha_recepcion >= dt_inicio,
+            Inbox.fecha_recepcion <= dt_fin
+        )
+
+        # --- TOTALES GENERALES ---
+        # Total leads
+        stmt_total = select(func.count()).select_from(Inbox).where(condicion_fecha)
+        if comercial_ids is not None:
+            stmt_total = stmt_total.where(or_(Inbox.asignado_a.in_(comercial_ids), Inbox.asignado_a == None))
+        total_leads = (await self.db.execute(stmt_total)).scalar() or 0
+
+        # Convertidos
+        stmt_convertidos = select(func.count()).select_from(Inbox).where(
+            and_(condicion_fecha, Inbox.estado == 'CONVERTIDO')
+        )
+        if comercial_ids is not None:
+            stmt_convertidos = stmt_convertidos.where(Inbox.asignado_a.in_(comercial_ids))
+        total_convertidos = (await self.db.execute(stmt_convertidos)).scalar() or 0
+
+        # Descartados
+        stmt_descartados = select(func.count()).select_from(Inbox).where(
+            and_(condicion_fecha, Inbox.estado == 'DESCARTADO')
+        )
+        if comercial_ids is not None:
+            stmt_descartados = stmt_descartados.where(Inbox.asignado_a.in_(comercial_ids))
+        total_descartados = (await self.db.execute(stmt_descartados)).scalar() or 0
+
+        # Sin respuesta (auto-asignados)
+        stmt_sin_respuesta = select(func.count()).select_from(Inbox).where(
+            and_(condicion_fecha, Inbox.tipo_interes == 'SIN_RESPUESTA')
+        )
+        if comercial_ids is not None:
+            stmt_sin_respuesta = stmt_sin_respuesta.where(Inbox.asignado_a.in_(comercial_ids))
+        total_sin_respuesta = (await self.db.execute(stmt_sin_respuesta)).scalar() or 0
+
+        # Tiempo promedio de respuesta (solo leads con respuesta)
+        stmt_avg_tiempo = select(func.avg(Inbox.tiempo_respuesta_segundos)).where(
+            and_(condicion_fecha, Inbox.tiempo_respuesta_segundos != None)
+        )
+        if comercial_ids is not None:
+            stmt_avg_tiempo = stmt_avg_tiempo.where(Inbox.asignado_a.in_(comercial_ids))
+        avg_tiempo = (await self.db.execute(stmt_avg_tiempo)).scalar() or 0
+
+        # Tasa de conversión y abandono
+        tasa_conversion = round((total_convertidos / total_leads * 100), 1) if total_leads > 0 else 0
+        tasa_abandono = round((total_sin_respuesta / total_leads * 100), 1) if total_leads > 0 else 0
+
+        totales = {
+            "total_leads": total_leads,
+            "total_convertidos": total_convertidos,
+            "total_descartados": total_descartados,
+            "total_sin_respuesta": total_sin_respuesta,
+            "tasa_conversion": tasa_conversion,
+            "tasa_abandono": tasa_abandono,
+            "avg_tiempo_respuesta_seg": int(avg_tiempo)
+        }
+
+        # --- POR COMERCIAL ---
+        stmt_comerciales = select(Usuario.id, Empleado.nombres).join(Empleado).join(Usuario.roles).where(
+            and_(Usuario.is_active == True, Rol.nombre == "COMERCIAL")
+        )
+        if comercial_ids is not None:
+            stmt_comerciales = stmt_comerciales.where(Usuario.id.in_(comercial_ids))
+        comerciales = (await self.db.execute(stmt_comerciales)).all()
+
+        comerciales_stats = []
+        for com in comerciales:
+            uid = com.id
+            nombre = com.nombres.split()[0] if com.nombres else 'Sin Nombre'
+
+            cond_com = and_(condicion_fecha, Inbox.asignado_a == uid)
+
+            # Leads asignados a este comercial
+            asignados = (await self.db.execute(
+                select(func.count()).select_from(Inbox).where(cond_com)
+            )).scalar() or 0
+
+            # Convertidos
+            convertidos = (await self.db.execute(
+                select(func.count()).select_from(Inbox).where(and_(cond_com, Inbox.estado == 'CONVERTIDO'))
+            )).scalar() or 0
+
+            # Descartados
+            descartados = (await self.db.execute(
+                select(func.count()).select_from(Inbox).where(and_(cond_com, Inbox.estado == 'DESCARTADO'))
+            )).scalar() or 0
+
+            # En gestión activa
+            en_gestion = (await self.db.execute(
+                select(func.count()).select_from(Inbox).where(
+                    and_(cond_com, Inbox.estado.in_(['EN_GESTION', 'SEGUIMIENTO', 'COTIZADO', 'PENDIENTE']))
+                )
+            )).scalar() or 0
+
+            # Tiempo promedio respuesta
+            avg_resp = (await self.db.execute(
+                select(func.avg(Inbox.tiempo_respuesta_segundos)).where(
+                    and_(cond_com, Inbox.tiempo_respuesta_segundos != None)
+                )
+            )).scalar() or 0
+
+            tasa_conv = round((convertidos / asignados * 100), 1) if asignados > 0 else 0
+
+            comerciales_stats.append({
+                "usuario_id": uid,
+                "nombre": nombre,
+                "leads_asignados": asignados,
+                "convertidos": convertidos,
+                "descartados": descartados,
+                "en_gestion": en_gestion,
+                "avg_tiempo_respuesta_seg": int(avg_resp),
+                "tasa_conversion": tasa_conv
+            })
+
+        return {"totales": totales, "por_comercial": comerciales_stats}

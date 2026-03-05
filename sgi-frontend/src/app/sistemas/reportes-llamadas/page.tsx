@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useReportesLlamadas } from '@/hooks/comercial/useReportesLlamadas';
 import { reportesLlamadasService } from '@/services/comercial/reportesLlamadas';
 import {
@@ -11,7 +12,12 @@ import {
     XCircle,
     ClipboardList,
     ChevronLeft,
-    ChevronRight
+    ChevronRight,
+    Bot,
+    MessageSquare,
+    Clock,
+    Tag,
+    AlertTriangle
 } from 'lucide-react';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -48,6 +54,23 @@ export default function HistorialLlamadasPage() {
     };
 
     const totalPages = data ? Math.ceil(data.total / pageSize) : 0;
+
+    // Bot Analytics
+    const { data: botData } = useQuery({
+        queryKey: ['bot-analytics', fechaInicio, fechaFin],
+        queryFn: () => reportesLlamadasService.getBotAnalytics({ fecha_inicio: fechaInicio, fecha_fin: fechaFin }),
+        enabled: !!fechaInicio && !!fechaFin,
+        staleTime: 5 * 60 * 1000
+    });
+
+    const TIPO_LABELS: Record<string, string> = {
+        'IMPORTACION': 'Importación',
+        'ASESORIA': 'Asesoría',
+        'DUDAS': 'Dudas',
+        'SIN_RESPUESTA': 'Sin respuesta',
+        'ASIGNACION_MANUAL': 'Asignación manual',
+        'AGENDAMIENTO': 'Agendamiento'
+    };
 
     return (
         <div className="space-y-6">
@@ -217,6 +240,123 @@ export default function HistorialLlamadasPage() {
                     </div>
                 )}
             </div>
+
+            {/* ======================================================= */}
+            {/* SECCIÓN: ANALYTICS DEL BOT                              */}
+            {/* ======================================================= */}
+            {botData && (
+                <div className="space-y-6">
+                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
+                        <Bot className="text-blue-500" size={24} />
+                        Análisis del Bot WhatsApp
+                    </h2>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+                        {/* Tipo de Interés */}
+                        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                            <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+                                <Tag className="text-indigo-500" size={18} />
+                                <h3 className="font-semibold text-gray-800">Distribución por tipo de interés</h3>
+                            </div>
+                            <div className="p-4 space-y-3">
+                                {botData.por_tipo_interes.length > 0 ? botData.por_tipo_interes.map((item, idx) => {
+                                    const maxTotal = Math.max(...botData.por_tipo_interes.map(i => i.total));
+                                    const pct = maxTotal > 0 ? (item.total / maxTotal) * 100 : 0;
+                                    return (
+                                        <div key={idx} className="flex items-center gap-3">
+                                            <span className="text-sm text-gray-700 font-medium w-36 shrink-0">
+                                                {TIPO_LABELS[item.tipo] || item.tipo}
+                                            </span>
+                                            <div className="flex-1 bg-gray-100 rounded-full h-6 overflow-hidden">
+                                                <div
+                                                    className="h-full bg-indigo-500 rounded-full flex items-center justify-end pr-2 transition-all"
+                                                    style={{ width: `${Math.max(pct, 8)}%` }}
+                                                >
+                                                    <span className="text-[11px] font-bold text-white">{item.total}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                }) : (
+                                    <p className="text-center text-gray-400 py-4">Sin datos</p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Motivos de Descarte */}
+                        <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                            <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+                                <AlertTriangle className="text-amber-500" size={18} />
+                                <h3 className="font-semibold text-gray-800">Motivos de descarte</h3>
+                            </div>
+                            <div className="p-4">
+                                {botData.motivos_descarte.length > 0 ? (
+                                    <table className="w-full text-sm">
+                                        <thead>
+                                            <tr className="text-gray-500 text-xs uppercase border-b">
+                                                <th className="text-left py-2 font-semibold">Motivo</th>
+                                                <th className="text-right py-2 font-semibold">Cantidad</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-50">
+                                            {botData.motivos_descarte.map((item, idx) => (
+                                                <tr key={idx} className="hover:bg-gray-50">
+                                                    <td className="py-2.5 text-gray-700 font-medium">{item.motivo}</td>
+                                                    <td className="py-2.5 text-right">
+                                                        <span className="bg-red-50 text-red-700 px-2 py-0.5 rounded-md text-xs font-bold">
+                                                            {item.total}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                ) : (
+                                    <p className="text-center text-gray-400 py-4">Sin descartes en este período</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Leads por Hora del Día */}
+                    <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
+                            <Clock className="text-teal-500" size={18} />
+                            <h3 className="font-semibold text-gray-800">Leads por hora del día</h3>
+                            <span className="text-xs text-gray-400 ml-auto">¿A qué hora llegan más leads?</span>
+                        </div>
+                        <div className="p-4">
+                            {botData.por_hora.length > 0 ? (
+                                <div className="flex items-end gap-1 h-40">
+                                    {Array.from({ length: 24 }, (_, h) => {
+                                        const item = botData.por_hora.find(i => i.hora === h);
+                                        const total = item?.total || 0;
+                                        const maxHora = Math.max(...botData.por_hora.map(i => i.total));
+                                        const height = maxHora > 0 ? (total / maxHora) * 100 : 0;
+                                        return (
+                                            <div key={h} className="flex-1 flex flex-col items-center gap-1">
+                                                {total > 0 && (
+                                                    <span className="text-[9px] font-bold text-gray-500">{total}</span>
+                                                )}
+                                                <div
+                                                    className={`w-full rounded-t transition-all ${total > 0 ? 'bg-teal-400 hover:bg-teal-500' : 'bg-gray-100'
+                                                        }`}
+                                                    style={{ height: `${Math.max(height, 4)}%`, minHeight: '3px' }}
+                                                    title={`${h}:00 - ${total} leads`}
+                                                />
+                                                <span className="text-[9px] text-gray-400 font-medium">{h}</span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <p className="text-center text-gray-400 py-4">Sin datos</p>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
