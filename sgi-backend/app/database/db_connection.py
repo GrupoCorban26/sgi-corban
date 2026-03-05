@@ -33,10 +33,11 @@ engine = create_async_engine(
     DB_URL, 
     echo=DB_ECHO,
     # --- MEJORAS SENIOR ---
-    pool_size=10,           # Conexiones que se mantienen abiertas siempre
-    max_overflow=20,        # Conexiones extra que puede crear en picos de tráfico
+    pool_size=20,           # Conexiones que se mantienen abiertas siempre
+    max_overflow=30,        # Conexiones extra que puede crear en picos de tráfico (total max: 50)
     pool_recycle=1800,      # Reinicia las conexiones cada 30 min para evitar conexiones "muertas"
     pool_pre_ping=True,     # Verifica si la conexión está viva antes de usarla (evita errores 500)
+    pool_timeout=10,        # Timeout de espera cuando el pool está lleno (segundos)
 )
 
 # Fábrica de sesiones
