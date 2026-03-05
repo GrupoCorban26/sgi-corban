@@ -167,7 +167,7 @@ class ImportacionesService:
             params_dict = {"search": search, "pais_origen": pais_origen, "cant_agentes": cant_agentes}
             
             if pais_origen is not None and pais_origen.strip() != '':
-                base_where += " AND ri.paises_origen = :pais_origen "
+                base_where += " AND ri.paises_origen LIKE '%' + :pais_origen + '%' "
                 
             if cant_agentes is not None:
                 base_where += " AND ri.cant_agentes_aduana = :cant_agentes "
@@ -199,18 +199,27 @@ class ImportacionesService:
 
     @staticmethod
     async def get_paises_dropdown(db: AsyncSession):
-        """Devuelve listado de países únicos (valores exactos)"""
+        """Devuelve listado de países únicos (valores exactos, separando múltiples países por - o /)"""
         try:
-            # Selecciona países distintos, descartando vacíos y nulos
             query = """
                 SELECT DISTINCT paises_origen 
                 FROM comercial.registro_importaciones 
                 WHERE paises_origen IS NOT NULL AND RTRIM(LTRIM(paises_origen)) <> ''
-                ORDER BY paises_origen
             """
             result = await db.execute(text(query))
             rows = result.scalars().all()
-            return [row.strip() for row in rows if row]
+            
+            paises_unicos = set()
+            for row in rows:
+                if row:
+                    # Separar por guiones o diagonales si existen múltiples países en una celda
+                    partes = row.replace('/', '-').split('-')
+                    for parte in partes:
+                        pais_limpio = parte.strip()
+                        if pais_limpio:
+                            paises_unicos.add(pais_limpio)
+                            
+            return sorted(list(paises_unicos))
         except Exception as e:
             logger.error(f"Error get_paises_dropdown: {e}")
             return []

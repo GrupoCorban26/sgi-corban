@@ -60,35 +60,31 @@ export default function BasePage() {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-4 rounded-lg text-white">
                         <div className="flex items-center gap-2 mb-1">
-                            <Building2 className="w-5 h-5 opacity-80" />
-                            <span className="text-sm opacity-80">Empresas Filtradas</span>
-                        </div>
-                        <span className="text-2xl font-bold">{(stats.empresas_transacciones ?? 0).toLocaleString()}</span>
-                    </div>
-                    <div className="bg-gradient-to-br from-green-500 to-green-600 p-4 rounded-lg text-white">
-                        <div className="flex items-center gap-2 mb-1">
-                            <Phone className="w-5 h-5 opacity-80" />
-                            <span className="text-sm opacity-80">Empresas c/ Teléfono</span>
-                        </div>
-                        <span className="text-2xl font-bold">{(stats.empresas_con_telefono ?? 0).toLocaleString()}</span>
-                    </div>
-                    <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-4 rounded-lg text-white">
-                        <div className="flex items-center gap-2 mb-1">
                             <Users className="w-5 h-5 opacity-80" />
-                            <span className="text-sm opacity-80">Contactos Disponibles</span>
+                            <span className="text-sm opacity-80">Total de Contactos</span>
                         </div>
                         <span className="text-2xl font-bold">{(stats.total_contactos ?? 0).toLocaleString()}</span>
                     </div>
+                    <div className="bg-gradient-to-br from-green-500 to-green-600 p-4 rounded-lg text-white">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Building2 className="w-5 h-5 opacity-80" />
+                            <span className="text-sm opacity-80">Empresas {`> 1 o 0`} agentes</span>
+                        </div>
+                        <span className="text-2xl font-bold">{(stats.empresas_multi_0_agentes ?? 0).toLocaleString()}</span>
+                    </div>
                     <div className="bg-gradient-to-br from-amber-500 to-amber-600 p-4 rounded-lg text-white">
                         <div className="flex items-center gap-2 mb-1">
-                            <TrendingUp className="w-5 h-5 opacity-80" />
-                            <span className="text-sm opacity-80">Cobertura</span>
+                            <Phone className="w-5 h-5 opacity-80" />
+                            <span className="text-sm opacity-80">Contactos Disponibles</span>
                         </div>
-                        <span className="text-2xl font-bold">
-                            {(stats.empresas_transacciones ?? 0) > 0
-                                ? Math.round(((stats.empresas_con_telefono ?? 0) / stats.empresas_transacciones) * 100)
-                                : 0}%
-                        </span>
+                        <span className="text-2xl font-bold">{(stats.contactos_disponibles ?? 0).toLocaleString()}</span>
+                    </div>
+                    <div className="bg-gradient-to-br from-purple-500 to-purple-600 p-4 rounded-lg text-white">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Building2 className="w-5 h-5 opacity-80" />
+                            <span className="text-sm opacity-80">Empresas Diferentes</span>
+                        </div>
+                        <span className="text-2xl font-bold">{(stats.empresas_diferentes ?? 0).toLocaleString()}</span>
                     </div>
                 </div>
             )}

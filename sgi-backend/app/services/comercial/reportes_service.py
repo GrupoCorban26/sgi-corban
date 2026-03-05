@@ -164,19 +164,43 @@ class ReportesLlamadasService:
             }
         )
 
-    async def get_bot_analytics(self, fecha_inicio: date, fecha_fin: date) -> dict:
+    async def get_bot_analytics(self, fecha_inicio: date, fecha_fin: date, comercial_ids: list = None) -> dict:
         """KPIs del bot para decisiones de Sistemas: tipo de interés, leads por hora, motivos de descarte."""
-        from sqlalchemy import extract
+        from sqlalchemy import extract, or_
+        import os
         
         dt_inicio = datetime.combine(fecha_inicio, datetime.min.time())
         dt_fin = datetime.combine(fecha_fin, datetime.max.time())
         condicion_fecha = and_(Inbox.fecha_recepcion >= dt_inicio, Inbox.fecha_recepcion <= dt_fin)
 
+        condiciones = [condicion_fecha]
+
+        # Si hay restricción de equipo
+        if comercial_ids is not None:
+            cond_asignacion = [Inbox.asignado_a.in_(comercial_ids)]
+            bot_jefe_id_str = os.getenv("BOT_JEFE_COMERCIAL_ID")
+            
+            # Verificar si este equipo dueño de comercial_ids es el dueño del bot
+            if bot_jefe_id_str:
+                try:
+                    from app.models.seguridad import Usuario
+                    query_bot_jefe = select(Usuario.id).where(Usuario.empleado_id == int(bot_jefe_id_str))
+                    bot_jefe_uid = (await self.db.execute(query_bot_jefe)).scalar()
+                    
+                    # Si el UID del jefe del bot está en los IDs permitidos, le permitimos ver los "Sin asignar" del bot
+                    if bot_jefe_uid and bot_jefe_uid in comercial_ids:
+                        cond_asignacion.append(Inbox.asignado_a == None)
+                except Exception:
+                    pass
+            condiciones.append(or_(*cond_asignacion))
+
+        condicion_base = and_(*condiciones)
+
         # 1. Distribución por tipo de interés
         stmt_tipo = select(
             Inbox.tipo_interes, func.count().label('total')
         ).where(
-            and_(condicion_fecha, Inbox.tipo_interes != None)
+            and_(condicion_base, Inbox.tipo_interes != None)
         ).group_by(Inbox.tipo_interes)
         result_tipo = await self.db.execute(stmt_tipo)
         por_tipo_interes = [{"tipo": row.tipo_interes or "SIN_CLASIFICAR", "total": row.total} for row in result_tipo.all()]
@@ -185,7 +209,7 @@ class ReportesLlamadasService:
         stmt_hora = select(
             extract('hour', Inbox.fecha_recepcion).label('hora'),
             func.count().label('total')
-        ).where(condicion_fecha).group_by(
+        ).where(condicion_base).group_by(
             extract('hour', Inbox.fecha_recepcion)
         ).order_by(extract('hour', Inbox.fecha_recepcion))
         result_hora = await self.db.execute(stmt_hora)
@@ -195,7 +219,7 @@ class ReportesLlamadasService:
         stmt_descarte = select(
             Inbox.motivo_descarte, func.count().label('total')
         ).where(
-            and_(condicion_fecha, Inbox.estado == 'DESCARTADO', Inbox.motivo_descarte != None)
+            and_(condicion_base, Inbox.estado == 'DESCARTADO', Inbox.motivo_descarte != None)
         ).group_by(Inbox.motivo_descarte).order_by(func.count().desc())
         result_descarte = await self.db.execute(stmt_descarte)
         motivos_descarte = [{"motivo": row.motivo_descarte, "total": row.total} for row in result_descarte.all()]
@@ -204,7 +228,7 @@ class ReportesLlamadasService:
         stmt_dia = select(
             func.cast(Inbox.fecha_recepcion, date).label('fecha'),
             func.count().label('total')
-        ).where(condicion_fecha).group_by(
+        ).where(condicion_base).group_by(
             func.cast(Inbox.fecha_recepcion, date)
         ).order_by(func.cast(Inbox.fecha_recepcion, date))
         result_dia = await self.db.execute(stmt_dia)

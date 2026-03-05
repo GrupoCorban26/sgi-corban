@@ -11,9 +11,10 @@ export interface BaseContacto {
 }
 
 export interface BaseStats {
-    empresas_transacciones: number;
-    empresas_con_telefono: number;
     total_contactos: number;
+    empresas_multi_0_agentes: number;
+    contactos_disponibles: number;
+    empresas_diferentes: number;
 }
 
 export interface BaseResponse {

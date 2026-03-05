@@ -219,7 +219,21 @@ class InboxService:
         )
         # Filtrar por equipo si comercial_ids no es None
         if comercial_ids is not None:
-            query = query.where(Inbox.asignado_a.in_(comercial_ids))
+            import os
+            from sqlalchemy import or_
+            bot_jefe_id_str = os.getenv("BOT_JEFE_COMERCIAL_ID")
+            condiciones_asignado = [Inbox.asignado_a.in_(comercial_ids)]
+            
+            if bot_jefe_id_str:
+                try:
+                    from app.models.seguridad import Usuario
+                    query_bot_jefe = select(Usuario.id).where(Usuario.empleado_id == int(bot_jefe_id_str))
+                    bot_jefe_uid = (await self.db.execute(query_bot_jefe)).scalar()
+                    if bot_jefe_uid and bot_jefe_uid in comercial_ids:
+                        condiciones_asignado.append(Inbox.asignado_a == None)
+                except Exception:
+                    pass
+            query = query.where(or_(*condiciones_asignado))
         query = query.order_by(Inbox.fecha_recepcion.desc())
         result = await self.db.execute(query)
         return result.scalars().all()
@@ -240,7 +254,21 @@ class InboxService:
         )
         # Filtrar por equipo si comercial_ids no es None
         if comercial_ids is not None:
-            query = query.where(Inbox.asignado_a.in_(comercial_ids))
+            import os
+            from sqlalchemy import or_
+            bot_jefe_id_str = os.getenv("BOT_JEFE_COMERCIAL_ID")
+            condiciones_asignado = [Inbox.asignado_a.in_(comercial_ids)]
+            
+            if bot_jefe_id_str:
+                try:
+                    from app.models.seguridad import Usuario
+                    query_bot_jefe = select(Usuario.id).where(Usuario.empleado_id == int(bot_jefe_id_str))
+                    bot_jefe_uid = (await self.db.execute(query_bot_jefe)).scalar()
+                    if bot_jefe_uid and bot_jefe_uid in comercial_ids:
+                        condiciones_asignado.append(Inbox.asignado_a == None)
+                except Exception:
+                    pass
+            query = query.where(or_(*condiciones_asignado))
         result = await self.db.execute(query)
         return result.scalar() or 0
 

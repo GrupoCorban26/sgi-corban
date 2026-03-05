@@ -68,8 +68,9 @@ async def exportar_reporte_llamadas_historico(
 async def get_bot_analytics(
     fecha_inicio: date = Query(..., description="Fecha inicio YYYY-MM-DD"),
     fecha_fin: date = Query(..., description="Fecha fin YYYY-MM-DD"),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    comercial_ids: Optional[List[int]] = Depends(resolver_comercial_ids)
 ):
     """KPIs del bot: tipo de interés, leads por hora, motivos de descarte."""
     service = ReportesLlamadasService(db)
-    return await service.get_bot_analytics(fecha_inicio, fecha_fin)
+    return await service.get_bot_analytics(fecha_inicio, fecha_fin, comercial_ids)

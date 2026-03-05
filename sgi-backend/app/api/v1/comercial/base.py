@@ -51,18 +51,28 @@ async def get_base_comercial(
         ),
         stats AS (
             SELECT 
-                (SELECT COUNT(DISTINCT ruc) FROM comercial.registro_importaciones) as empresas_transacciones,
+                (SELECT COUNT(*) FROM comercial.cliente_contactos cc
+                 INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
+                 WHERE cc.is_active = 1
+                   AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)
+                ) as total_contactos_general,
+                
+                (SELECT COUNT(*) FROM comercial.registro_importaciones 
+                 WHERE cant_agentes_aduana > 1 OR cant_agentes_aduana = 0 OR cant_agentes_aduana IS NULL) as empresas_multi_0_agentes,
+                 
+                (SELECT COUNT(*) FROM base_filter) as contactos_disponibles,
+                
                 (SELECT COUNT(DISTINCT cc2.ruc) FROM comercial.cliente_contactos cc2
                  INNER JOIN comercial.registro_importaciones ri2 ON cc2.ruc = ri2.ruc
                  WHERE cc2.is_active = 1
-                   AND cc2.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)) as empresas_con_telefono,
-                (SELECT COUNT(*) FROM base_filter) as total_contactos
+                   AND cc2.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)) as empresas_diferentes
         )
         SELECT 
             (SELECT COUNT(*) FROM base_filter) as total_count,
-            (SELECT empresas_transacciones FROM stats) as empresas_transacciones,
-            (SELECT empresas_con_telefono FROM stats) as empresas_con_telefono,
-            (SELECT total_contactos FROM stats) as total_contactos;
+            (SELECT total_contactos_general FROM stats) as total_contactos_general,
+            (SELECT empresas_multi_0_agentes FROM stats) as empresas_multi_0_agentes,
+            (SELECT contactos_disponibles FROM stats) as contactos_disponibles,
+            (SELECT empresas_diferentes FROM stats) as empresas_diferentes;
     """)
     
     stats_result = await db.execute(query, {"search": search_param})
@@ -100,9 +110,10 @@ async def get_base_comercial(
         "page": page,
         "page_size": page_size,
         "stats": {
-            "empresas_transacciones": stats_row[1] if stats_row else 0,
-            "empresas_con_telefono": stats_row[2] if stats_row else 0,
-            "total_contactos": stats_row[3] if stats_row else 0,
+            "total_contactos": stats_row[1] if stats_row else 0,
+            "empresas_multi_0_agentes": stats_row[2] if stats_row else 0,
+            "contactos_disponibles": stats_row[3] if stats_row else 0,
+            "empresas_diferentes": stats_row[4] if stats_row else 0,
         },
         "data": data
     }
@@ -115,22 +126,31 @@ async def get_base_stats(
     """Estadísticas de la base comercial."""
     query = text("""
         SELECT 
-            (SELECT COUNT(DISTINCT ruc) FROM comercial.registro_importaciones) as empresas_filtradas,
-            (SELECT COUNT(DISTINCT cc.ruc) FROM comercial.cliente_contactos cc
+            (SELECT COUNT(*) FROM comercial.cliente_contactos cc
              INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
              WHERE cc.is_active = 1
-               AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)) as empresas_con_telefono,
+               AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)) as total_contactos_general,
+               
+            (SELECT COUNT(*) FROM comercial.registro_importaciones 
+             WHERE cant_agentes_aduana > 1 OR cant_agentes_aduana = 0 OR cant_agentes_aduana IS NULL) as empresas_multi_0_agentes,
+             
             (SELECT COUNT(*) FROM comercial.cliente_contactos cc
              INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
              WHERE cc.is_active = 1 
                AND cc.estado = 'DISPONIBLE'
-               AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)) as contactos_disponibles
+               AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)) as contactos_disponibles,
+               
+            (SELECT COUNT(DISTINCT cc.ruc) FROM comercial.cliente_contactos cc
+             INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
+             WHERE cc.is_active = 1
+               AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)) as empresas_diferentes
     """)
     result = await db.execute(query)
     row = result.fetchone()
     
     return {
-        "empresas_filtradas": row[0] if row else 0,
-        "empresas_con_telefono": row[1] if row else 0,
+        "total_contactos": row[0] if row else 0,
+        "empresas_multi_0_agentes": row[1] if row else 0,
         "contactos_disponibles": row[2] if row else 0,
+        "empresas_diferentes": row[3] if row else 0,
     }

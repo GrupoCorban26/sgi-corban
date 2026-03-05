@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Date, Text
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Date, Text, Unicode, UnicodeText
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .base import Base
@@ -9,8 +9,8 @@ class Inbox(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     telefono = Column(String(20), nullable=False)
-    mensaje_inicial = Column(Text)
-    nombre_whatsapp = Column(String(100))
+    mensaje_inicial = Column(UnicodeText)
+    nombre_whatsapp = Column(Unicode(100))
     asignado_a = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=True)
     estado = Column(String(20), default="PENDIENTE", nullable=False) # PENDIENTE, CONVERTIDO, DESCARTADO
     tipo_interes = Column(String(30), nullable=True) # IMPORTACION, ASESORIA, DUDAS
@@ -22,7 +22,7 @@ class Inbox(Base):
     
     # Descarte
     motivo_descarte = Column(String(100), nullable=True)
-    comentario_descarte = Column(Text, nullable=True)
+    comentario_descarte = Column(UnicodeText, nullable=True)
     
     # Tracking de tiempos
     tiempo_respuesta_segundos = Column(Integer, nullable=True)  # Segundos hasta primera respuesta

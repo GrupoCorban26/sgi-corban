@@ -168,7 +168,7 @@ class AnalyticsService:
         # Total leads
         stmt_total = select(func.count()).select_from(Inbox).where(condicion_fecha)
         if comercial_ids is not None:
-            stmt_total = stmt_total.where(or_(Inbox.asignado_a.in_(comercial_ids), Inbox.asignado_a == None))
+            stmt_total = stmt_total.where(Inbox.asignado_a.in_(comercial_ids))
         total_leads = (await self.db.execute(stmt_total)).scalar() or 0
 
         # Convertidos
