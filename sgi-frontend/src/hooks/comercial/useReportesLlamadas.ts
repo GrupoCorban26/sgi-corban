@@ -16,5 +16,7 @@ export const useReportesLlamadas = (params: {
         }),
         enabled: !!params.fecha_inicio && !!params.fecha_fin,
         placeholderData: (previousData) => previousData, // keep previous data while fetching
+        staleTime: 60 * 1000, // 1 minuto
+        refetchInterval: 60 * 1000, // Auto-refrescar cada 1 minuto
     });
 };

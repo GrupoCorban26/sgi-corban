@@ -53,8 +53,8 @@ export default function BaseComercialPage() {
   const [manualForm, setManualForm] = useState({ nombre: '', cargo: '', telefono: '', email: '' });
   const [crearComoProspecto, setCrearComoProspecto] = useState(false);
 
-  // Estado para rastrear filas guardadas (sin cambios pendientes)
-  const [savedRows, setSavedRows] = useState<Set<number>>(new Set());
+  // Estado para rastrear filas editadas DESPUÉS de guardar (necesitan re-guardar)
+  const [editedAfterSave, setEditedAfterSave] = useState<Set<number>>(new Set());
 
   // Inicializar feedbackLocal cuando se cargan los contactos
   const getFeedback = (contacto: ContactoAsignado) => {
@@ -116,8 +116,12 @@ export default function BaseComercialPage() {
         comentario: fb.comentario
       });
       toast.success('Feedback guardado');
-      // Marcar como guardado (no borramos feedbackLocal para mantener el estado correcto)
-      setSavedRows(prev => new Set(prev).add(contacto.id));
+      // Quitar de editados ya que se acaba de guardar
+      setEditedAfterSave(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(contacto.id);
+        return newSet;
+      });
       refetch();
     } catch {
       toast.error('Error al guardar feedback');
@@ -351,10 +355,10 @@ export default function BaseComercialPage() {
                                   caso_id: 0
                                 }
                               }));
-                              // Quitar de guardados si se edita
-                              setSavedRows(prev => {
+                              // Marcar como editado después de guardar
+                              setEditedAfterSave(prev => {
                                 const newSet = new Set(prev);
-                                newSet.delete(contacto.id);
+                                newSet.add(contacto.id);
                                 return newSet;
                               });
                             }}
@@ -390,10 +394,10 @@ export default function BaseComercialPage() {
                                 ...prev,
                                 [contacto.id]: { ...fb, caso_id: Number(e.target.value) }
                               }));
-                              // Quitar de guardados si se edita
-                              setSavedRows(prev => {
+                              // Marcar como editado después de guardar
+                              setEditedAfterSave(prev => {
                                 const newSet = new Set(prev);
-                                newSet.delete(contacto.id);
+                                newSet.add(contacto.id);
                                 return newSet;
                               });
                             }}
@@ -426,10 +430,10 @@ export default function BaseComercialPage() {
                               ...prev,
                               [contacto.id]: { ...fb, comentario: e.target.value }
                             }));
-                            // Quitar de guardados si se edita
-                            setSavedRows(prev => {
+                            // Marcar como editado después de guardar
+                            setEditedAfterSave(prev => {
                               const newSet = new Set(prev);
-                              newSet.delete(contacto.id);
+                              newSet.add(contacto.id);
                               return newSet;
                             });
                           }}
@@ -452,7 +456,7 @@ export default function BaseComercialPage() {
                       <td className="px-3 py-2">
                         <div className="flex items-center gap-2 justify-center">
                           {estado === 'completo' ? (
-                            savedRows.has(contacto.id) ? (
+                            (contacto.fecha_llamada !== null && !editedAfterSave.has(contacto.id)) ? (
                               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-lg">
                                 <CheckCircle2 size={12} />
                                 Guardado
