@@ -9,6 +9,7 @@ from typing import List, Optional
 from app.models.chat_message import ChatMessage
 from app.models.comercial_inbox import Inbox
 from app.models.seguridad import Usuario
+from app.models.rrhh import Empleado
 from app.schemas.comercial.chat import ChatMessageCreate
 
 class ChatService:
@@ -27,7 +28,8 @@ class ChatService:
                 )
             )
             .options(
-                selectinload(Inbox.mensajes)
+                selectinload(Inbox.mensajes),
+                selectinload(Inbox.usuario_asignado).selectinload(Usuario.empleado)
             )
             .order_by(
                 case(
@@ -65,7 +67,8 @@ class ChatService:
                 "ultimo_mensaje_at": ibx.ultimo_mensaje_at,
                 "mensajes_no_leidos": unread,
                 "ultimo_mensaje_preview": latest_msg[:50] + "..." if latest_msg and len(latest_msg) > 50 else latest_msg,
-                "asignado_a": ibx.asignado_a
+                "asignado_a": ibx.asignado_a,
+                "nombre_asignado": ibx.nombre_asignado
             })
         return previews
 
@@ -77,7 +80,8 @@ class ChatService:
                 Inbox.estado.not_in(['CIERRE', 'DESCARTADO', 'CONVERTIDO'])
             )
             .options(
-                selectinload(Inbox.mensajes)
+                selectinload(Inbox.mensajes),
+                selectinload(Inbox.usuario_asignado).selectinload(Usuario.empleado)
             )
             .order_by(
                 case(
@@ -105,7 +109,8 @@ class ChatService:
                 "ultimo_mensaje_at": ibx.ultimo_mensaje_at,
                 "mensajes_no_leidos": unread,
                 "ultimo_mensaje_preview": latest_msg[:50] + "..." if latest_msg and len(latest_msg) > 50 else latest_msg,
-                "asignado_a": ibx.asignado_a
+                "asignado_a": ibx.asignado_a,
+                "nombre_asignado": ibx.nombre_asignado
             })
         return previews
 

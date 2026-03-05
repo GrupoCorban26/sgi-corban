@@ -53,3 +53,4 @@ class ChatConversationPreview(BaseModel):
     mensajes_no_leidos: int = 0
     ultimo_mensaje_preview: Optional[str] = None
     asignado_a: Optional[int] = None
+    nombre_asignado: Optional[str] = None

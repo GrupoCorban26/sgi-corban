@@ -24,6 +24,7 @@ export interface ChatConversationPreview {
     mensajes_no_leidos: number;
     ultimo_mensaje_preview: string | null;
     asignado_a: number | null;
+    nombre_asignado: string | null;
 }
 
 export interface SendMessageRequest {

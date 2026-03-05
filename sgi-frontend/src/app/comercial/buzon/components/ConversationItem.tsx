@@ -117,8 +117,8 @@ export default function ConversationItem({ conv, isSelected, onClick }: Props) {
                         )}
                     </div>
 
-                    {/* Badge de estado */}
-                    <div className="mt-1.5">
+                    {/* Badge de estado + Asesor asignado */}
+                    <div className="mt-1.5 flex items-center gap-2">
                         <span className={`
                             inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-semibold
                             ${colors.bg} ${colors.text}
@@ -126,6 +126,12 @@ export default function ConversationItem({ conv, isSelected, onClick }: Props) {
                             <span className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
                             {estadoLabel}
                         </span>
+                        {conv.nombre_asignado && (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 font-medium truncate">
+                                <Headset size={10} className="flex-shrink-0" />
+                                {conv.nombre_asignado}
+                            </span>
+                        )}
                     </div>
                 </div>
             </div>
