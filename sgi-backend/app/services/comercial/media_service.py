@@ -34,8 +34,8 @@ MIME_EXTENSIONS = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
 }
 
-# Directorio base para almacenar archivos
-UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), "uploads", "media")
+# Directorio base para almacenar archivos (relativo al directorio de trabajo del servidor)
+UPLOAD_DIR = os.path.join(os.getcwd(), "uploads", "media")
 
 
 class MediaService:

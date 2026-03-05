@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 from app.database.db_connection import get_db
 from app.services.comercial.inbox_service import InboxService
-from app.schemas.comercial.inbox import InboxDistribute, InboxDistributionResponse, InboxResponse, InboxDescartarRequest
+from app.schemas.comercial.inbox import InboxDistribute, InboxDistributionResponse, InboxResponse, InboxDescartarRequest, InboxAsignarManualRequest
 from app.core.dependencies import get_current_user_obj, resolver_comercial_ids
 from app.models.seguridad import Usuario
 from typing import List, Optional
@@ -106,3 +106,18 @@ async def escalar_a_directo(
     if not success:
         raise HTTPException(status_code=400, detail="Lead no encontrado o ya fue escalado")
     return {"message": "Lead escalado a contacto directo"}
+
+@router.post("/{id}/asignar-manual")
+async def asignar_lead_manual(
+    id: int,
+    request: InboxAsignarManualRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user_obj)
+):
+    """Asigna manualmente un lead a un comercial específico (sin enviar mensaje al cliente)."""
+    service = InboxService(db)
+    try:
+        result = await service.asignar_manual(id, request.comercial_id)
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))

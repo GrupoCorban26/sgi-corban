@@ -44,12 +44,28 @@ export const useInbox = (role?: string) => {
         },
     });
 
+    // 4. Asignar Manual
+    const asignarManualMutation = useMutation({
+        mutationFn: async ({ id, comercialId }: { id: number; comercialId: number }) => {
+            const { data } = await api.post(`${INBOX_URL}/${id}/asignar-manual`, {
+                comercial_id: comercialId
+            });
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['inbox-leads'] });
+            queryClient.invalidateQueries({ queryKey: ['inbox', 'count'] });
+            queryClient.invalidateQueries({ queryKey: ['chat-conversations'] });
+        },
+    });
+
     return {
         leads: inboxQuery.data || [],
         isLoading: inboxQuery.isLoading,
         isError: inboxQuery.isError,
         refetch: inboxQuery.refetch,
         convertMutation,
-        discardMutation
+        discardMutation,
+        asignarManualMutation
     };
 };

@@ -39,3 +39,6 @@ class InboxDescartarRequest(BaseModel):
     motivo_descarte: str
     comentario_descarte: str
 
+class InboxAsignarManualRequest(BaseModel):
+    comercial_id: int
+

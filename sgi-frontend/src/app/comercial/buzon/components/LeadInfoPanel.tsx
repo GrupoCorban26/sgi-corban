@@ -2,9 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ChatConversationPreview } from '@/types/chat';
 import { useChatActions } from '@/hooks/comercial/useChat';
+import { useInbox } from '@/hooks/comercial/useInbox';
+import { useComerciales } from '@/hooks/organizacion/useComerciales';
 import {
     Building2, Phone, Calendar, Bot, AlertCircle,
-    CheckCircle2, X, ChevronRight, Headset, Clock, Tag
+    CheckCircle2, X, ChevronRight, Headset, Clock, Tag, UserPlus
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -33,14 +35,43 @@ const MOTIVOS_DESCARTE = [
 
 export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClick, onClose }: Props) {
     const { changeEstado, releaseChat, descartarLead } = useChatActions();
+    const { asignarManualMutation } = useInbox();
+    const { data: comerciales = [] } = useComerciales();
     const [showDiscardModal, setShowDiscardModal] = useState(false);
     const [discardData, setDiscardData] = useState({ motivo_descarte: '', comentario_descarte: '' });
     const [isDiscarding, setIsDiscarding] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
+    const [selectedComercialId, setSelectedComercialId] = useState<number | ''>('');
+    const [isAssigning, setIsAssigning] = useState(false);
+
+    // Resetear selección al cambiar de lead
+    useEffect(() => {
+        setSelectedComercialId('');
+    }, [selectedConv.inbox_id]);
 
     useEffect(() => {
         setIsMounted(true);
     }, []);
+
+    const handleAsignarManual = async () => {
+        if (!selectedComercialId) {
+            toast.error('Selecciona un asesor');
+            return;
+        }
+        setIsAssigning(true);
+        try {
+            await asignarManualMutation.mutateAsync({
+                id: selectedConv.inbox_id,
+                comercialId: selectedComercialId as number
+            });
+            toast.success('Lead asignado exitosamente');
+            onChangeConv({ ...selectedConv, estado: 'PENDIENTE', modo: 'ASESOR' });
+        } catch (error: any) {
+            toast.error(error?.response?.data?.detail || 'Error al asignar');
+        } finally {
+            setIsAssigning(false);
+        }
+    };
 
     const handleEstadoChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
         const nuevo_estado = e.target.value;
@@ -183,6 +214,43 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
                     ))}
                 </select>
             </div>
+
+            {/* Asignación manual (solo para leads NUEVO sin asesor) */}
+            {(selectedConv.estado === 'NUEVO' || !selectedConv.asignado_a) && (
+                <div className="px-5 py-4 border-b border-slate-100 space-y-2.5">
+                    <div className="flex items-center gap-2 mb-1">
+                        <UserPlus size={14} className="text-blue-500" />
+                        <label className="text-xs font-semibold text-blue-600 uppercase tracking-wider">
+                            Asignar Asesor
+                        </label>
+                    </div>
+                    <p className="text-xs text-slate-400 -mt-1">
+                        Este lead no tiene asesor asignado. Selecciona uno manualmente.
+                    </p>
+                    <select
+                        value={selectedComercialId}
+                        onChange={(e) => setSelectedComercialId(e.target.value ? Number(e.target.value) : '')}
+                        className="w-full bg-slate-50 border border-slate-200 text-slate-700 rounded-xl px-3 py-2.5 text-sm font-medium
+                            focus:outline-none focus:ring-2 focus:ring-blue-200 focus:border-blue-400
+                            transition-all cursor-pointer"
+                    >
+                        <option value="">-- Selecciona un asesor --</option>
+                        {comerciales.map(c => (
+                            <option key={c.id} value={c.id}>{c.nombre}</option>
+                        ))}
+                    </select>
+                    <button
+                        onClick={handleAsignarManual}
+                        disabled={!selectedComercialId || isAssigning}
+                        className="w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-semibold
+                            flex items-center justify-center gap-2 shadow-sm shadow-blue-200 hover:shadow-md transition-all
+                            disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                        <UserPlus size={15} />
+                        {isAssigning ? 'Asignando...' : 'Asignar Asesor'}
+                    </button>
+                </div>
+            )}
 
             {/* Acciones */}
             <div className="px-5 py-4 border-b border-slate-100 space-y-2.5">

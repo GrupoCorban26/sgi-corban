@@ -315,3 +315,54 @@ class InboxService:
             await self.db.commit()
             return True
         return False
+
+    async def asignar_manual(self, lead_id: int, comercial_id: int) -> dict:
+        """Asigna manualmente un lead NUEVO a un comercial específico (sin enviar mensaje al cliente)."""
+        from sqlalchemy.orm import selectinload
+        from app.models.comercial_session import ConversationSession
+        from sqlalchemy import and_, or_
+        
+        lead = await self.db.get(Inbox, lead_id)
+        if not lead:
+            raise Exception("Lead no encontrado")
+        
+        if lead.estado not in ('NUEVO', 'PENDIENTE'):
+            raise Exception(f"Solo se pueden asignar leads en estado NUEVO o PENDIENTE (actual: {lead.estado})")
+        
+        # Verificar que el comercial existe y está activo
+        query_user = select(Usuario).options(selectinload(Usuario.empleado)).where(
+            and_(Usuario.id == comercial_id, Usuario.is_active == True)
+        )
+        result_user = await self.db.execute(query_user)
+        user = result_user.scalar_one_or_none()
+        if not user:
+            raise Exception("Comercial no encontrado o inactivo")
+        
+        # Asignar el lead
+        lead.asignado_a = comercial_id
+        lead.estado = 'PENDIENTE'
+        lead.fecha_asignacion = datetime.now()
+        lead.modo = 'ASESOR'  # Para que el bot no interfiera
+        
+        if not lead.tipo_interes:
+            lead.tipo_interes = 'ASIGNACION_MANUAL'
+        
+        # Limpiar sesiones del bot para este teléfono
+        query_sessions = select(ConversationSession).where(
+            ConversationSession.telefono.like(f"%{lead.telefono}%")
+        )
+        result_sessions = await self.db.execute(query_sessions)
+        for session in result_sessions.scalars().all():
+            await self.db.delete(session)
+        
+        await self.db.commit()
+        await self.db.refresh(lead)
+        
+        nombre = f"{user.empleado.nombres} {user.empleado.apellido_paterno}" if user.empleado else user.correo_corp
+        return {
+            "lead_id": lead.id,
+            "asignado_a": comercial_id,
+            "nombre_asignado": nombre,
+            "estado": lead.estado,
+            "modo": lead.modo
+        }
