@@ -8,6 +8,7 @@ from app.models.seguridad import Usuario, Rol, usuarios_roles
 from app.models.comercial import Cliente, ClienteContacto
 from app.models.administrativo import Empleado, EmpleadoActivo, Activo, LineaCorporativa
 from app.schemas.comercial.inbox import InboxDistribute
+from app.utils.horario_laboral import calcular_segundos_horario_laboral
 from datetime import datetime
 
 # Lock global para prevenir condiciones de carrera en el Round Robin
@@ -177,6 +178,21 @@ class InboxService:
         await self.db.commit()
         await self.db.refresh(new_lead)
         
+        # Notificar al comercial de la asignación
+        try:
+            from app.services.notificacion_service import NotificacionService
+            notif_svc = NotificacionService(self.db)
+            nombre_lead = data.nombre_display or phone
+            await notif_svc.notificar_lead_asignado(
+                comercial_id=assigned_user.id,
+                nombre_lead=nombre_lead,
+                telefono=phone,
+                inbox_id=new_lead.id
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"No se pudo crear notificación: {e}")
+        
         return self._format_response(new_lead, assigned_user, is_existing_client)
 
     def _format_response(self, lead, user, is_existing_client=False):
@@ -283,8 +299,8 @@ class InboxService:
             base_date = lead.fecha_asignacion or lead.fecha_recepcion
             if base_date and not lead.tiempo_respuesta_segundos:
                 base_date_naive = base_date.replace(tzinfo=None) if base_date.tzinfo else base_date
-                lead.tiempo_respuesta_segundos = int(
-                    (datetime.now() - base_date_naive).total_seconds()
+                lead.tiempo_respuesta_segundos = calcular_segundos_horario_laboral(
+                    base_date_naive, datetime.now()
                 )
             
             # Trazabilidad: vincular el cliente con su lead de origen
@@ -327,8 +343,8 @@ class InboxService:
             base_date = lead.fecha_asignacion or lead.fecha_recepcion
             if base_date:
                 base_date_naive = base_date.replace(tzinfo=None) if base_date.tzinfo else base_date
-                lead.tiempo_respuesta_segundos = int(
-                    (datetime.now() - base_date_naive).total_seconds()
+                lead.tiempo_respuesta_segundos = calcular_segundos_horario_laboral(
+                    base_date_naive, datetime.now()
                 )
             await self.db.commit()
             return True
@@ -387,6 +403,22 @@ class InboxService:
         await self.db.refresh(lead)
         
         nombre = f"{user.empleado.nombres} {user.empleado.apellido_paterno}" if user.empleado else user.correo_corp
+        
+        # Notificar al comercial de la asignación manual
+        try:
+            from app.services.notificacion_service import NotificacionService
+            notif_svc = NotificacionService(self.db)
+            nombre_lead = lead.nombre_whatsapp or lead.telefono
+            await notif_svc.notificar_lead_asignado(
+                comercial_id=comercial_id,
+                nombre_lead=nombre_lead,
+                telefono=lead.telefono,
+                inbox_id=lead.id
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).warning(f"No se pudo crear notificación: {e}")
+        
         return {
             "lead_id": lead.id,
             "asignado_a": comercial_id,

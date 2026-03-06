@@ -62,70 +62,14 @@ POST_ATENCION_CONFIRM_BUTTONS = [
     {"id": "btn_finalizar", "title": "👋 Finalizar chat"}
 ]
 
-DIAS_SEMANA = {
-    0: "Lunes", 1: "Martes", 2: "Miércoles",
-    3: "Jueves", 4: "Viernes",
-}
-
-
-# ==========================================
-# FERIADOS PERÚ
-# ==========================================
-
-# Feriados fijos (mes, día) - se repiten cada año
-FERIADOS_FIJOS = [
-    (1, 1),    # Año Nuevo
-    (5, 1),    # Día del Trabajo
-    (6, 29),   # San Pedro y San Pablo
-    (7, 28),   # Fiestas Patrias
-    (7, 29),   # Fiestas Patrias
-    (8, 6),    # Batalla de Junín
-    (8, 30),   # Santa Rosa de Lima
-    (10, 8),   # Combate de Angamos
-    (11, 1),   # Todos los Santos
-    (12, 8),   # Inmaculada Concepción
-    (12, 9),   # Batalla de Ayacucho
-    (12, 25),  # Navidad
-]
-
-# Feriados variables 2026 (Semana Santa - cambian cada año)
-FERIADOS_VARIABLES_2026 = [
-    date(2026, 4, 9),   # Jueves Santo
-    date(2026, 4, 10),  # Viernes Santo
-]
-
-
-# ==========================================
-# UTILITY FUNCTIONS
-# ==========================================
-
-def _es_feriado(fecha: date) -> bool:
-    """Check if a date is a Peruvian holiday."""
-    if (fecha.month, fecha.day) in FERIADOS_FIJOS:
-        return True
-    if fecha in FERIADOS_VARIABLES_2026:
-        return True
-    return False
-
-
-def _es_dia_habil(fecha: date) -> bool:
-    """Check if a date is a business day (not weekend, not holiday)."""
-    if fecha.weekday() >= 5:  # Saturday=5, Sunday=6
-        return False
-    if _es_feriado(fecha):
-        return False
-    return True
-
-
-def _proximos_dias_habiles(desde: date, cantidad: int = 10) -> list:
-    """Get the next N business days starting from a date."""
-    dias = []
-    current = desde
-    while len(dias) < cantidad:
-        current += timedelta(days=1)
-        if _es_dia_habil(current):
-            dias.append(current)
-    return dias
+# Importar utilidades de horario laboral desde módulo compartido
+from app.utils.horario_laboral import (
+    DIAS_SEMANA,
+    es_feriado as _es_feriado,
+    es_dia_habil as _es_dia_habil,
+    es_horario_laboral,
+    proximos_dias_habiles as _proximos_dias_habiles,
+)
 
 
 def _sanitizar_ruc(texto: str) -> str:
@@ -152,20 +96,8 @@ class ChatbotService:
         self.db = db
 
     def _is_working_hours(self) -> bool:
-        """Verifica si la hora actual está dentro del horario laboral (L-V 8am-6pm, Sáb 8am-11am)."""
-        try:
-            from zoneinfo import ZoneInfo
-            lima_tz = ZoneInfo('America/Lima')
-            now = datetime.now(lima_tz)
-        except ImportError:
-            # Fallback para versiones de python antiguas o si zoneinfo falla
-            now = datetime.now() - timedelta(hours=5) # UTC-5 (Aproximación para Lima sin daylight saving)
-            
-        if now.weekday() < 5:  # Lunes a Viernes (0-4)
-            return 8 <= now.hour < 18
-        elif now.weekday() == 5:  # Sábado (5)
-            return 8 <= now.hour < 11
-        return False  # Domingo u horario fuera de rango
+        """Verifica si la hora actual está dentro del horario laboral."""
+        return es_horario_laboral()
 
 
     async def process_message(self, data: WhatsAppIncoming) -> WhatsAppResponse:

@@ -2,8 +2,9 @@
 
 import { jwtDecode } from 'jwt-decode';
 import Cookies from 'js-cookie';
-import { UserRoundCog, Bell, LogOut, Menu } from 'lucide-react';
+import { UserRoundCog, LogOut, Menu } from 'lucide-react';
 import { handleLogoutAction } from '@/app/login/process';
+import NotificacionesDropdown from './NotificacionesDropdown';
 
 interface HeaderProps {
     onMenuToggle?: () => void;
@@ -50,12 +51,7 @@ export function Header({ onMenuToggle }: HeaderProps = {}) {
             {/* Right side - User info */}
             <div className="flex items-center gap-4">
                 {/* Notifications */}
-                <button
-                    className="p-2 hover:bg-naranja-600 rounded-lg transition-colors relative"
-                    aria-label="Notificaciones"
-                >
-                    <Bell size={20} />
-                </button>
+                <NotificacionesDropdown />
 
                 {/* User */}
                 <div className="flex items-center gap-3 pl-4 border-l border-naranja-400">

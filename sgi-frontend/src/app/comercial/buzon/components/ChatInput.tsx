@@ -2,6 +2,10 @@ import React, { useState, KeyboardEvent, useRef, useEffect } from 'react';
 import { Send, Smile, Paperclip, Zap } from 'lucide-react';
 import { useChatActions } from '@/hooks/comercial/useChat';
 import { toast } from 'sonner';
+import dynamic from 'next/dynamic';
+
+// Carga dinámica para evitar SSR issues con emoji-picker-react
+const EmojiPicker = dynamic(() => import('emoji-picker-react'), { ssr: false });
 
 interface Props {
     inboxId: number;
@@ -20,9 +24,11 @@ const QUICK_REPLIES = [
 export default function ChatInput({ inboxId, disabled = false }: Props) {
     const [message, setMessage] = useState('');
     const [showQuick, setShowQuick] = useState(false);
+    const [showEmojis, setShowEmojis] = useState(false);
     const { sendMessage } = useChatActions();
     const inputRef = useRef<HTMLTextAreaElement>(null);
     const quickRef = useRef<HTMLDivElement>(null);
+    const emojiRef = useRef<HTMLDivElement>(null);
 
     const handleSend = () => {
         if (!message.trim() || disabled || sendMessage.isPending) return;
@@ -69,30 +75,57 @@ export default function ChatInput({ inboxId, disabled = false }: Props) {
         inputRef.current?.focus();
     };
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const handleEmojiSelect = (emojiData: any) => {
+        setMessage(prev => prev + emojiData.emoji);
+        inputRef.current?.focus();
+    };
+
     // Cerrar dropdown al hacer clic fuera
     useEffect(() => {
         const handleClickOutside = (e: MouseEvent) => {
             if (quickRef.current && !quickRef.current.contains(e.target as Node)) {
                 setShowQuick(false);
             }
+            if (emojiRef.current && !emojiRef.current.contains(e.target as Node)) {
+                setShowEmojis(false);
+            }
         };
-        if (showQuick) {
+        if (showQuick || showEmojis) {
             document.addEventListener('mousedown', handleClickOutside);
         }
         return () => document.removeEventListener('mousedown', handleClickOutside);
-    }, [showQuick]);
+    }, [showQuick, showEmojis]);
 
     return (
         <div className="bg-slate-100/95 backdrop-blur-sm px-3 py-2.5 flex items-end gap-2 border-t border-slate-200 z-10 flex-shrink-0">
             {/* Botones izquierda */}
-            <div className="flex items-center gap-0.5 mb-1">
+            <div className="flex items-center gap-0.5 mb-1 relative" ref={emojiRef}>
                 <button
-                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg transition-all"
+                    className={`p-2 rounded-lg transition-all ${showEmojis
+                            ? 'text-amber-500 bg-amber-50'
+                            : 'text-slate-400 hover:text-slate-600 hover:bg-white'
+                        }`}
                     disabled={disabled}
                     title="Emojis"
+                    onClick={() => { setShowEmojis(!showEmojis); setShowQuick(false); }}
                 >
                     <Smile size={22} strokeWidth={1.5} />
                 </button>
+
+                {/* Emoji Picker Dropdown */}
+                {showEmojis && (
+                    <div className="absolute bottom-full mb-2 left-0 z-50">
+                        <EmojiPicker
+                            onEmojiClick={handleEmojiSelect}
+                            width={320}
+                            height={400}
+                            searchPlaceholder="Buscar emoji..."
+                            previewConfig={{ showPreview: false }}
+                        />
+                    </div>
+                )}
+
                 <button
                     className="p-2 text-slate-400 hover:text-slate-600 hover:bg-white rounded-lg transition-all"
                     disabled={disabled}
@@ -130,7 +163,7 @@ export default function ChatInput({ inboxId, disabled = false }: Props) {
 
                 <div className="bg-white rounded-xl flex items-end shadow-sm border border-slate-200/60">
                     <button
-                        onClick={(e) => { e.stopPropagation(); setShowQuick(!showQuick); }}
+                        onClick={(e) => { e.stopPropagation(); setShowQuick(!showQuick); setShowEmojis(false); }}
                         disabled={disabled}
                         className={`
                             p-3 font-bold rounded-l-xl transition-all text-sm flex-shrink-0

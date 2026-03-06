@@ -5,6 +5,7 @@ from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 from datetime import datetime
 from typing import List, Optional
+from app.utils.horario_laboral import calcular_segundos_horario_laboral
 
 from app.models.chat_message import ChatMessage
 from app.models.comercial_inbox import Inbox
@@ -71,8 +72,10 @@ class ChatService:
             })
         return previews
 
-    async def get_all_conversations(self):
-        """Fetch all conversations for Chiefs."""
+    async def get_all_conversations(self, comercial_ids: list = None):
+        """Fetch all conversations, optionally filtered by team."""
+        from sqlalchemy import or_
+        
         query = (
             select(Inbox)
             .where(
@@ -90,6 +93,25 @@ class ChatService:
                 Inbox.ultimo_mensaje_at.desc()
             )
         )
+        
+        # Filtrar por equipo si comercial_ids no es None
+        if comercial_ids is not None:
+            import os
+            bot_jefe_id_str = os.getenv("BOT_JEFE_COMERCIAL_ID")
+            condiciones = [Inbox.asignado_a.in_(comercial_ids)]
+            
+            if bot_jefe_id_str:
+                try:
+                    query_bot_jefe = select(Usuario.id).where(Usuario.empleado_id == int(bot_jefe_id_str))
+                    bot_jefe_uid = (await self.db.execute(query_bot_jefe)).scalar()
+                    if bot_jefe_uid and bot_jefe_uid in comercial_ids:
+                        # El jefe del bot también ve los leads sin asignar
+                        condiciones.append(Inbox.asignado_a == None)
+                except Exception:
+                    pass
+            
+            query = query.where(or_(*condiciones))
+        
         result = await self.db.execute(query)
         inboxes = result.scalars().all()
         
@@ -160,8 +182,8 @@ class ChatService:
                     base_date = inbox.fecha_asignacion or inbox.fecha_recepcion
                     if base_date:
                         base_date_naive = base_date.replace(tzinfo=None) if base_date.tzinfo else base_date
-                        inbox.tiempo_respuesta_segundos = int(
-                            (datetime.now() - base_date_naive).total_seconds()
+                        inbox.tiempo_respuesta_segundos = calcular_segundos_horario_laboral(
+                            base_date_naive, datetime.now()
                         )
                 
                 # Destruir sesión activa del bot para que el bot no se entrometa

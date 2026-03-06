@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List
 
 from app.database.db_connection import get_db
-from app.core.dependencies import get_current_user_obj
+from app.core.dependencies import get_current_user_obj, resolver_comercial_ids
 from app.models.seguridad import Usuario
 from app.schemas.comercial.chat import (
     ChatMessageResponse, 
@@ -20,17 +20,18 @@ router = APIRouter()
 @router.get("/conversations", response_model=List[ChatConversationPreview])
 async def get_conversations(
     current_user: Usuario = Depends(get_current_user_obj),
+    comercial_ids: list = Depends(resolver_comercial_ids),
     db: AsyncSession = Depends(get_db)
 ):
-    """Obtener todas las conversaciones activas para el comercial logueado."""
+    """Obtener conversaciones activas filtradas por equipo del usuario."""
     chat_svc = ChatService(db)
     
-    # Check if user is Jefe Comercial
-    is_jefe = any(r.nombre == "JEFE_COMERCIAL" for r in current_user.roles)
-    if is_jefe:
+    # Si comercial_ids es None → rol global (Admin/Sistemas/Gerencia), ve todo
+    if comercial_ids is None:
         return await chat_svc.get_all_conversations()
-        
-    return await chat_svc.get_conversations(current_user.id)
+    
+    # Jefe Comercial o Comercial → filtrar por equipo
+    return await chat_svc.get_all_conversations(comercial_ids=comercial_ids)
 
 @router.get("/{inbox_id}/messages", response_model=List[ChatMessageResponse])
 async def get_messages(
