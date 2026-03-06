@@ -365,7 +365,8 @@ class ClientesService:
             # Calcular tiempo en estado anterior
             tiempo_en_estado = None
             if cliente.updated_at:
-                tiempo_en_estado = int((datetime.now() - cliente.updated_at).total_seconds() / 60)
+                updated_naive = cliente.updated_at.replace(tzinfo=None)
+            tiempo_en_estado = int((datetime.now() - updated_naive).total_seconds() / 60)
             
             # Aplicar cambio
             cliente.tipo_estado = nuevo_estado
@@ -409,7 +410,8 @@ class ClientesService:
             estado_anterior = cliente.tipo_estado
             tiempo_en_estado = None
             if cliente.updated_at:
-                tiempo_en_estado = int((datetime.now() - cliente.updated_at).total_seconds() / 60)
+                updated_naive = cliente.updated_at.replace(tzinfo=None)
+            tiempo_en_estado = int((datetime.now() - updated_naive).total_seconds() / 60)
             
             cliente.tipo_estado = "PERDIDO"
             cliente.motivo_perdida = motivo
@@ -447,7 +449,8 @@ class ClientesService:
             estado_anterior = cliente.tipo_estado
             tiempo_en_estado = None
             if cliente.updated_at:
-                tiempo_en_estado = int((datetime.now() - cliente.updated_at).total_seconds() / 60)
+                updated_naive = cliente.updated_at.replace(tzinfo=None)
+            tiempo_en_estado = int((datetime.now() - updated_naive).total_seconds() / 60)
             
             cliente.tipo_estado = "PROSPECTO"
             cliente.is_active = True
@@ -488,7 +491,8 @@ class ClientesService:
             estado_anterior = cliente.tipo_estado
             tiempo_en_estado = None
             if cliente.updated_at:
-                tiempo_en_estado = int((datetime.now() - cliente.updated_at).total_seconds() / 60)
+                updated_naive = cliente.updated_at.replace(tzinfo=None)
+            tiempo_en_estado = int((datetime.now() - updated_naive).total_seconds() / 60)
             
             cliente.tipo_estado = "INACTIVO"
             cliente.is_active = False
