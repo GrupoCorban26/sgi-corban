@@ -57,8 +57,11 @@ async def get_base_comercial(
                    AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)
                 ) as total_contactos_general,
                 
-                (SELECT COUNT(*) FROM comercial.registro_importaciones 
-                 WHERE cant_agentes_aduana > 1 OR cant_agentes_aduana = 0 OR cant_agentes_aduana IS NULL) as empresas_multi_0_agentes,
+                (SELECT COUNT(DISTINCT ri2.ruc) FROM comercial.registro_importaciones ri2
+                 INNER JOIN comercial.cliente_contactos cc2 ON ri2.ruc = cc2.ruc
+                 WHERE cc2.is_active = 1
+                   AND cc2.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)
+                   AND (ri2.cant_agentes_aduana > 1 OR ri2.cant_agentes_aduana = 0 OR ri2.cant_agentes_aduana IS NULL)) as empresas_multi_0_agentes,
                  
                 (SELECT COUNT(*) FROM base_filter) as contactos_disponibles,
                 
@@ -131,8 +134,11 @@ async def get_base_stats(
              WHERE cc.is_active = 1
                AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)) as total_contactos_general,
                
-            (SELECT COUNT(*) FROM comercial.registro_importaciones 
-             WHERE cant_agentes_aduana > 1 OR cant_agentes_aduana = 0 OR cant_agentes_aduana IS NULL) as empresas_multi_0_agentes,
+            (SELECT COUNT(DISTINCT ri2.ruc) FROM comercial.registro_importaciones ri2
+              INNER JOIN comercial.cliente_contactos cc2 ON ri2.ruc = cc2.ruc
+              WHERE cc2.is_active = 1
+                AND cc2.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)
+                AND (ri2.cant_agentes_aduana > 1 OR ri2.cant_agentes_aduana = 0 OR ri2.cant_agentes_aduana IS NULL)) as empresas_multi_0_agentes,
              
             (SELECT COUNT(*) FROM comercial.cliente_contactos cc
              INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
