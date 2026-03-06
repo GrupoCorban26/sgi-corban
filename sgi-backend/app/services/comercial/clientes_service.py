@@ -515,6 +515,7 @@ class ClientesService:
             await self.db.commit()
             return {"success": 1, "message": "Cliente archivado (INACTIVO)"}
         except Exception as e:
+            logger.error(f"Error al archivar cliente {id}: {e}", exc_info=True)
             await self.db.rollback()
             return {"success": 0, "message": f"Error al archivar: {str(e)}"}
 
