@@ -58,7 +58,7 @@ async def update_contacto(
 ):
     """Actualiza un contacto existente."""
     service = ContactosService(db)
-    return await service.update_contacto(id, contacto.dict())
+    return await service.update_contacto(id, contacto.dict(exclude_none=True))
 
 
 @router.delete("/{id}", response_model=bool, dependencies=[Depends(require_permission("contactos.editar"))])
