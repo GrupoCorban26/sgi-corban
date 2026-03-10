@@ -272,7 +272,7 @@ export default function BasePage() {
                                     <option value="">-- Seleccione un asesor --</option>
                                     {comerciales.map(c => (
                                         <option key={c.id} value={c.id}>
-                                            {c.nombres} {c.apellidos}
+                                            {c.nombre_completo}
                                         </option>
                                     ))}
                                 </select>
