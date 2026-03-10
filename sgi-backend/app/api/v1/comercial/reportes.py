@@ -9,8 +9,8 @@ from app.services.comercial.reportes_service import ReportesLlamadasService
 from app.schemas.comercial.reportes import ReporteLlamadaPaginated
 
 router = APIRouter(
-    prefix="/reportes",
-    tags=["Reportes Comercial"]
+    prefix="/comercial/reportes",
+    tags=["Reportes"]
 )
 
 @router.get("/llamadas", response_model=ReporteLlamadaPaginated, dependencies=[Depends(require_permission("reportes.ver_comercial"))])

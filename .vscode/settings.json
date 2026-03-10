@@ -1,0 +1,7 @@
+{
+    "python.analysis.extraPaths": [
+        "c:/sistema-gestion-integral/sgi-backend"
+    ],
+    "python.defaultInterpreterPath": "c:/sistema-gestion-integral/sgi-backend/venv/Scripts/python.exe",
+    "python.analysis.typeCheckingMode": "basic"
+}

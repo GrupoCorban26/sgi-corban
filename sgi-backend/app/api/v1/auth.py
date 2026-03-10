@@ -1,20 +1,22 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 import logging
-# 1. Quitamos OAuth2PasswordRequestForm e importamos tu esquema
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from app.schemas.auth import UserLoginSchema 
-from sqlalchemy.ext.asyncio import AsyncSession # Asegúrate de usar AsyncSession si tu service es async
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.db_connection import get_db 
 from app.core import security
 from app.services.auth import AuthService
 
+limiter = Limiter(key_func=get_remote_address)
 router = APIRouter(prefix="/login", tags=["Seguridad"])
 
 @router.post("/")
+@limiter.limit("10/minute")
 async def login(
-    # 2. Cambiamos el Depends del formulario por tu Schema de Pydantic
     payload: UserLoginSchema, 
     request: Request,
-    db: AsyncSession = Depends(get_db) # Cambiado a AsyncSession para consistencia con tu service
+    db: AsyncSession = Depends(get_db)
 ):
     # 3. Accedemos a los datos mediante 'payload.correo' (ya no es .username)
     auth_svc = AuthService(db)

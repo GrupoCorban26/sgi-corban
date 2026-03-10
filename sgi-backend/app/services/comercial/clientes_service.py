@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -266,7 +267,7 @@ class ClientesService:
                     select(Cliente).where(Cliente.ruc == cliente.ruc, Cliente.is_active == True)
                 )
                 if existing.scalar():
-                    return {"success": 0, "message": "Ya existe un cliente con ese RUC"}
+                    raise HTTPException(status_code=400, detail="Ya existe un cliente con ese RUC")
             
             nuevo_cliente = Cliente(
                 ruc=cliente.ruc,
@@ -304,7 +305,7 @@ class ClientesService:
             return {"success": 1, "message": "Cliente creado exitosamente", "id": nuevo_cliente.id}
         except Exception as e:
             await self.db.rollback()
-            return {"success": 0, "message": f"Error al crear cliente: {str(e)}"}
+            raise HTTPException(status_code=400, detail=f"Error al crear cliente: {str(e)}")
 
     async def update(self, id: int, cliente: ClienteUpdate, updated_by: int) -> dict:
         """Actualiza un cliente existente."""
@@ -315,7 +316,7 @@ class ClientesService:
             db_cliente = result.scalar()
             
             if not db_cliente:
-                return {"success": 0, "message": "Cliente no encontrado"}
+                raise HTTPException(status_code=400, detail="Cliente no encontrado")
             
             # Actualizar solo los campos proporcionados
             update_data = cliente.model_dump(exclude_unset=True)
@@ -332,7 +333,7 @@ class ClientesService:
             return {"success": 1, "message": "Cliente actualizado exitosamente", "id": db_cliente.id}
         except Exception as e:
             await self.db.rollback()
-            return {"success": 0, "message": f"Error al actualizar cliente: {str(e)}"}
+            raise HTTPException(status_code=400, detail=f"Error al actualizar cliente: {str(e)}")
 
     async def delete(self, id: int, updated_by: int) -> dict:
         """Soft delete de un cliente."""
@@ -349,7 +350,7 @@ class ClientesService:
             cliente = result.scalar()
             
             if not cliente:
-                return {"success": 0, "message": "Cliente no encontrado"}
+                raise HTTPException(status_code=400, detail="Cliente no encontrado")
             
             estado_actual = cliente.tipo_estado
             
@@ -393,7 +394,7 @@ class ClientesService:
         except Exception as e:
             logger.error(f"Error cambiar estado cliente {id}: {e}")
             await self.db.rollback()
-            return {"success": 0, "message": f"Error al cambiar estado: {str(e)}"}
+            raise HTTPException(status_code=400, detail=f"Error al cambiar estado: {str(e)}")
 
     async def marcar_perdido(self, id: int, motivo: str, fecha_reactivacion: date, updated_by: int) -> dict:
         """Marca como PERDIDO. Si no hay fecha de reactivación, archiva a INACTIVO."""
@@ -402,7 +403,7 @@ class ClientesService:
             cliente = result.scalar()
             
             if not cliente:
-                return {"success": 0, "message": "Cliente no encontrado"}
+                raise HTTPException(status_code=400, detail="Cliente no encontrado")
             
             if not fecha_reactivacion:
                 return await self.archivar(id, updated_by)
@@ -435,7 +436,7 @@ class ClientesService:
             return {"success": 1, "message": "Cliente marcado como perdido (temporalmente)"}
         except Exception as e:
             await self.db.rollback()
-            return {"success": 0, "message": f"Error al marcar perdido: {str(e)}"}
+            raise HTTPException(status_code=400, detail=f"Error al marcar perdido: {str(e)}")
 
     async def reactivar(self, id: int, updated_by: int) -> dict:
         """Reactiva un cliente PERDIDO o INACTIVO a PROSPECTO."""
@@ -444,7 +445,7 @@ class ClientesService:
             cliente = result.scalar()
             
             if not cliente:
-                return {"success": 0, "message": "Cliente no encontrado"}
+                raise HTTPException(status_code=400, detail="Cliente no encontrado")
             
             estado_anterior = cliente.tipo_estado
             tiempo_en_estado = None
@@ -477,7 +478,7 @@ class ClientesService:
             return {"success": 1, "message": "Cliente reactivado a PROSPECTO"}
         except Exception as e:
             await self.db.rollback()
-            return {"success": 0, "message": f"Error al reactivar: {str(e)}"}
+            raise HTTPException(status_code=400, detail=f"Error al reactivar: {str(e)}")
 
     async def archivar(self, id: int, updated_by: int) -> dict:
         """Pasa a INACTIVO y desactiva contactos."""
@@ -486,7 +487,7 @@ class ClientesService:
             cliente = result.scalar()
             
             if not cliente:
-                return {"success": 0, "message": "Cliente no encontrado"}
+                raise HTTPException(status_code=400, detail="Cliente no encontrado")
             
             estado_anterior = cliente.tipo_estado
             tiempo_en_estado = None
@@ -517,7 +518,7 @@ class ClientesService:
         except Exception as e:
             logger.error(f"Error al archivar cliente {id}: {e}", exc_info=True)
             await self.db.rollback()
-            return {"success": 0, "message": f"Error al archivar: {str(e)}"}
+            raise HTTPException(status_code=400, detail=f"Error al archivar: {str(e)}")
 
     async def _cascade_contactos(self, ruc: str, activate: bool):
         """Activa o desactiva contactos según el RUC.

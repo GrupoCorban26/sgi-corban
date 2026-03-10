@@ -4,6 +4,8 @@ import { useDisponibilidadBuzon } from '@/hooks/comercial/useDisponibilidad';
 import { ChatConversationPreview } from '@/types/chat';
 import ConversationItem from './ConversationItem';
 import { Loader2, MessageSquareDashed, Search, X, Inbox } from 'lucide-react';
+import { useComerciales } from '@/hooks/organizacion/useComerciales';
+import Cookies from 'js-cookie';
 
 interface Props {
     selectedId: number | null;
@@ -18,10 +20,27 @@ const TABS = [
 ];
 
 export default function ConversationList({ selectedId, onSelect }: Props) {
-    const { data: conversations = [], isLoading } = useChatConversations();
-    const { disponible, toggle, isToggling } = useDisponibilidadBuzon();
     const [activeTab, setActiveTab] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
+    const [filtroComercial, setFiltroComercial] = useState<number | ''>('');
+
+    // Verificar si es jefa comercial
+    const [isJefa, setIsJefa] = useState(false);
+    React.useEffect(() => {
+        try {
+            const userDataStr = Cookies.get('user_data');
+            if (userDataStr) {
+                const userData = JSON.parse(userDataStr);
+                if (userData.roles?.includes('JEFE_COMERCIAL')) {
+                    setIsJefa(true);
+                }
+            }
+        } catch (e) { console.error(e); }
+    }, []);
+
+    const { data: comerciales = [] } = useComerciales();
+    const { data: conversations = [], isLoading } = useChatConversations(filtroComercial);
+    const { disponible, toggle, isToggling } = useDisponibilidadBuzon();
 
     const filtered = conversations.filter(c => {
         if (activeTab !== 'all' && c.estado !== activeTab) return false;
@@ -109,6 +128,24 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
                         </button>
                     )}
                 </div>
+
+                {/* Filtro Comercial (Solo Jefatura) */}
+                {isJefa && (
+                    <div className="mt-2 text-xs">
+                        <select
+                            value={filtroComercial}
+                            onChange={(e) => setFiltroComercial(e.target.value ? Number(e.target.value) : '')}
+                            className="w-full pl-3 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-emerald-300 focus:ring-1 focus:ring-emerald-200"
+                        >
+                            <option value="">Todos los asesores...</option>
+                            {comerciales.map(c => (
+                                <option key={c.id} value={c.id}>
+                                    {c.nombre}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
             </div>
 
             {/* Tabs con contadores */}

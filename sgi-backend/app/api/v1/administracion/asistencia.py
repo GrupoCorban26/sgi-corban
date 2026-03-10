@@ -18,7 +18,7 @@ from app.services.asistencia_service import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/asistencia", tags=["Administración - Asistencia"])
+router = APIRouter(prefix="/administracion/asistencia", tags=["Administración - Asistencia"])
 
 
 EXTENSIONES_PERMITIDAS = {".xls", ".xlsx"}

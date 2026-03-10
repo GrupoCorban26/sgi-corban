@@ -21,6 +21,9 @@ class ContactoManualCreate(BaseModel):
     email: Optional[str] = Field(None, max_length=100)
     crear_como_prospecto: bool = Field(False, description="Si True, crea Cliente y va directo a cartera")
 
+class AsignarLeadManual(BaseModel):
+    comercial_id: int = Field(..., description="ID del comercial responsable")
+
 class ContactoUpdate(BaseModel):
     cargo: Optional[str] = None
     telefono: Optional[str] = None

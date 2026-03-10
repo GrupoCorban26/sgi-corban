@@ -14,7 +14,7 @@ from app.models.administrativo import (
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(prefix="/organizacion/dashboard", tags=["dashboard"])
 
 @router.get("/stats")
 async def get_dashboard_stats(

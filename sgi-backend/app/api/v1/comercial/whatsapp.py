@@ -8,7 +8,7 @@ from app.services.comercial.chatbot_service import ChatbotService
 from app.schemas.comercial.whatsapp import WhatsAppIncoming, WhatsAppResponse, WhatsAppWebhookPayload
 from app.database.db_connection import get_db
 
-router = APIRouter()
+router = APIRouter(prefix="/comercial/whatsapp", tags=["whatsapp"])
 
 
 @router.get("/test")

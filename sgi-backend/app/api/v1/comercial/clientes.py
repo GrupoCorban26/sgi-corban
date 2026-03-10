@@ -139,9 +139,6 @@ async def crear_cliente(
         comercial_id=current_user_id,
         created_by=current_user_id
     )
-    
-    if result.get("success") == 0:
-        raise HTTPException(status_code=400, detail=result.get("message"))
         
     return result
 
@@ -156,9 +153,6 @@ async def actualizar_cliente(
     """Actualiza datos de un cliente existente."""
     service = ClientesService(db)
     result = await service.update(id, cliente, updated_by=current_user_id)
-    
-    if result.get("success") == 0:
-        raise HTTPException(status_code=400, detail=result.get("message"))
         
     return result
 
@@ -172,9 +166,6 @@ async def desactivar_cliente(
     """Desactivación lógica (Soft Delete) del cliente."""
     service = ClientesService(db)
     result = await service.delete(id, updated_by=current_user_id)
-    
-    if result.get("success") == 0:
-        raise HTTPException(status_code=400, detail=result.get("message"))
         
     return result
 
@@ -194,9 +185,6 @@ async def cambiar_estado(
         updated_by=current_user_id,
         motivo=estado_data.motivo
     )
-    
-    if result.get("success") == 0:
-        raise HTTPException(status_code=400, detail=result.get("message"))
         
     return result
 
@@ -216,9 +204,6 @@ async def marcar_perdido(
         fecha_reactivacion=data.fecha_reactivacion, 
         updated_by=current_user_id
     )
-    
-    if result.get("success") == 0:
-        raise HTTPException(status_code=400, detail=result.get("message"))
         
     return result
 
@@ -232,9 +217,6 @@ async def reactivar_cliente(
     """Reactiva un cliente PERDIDO o INACTIVO a PROSPECTO."""
     service = ClientesService(db)
     result = await service.reactivar(id, updated_by=current_user_id)
-    
-    if result.get("success") == 0:
-        raise HTTPException(status_code=400, detail=result.get("message"))
         
     return result
 
@@ -248,9 +230,6 @@ async def archivar_cliente(
     """Archiva un cliente a INACTIVO y desactiva sus contactos."""
     service = ClientesService(db)
     result = await service.archivar(id, updated_by=current_user_id)
-    
-    if result.get("success") == 0:
-        raise HTTPException(status_code=400, detail=result.get("message"))
         
     return result
 

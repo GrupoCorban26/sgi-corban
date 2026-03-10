@@ -15,12 +15,13 @@ from app.schemas.comercial.chat import (
 from app.services.comercial.chat_service import ChatService
 from app.services.comercial.whatsapp_service import WhatsAppService
 
-router = APIRouter()
+router = APIRouter(prefix="/comercial/chat", tags=["chat"])
 
 @router.get("/conversations", response_model=List[ChatConversationPreview])
 async def get_conversations(
     current_user: Usuario = Depends(get_current_user_obj),
     comercial_ids: list = Depends(resolver_comercial_ids),
+    filtro_comercial_id: int = None,
     db: AsyncSession = Depends(get_db)
 ):
     """Obtener conversaciones activas filtradas por equipo del usuario."""
@@ -28,10 +29,10 @@ async def get_conversations(
     
     # Si comercial_ids es None → rol global (Admin/Sistemas/Gerencia), ve todo
     if comercial_ids is None:
-        return await chat_svc.get_all_conversations()
+        return await chat_svc.get_all_conversations(filtro_comercial_id=filtro_comercial_id)
     
     # Jefe Comercial o Comercial → filtrar por equipo
-    return await chat_svc.get_all_conversations(comercial_ids=comercial_ids)
+    return await chat_svc.get_all_conversations(comercial_ids=comercial_ids, filtro_comercial_id=filtro_comercial_id)
 
 @router.get("/{inbox_id}/messages", response_model=List[ChatMessageResponse])
 async def get_messages(

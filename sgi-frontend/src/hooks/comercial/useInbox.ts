@@ -4,16 +4,20 @@ import { InboxLead } from '@/types/inbox';
 
 const INBOX_URL = '/comercial/inbox';
 
-export const useInbox = (role?: string) => {
+export const useInbox = (role?: string, filtroComercialId?: number | '') => {
     const queryClient = useQueryClient();
     const isJefa = role === 'jefa_comercial';
     const endpoint = isJefa ? `${INBOX_URL}/all-leads` : `${INBOX_URL}/my-leads`;
 
     // 1. Get Leads (My Leads or All Leads)
     const inboxQuery = useQuery({
-        queryKey: ['inbox-leads', role],
+        queryKey: ['inbox-leads', role, filtroComercialId],
         queryFn: async () => {
-            const { data } = await api.get<InboxLead[]>(endpoint);
+            const params: Record<string, any> = {};
+            if (isJefa && filtroComercialId) {
+                params.filtro_comercial_id = filtroComercialId;
+            }
+            const { data } = await api.get<InboxLead[]>(endpoint, { params });
             return data;
         },
     });

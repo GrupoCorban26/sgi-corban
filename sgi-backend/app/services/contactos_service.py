@@ -88,6 +88,10 @@ class ContactosService:
         """Asigna contactos a un comercial siguiendo la lógica de lotes y empresas únicas."""
         return await self._asignacion_service.assign_leads_batch(user_id)
     
+    async def asignar_lead_manualmente(self, ruc: str, comercial_id: int, actor_id: int):
+        """Deriva manualmente un lead a un comercial específico."""
+        return await self._asignacion_service.asignar_lead_manualmente(ruc, comercial_id, actor_id)
+    
     async def actualizar_feedback(self, contacto_id: int, caso_id: int, comentario: str, user_id: int = None):
         """Actualiza el feedback y crea Cliente si es positivo."""
         return await self._asignacion_service.actualizar_feedback(contacto_id, caso_id, comentario, user_id)

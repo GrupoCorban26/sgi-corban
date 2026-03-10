@@ -10,7 +10,8 @@ from app.utils.horario_laboral import calcular_segundos_horario_laboral
 from app.models.chat_message import ChatMessage
 from app.models.comercial_inbox import Inbox
 from app.models.seguridad import Usuario
-from app.schemas.comercial.chat import ChatMessageCreate
+from app.schemas.comercial.chat import ChatMessageBase, ChatMessageCreate
+from app.core.query_helpers import aplicar_filtro_comercial
 
 class ChatService:
     def __init__(self, db: AsyncSession):
@@ -72,7 +73,7 @@ class ChatService:
             })
         return previews
 
-    async def get_all_conversations(self, comercial_ids: list = None):
+    async def get_all_conversations(self, comercial_ids: list = None, filtro_comercial_id: int = None):
         """Fetch all conversations, optionally filtered by team."""
         from sqlalchemy import or_
         
@@ -94,24 +95,15 @@ class ChatService:
             )
         )
         
-        # Filtrar por equipo si comercial_ids no es None
-        if comercial_ids is not None:
-            import os
-            bot_jefe_id_str = os.getenv("BOT_JEFE_COMERCIAL_ID")
-            condiciones = [Inbox.asignado_a.in_(comercial_ids)]
+        query = await aplicar_filtro_comercial(
+            query, Inbox.asignado_a, self.db,
+            comercial_ids=comercial_ids,
+            filtro_comercial_id=filtro_comercial_id,
+            incluir_sin_asignar=True
+        )
+        if query is None:
+            return []
             
-            if bot_jefe_id_str:
-                try:
-                    query_bot_jefe = select(Usuario.id).where(Usuario.empleado_id == int(bot_jefe_id_str))
-                    bot_jefe_uid = (await self.db.execute(query_bot_jefe)).scalar()
-                    if bot_jefe_uid and bot_jefe_uid in comercial_ids:
-                        # El jefe del bot también ve los leads sin asignar
-                        condiciones.append(Inbox.asignado_a == None)
-                except Exception:
-                    pass
-            
-            query = query.where(or_(*condiciones))
-        
         result = await self.db.execute(query)
         inboxes = result.scalars().all()
         

@@ -9,6 +9,7 @@ from app.models.comercial import Cliente, ClienteContacto
 from app.models.administrativo import Empleado, EmpleadoActivo, Activo, LineaCorporativa
 from app.schemas.comercial.inbox import InboxDistribute
 from app.utils.horario_laboral import calcular_segundos_horario_laboral
+from app.core.query_helpers import aplicar_filtro_comercial
 from datetime import datetime
 
 # Lock global para prevenir condiciones de carrera en el Round Robin
@@ -223,7 +224,7 @@ class InboxService:
         result = await self.db.execute(query)
         return result.scalars().all()
 
-    async def get_all_leads(self, comercial_ids: list = None):
+    async def get_all_leads(self, comercial_ids: list = None, filtro_comercial_id: int = None):
         query = select(Inbox).where(
             Inbox.estado == 'PENDIENTE'
         ).options(
@@ -233,23 +234,16 @@ class InboxService:
                 .selectinload(EmpleadoActivo.activo)
                 .selectinload(Activo.linea_instalada)
         )
-        # Filtrar por equipo si comercial_ids no es None
-        if comercial_ids is not None:
-            import os
-            from sqlalchemy import or_
-            bot_jefe_id_str = os.getenv("BOT_JEFE_COMERCIAL_ID")
-            condiciones_asignado = [Inbox.asignado_a.in_(comercial_ids)]
+        
+        query = await aplicar_filtro_comercial(
+            query, Inbox.asignado_a, self.db,
+            comercial_ids=comercial_ids,
+            filtro_comercial_id=filtro_comercial_id,
+            incluir_sin_asignar=True
+        )
+        if query is None:
+            return []
             
-            if bot_jefe_id_str:
-                try:
-                    from app.models.seguridad import Usuario
-                    query_bot_jefe = select(Usuario.id).where(Usuario.empleado_id == int(bot_jefe_id_str))
-                    bot_jefe_uid = (await self.db.execute(query_bot_jefe)).scalar()
-                    if bot_jefe_uid and bot_jefe_uid in comercial_ids:
-                        condiciones_asignado.append(Inbox.asignado_a == None)
-                except Exception:
-                    pass
-            query = query.where(or_(*condiciones_asignado))
         query = query.order_by(Inbox.fecha_recepcion.desc())
         result = await self.db.execute(query)
         return result.scalars().all()
@@ -264,27 +258,20 @@ class InboxService:
         result = await self.db.execute(query)
         return result.scalar() or 0
 
-    async def get_all_pending_count(self, comercial_ids: list = None) -> int:
+    async def get_all_pending_count(self, comercial_ids: list = None, filtro_comercial_id: int = None) -> int:
         query = select(func.count()).select_from(Inbox).where(
             Inbox.estado == 'PENDIENTE'
         )
-        # Filtrar por equipo si comercial_ids no es None
-        if comercial_ids is not None:
-            import os
-            from sqlalchemy import or_
-            bot_jefe_id_str = os.getenv("BOT_JEFE_COMERCIAL_ID")
-            condiciones_asignado = [Inbox.asignado_a.in_(comercial_ids)]
+        
+        query = await aplicar_filtro_comercial(
+            query, Inbox.asignado_a, self.db,
+            comercial_ids=comercial_ids,
+            filtro_comercial_id=filtro_comercial_id,
+            incluir_sin_asignar=True
+        )
+        if query is None:
+            return 0
             
-            if bot_jefe_id_str:
-                try:
-                    from app.models.seguridad import Usuario
-                    query_bot_jefe = select(Usuario.id).where(Usuario.empleado_id == int(bot_jefe_id_str))
-                    bot_jefe_uid = (await self.db.execute(query_bot_jefe)).scalar()
-                    if bot_jefe_uid and bot_jefe_uid in comercial_ids:
-                        condiciones_asignado.append(Inbox.asignado_a == None)
-                except Exception:
-                    pass
-            query = query.where(or_(*condiciones_asignado))
         result = await self.db.execute(query)
         return result.scalar() or 0
 

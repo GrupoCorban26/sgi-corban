@@ -1,4 +1,4 @@
-import { LucideIcon, Home, BarChart3, ArrowRightLeft, Users, Database, UserCog, Building2, Package, Cable, Clock, Phone, ShoppingBag } from 'lucide-react';
+import { LucideIcon, Home, BarChart3, ArrowRightLeft, Users, Database, UserCog, Building2, Package, Cable, Clock, Phone, ShoppingBag, Globe } from 'lucide-react';
 
 export interface MenuItem {
   label: string;
@@ -12,6 +12,7 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
     { label: 'Base', href: '/comercial/base', icon: Database },
     { label: 'Cartera', href: '/comercial/cartera', icon: Users },
     { label: 'Buzón', href: '/comercial/buzon', icon: Package },
+    { label: 'Leads Web', href: '/comercial/leads-web', icon: Globe },
   ],
   administrador: [
     { label: 'Inicio', href: '/administracion/', icon: Home },
@@ -28,6 +29,7 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
     { label: 'Citas', href: '/comercial/citas', icon: Users },
     { label: 'Cartera Global', href: '/comercial/cartera-global', icon: Database },
     { label: 'Buzón', href: '/comercial/buzon', icon: Package },
+    { label: 'Leads Web', href: '/comercial/leads-web', icon: Globe },
     { label: 'Reportes', href: '/sistemas/reportes', icon: BarChart3 },
     { label: 'Hist. Llamadas', href: '/sistemas/reportes-llamadas', icon: Phone },
   ],

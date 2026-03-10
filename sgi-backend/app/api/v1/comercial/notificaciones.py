@@ -6,7 +6,7 @@ from app.core.dependencies import get_current_user_obj
 from app.models.seguridad import Usuario
 from app.services.notificacion_service import NotificacionService
 
-router = APIRouter(prefix="/notificaciones", tags=["notificaciones"])
+router = APIRouter(prefix="/comercial/notificaciones", tags=["notificaciones"])
 
 
 @router.get("/")

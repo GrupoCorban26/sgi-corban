@@ -7,10 +7,13 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { baseService } from '@/services/comercial/base';
+import { contactosService } from '@/services/comercial/contactos';
 import { BaseContacto, BaseStats } from '@/types/base';
+import { useEmpleadosParaSelect } from '@/hooks/organizacion/useEmpleado';
+import { toast } from 'sonner';
 import {
     Search, Users, Phone, Building2, TrendingUp,
-    ChevronLeft, ChevronRight, Loader2, ArrowDownWideNarrow, ArrowUpDown
+    ChevronLeft, ChevronRight, Loader2, ArrowDownWideNarrow, ArrowUpDown, UserPlus, X
 } from 'lucide-react';
 
 export default function BasePage() {
@@ -22,6 +25,14 @@ export default function BasePage() {
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(false);
     const [sortByRucDesc, setSortByRucDesc] = useState(false);
+
+    // Estado para la modal de derivación de lead
+    const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
+    const [selectedRucToAssign, setSelectedRucToAssign] = useState<string | null>(null);
+    const [selectedComercial, setSelectedComercial] = useState<number | ''>('');
+    const [isAssigning, setIsAssigning] = useState(false);
+
+    const { data: comerciales = [] } = useEmpleadosParaSelect();
 
     const loadData = useCallback(async () => {
         setLoading(true);
@@ -44,6 +55,30 @@ export default function BasePage() {
     }, [loadData]);
 
     const totalPages = Math.ceil(total / pageSize) || 1;
+
+    const handleOpenAssignModal = (ruc: string) => {
+        setSelectedRucToAssign(ruc);
+        setSelectedComercial('');
+        setIsAssignModalOpen(true);
+    };
+
+    const handleAssignLead = async () => {
+        if (!selectedRucToAssign || selectedComercial === '') return;
+
+        setIsAssigning(true);
+        try {
+            const resp = await contactosService.assignManual(selectedRucToAssign, Number(selectedComercial));
+            if (resp.success) {
+                toast.success(resp.message);
+                setIsAssignModalOpen(false);
+                loadData(); // recargar la tabla para mostrar el nuevo estado
+            }
+        } catch (error: any) {
+            toast.error(error?.response?.data?.detail || 'Error al derivar lead');
+        } finally {
+            setIsAssigning(false);
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -157,13 +192,22 @@ export default function BasePage() {
                                             )}
                                         </td>
                                         <td className="px-4 py-3 text-center">
-                                            <span className={`px-2 py-0.5 rounded text-xs font-medium
+                                            <span className={`px-2 py-0.5 rounded text-xs font-medium inline-block
                                                 ${item.estado === 'DISPONIBLE' ? 'bg-green-100 text-green-700' : ''}
                                                 ${item.estado === 'ASIGNADO' ? 'bg-amber-100 text-amber-700' : ''}
                                                 ${item.estado === 'EN_GESTION' ? 'bg-purple-100 text-purple-700' : ''}
                                             `}>
                                                 {item.estado}
                                             </span>
+                                            {item.estado === 'DISPONIBLE' && (
+                                                <button
+                                                    onClick={() => handleOpenAssignModal(item.ruc)}
+                                                    className="ml-2 text-indigo-600 hover:text-indigo-800 p-1 hover:bg-indigo-50 rounded-full transition-colors"
+                                                    title="Derivar a Comercial"
+                                                >
+                                                    <UserPlus size={14} />
+                                                </button>
+                                            )}
                                         </td>
                                     </tr>
                                 ))
@@ -195,6 +239,65 @@ export default function BasePage() {
                     </div>
                 </div>
             </div>
+
+            {/* MODAL DERIVAR LEAD */}
+            {isAssignModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm overflow-hidden flex flex-col">
+                        <div className="px-5 py-4 border-b flex justify-between items-center bg-gray-50">
+                            <h2 className="text-lg font-bold text-gray-800">Derivar Lead Manulamente</h2>
+                            <button
+                                onClick={() => setIsAssignModalOpen(false)}
+                                className="p-1 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-200"
+                                disabled={isAssigning}
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+                        <div className="p-5 space-y-4">
+                            <p className="text-sm text-gray-500">
+                                Vas a asignar el RUC <span className="font-mono text-gray-700 bg-gray-100 px-1 py-0.5 rounded">{selectedRucToAssign}</span> a un comercial específico.
+                            </p>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Seleccionar Comercial
+                                </label>
+                                <select
+                                    value={selectedComercial}
+                                    onChange={(e) => setSelectedComercial(Number(e.target.value))}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                                    disabled={isAssigning}
+                                >
+                                    <option value="">-- Seleccione un asesor --</option>
+                                    {comerciales.map(c => (
+                                        <option key={c.id} value={c.id}>
+                                            {c.nombres} {c.apellidos}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                        <div className="px-5 py-4 border-t bg-gray-50 flex justify-end gap-2">
+                            <button
+                                onClick={() => setIsAssignModalOpen(false)}
+                                disabled={isAssigning}
+                                className="px-4 py-2 text-sm text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                onClick={handleAssignLead}
+                                disabled={selectedComercial === '' || isAssigning}
+                                className="px-4 py-2 text-sm text-white bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+                            >
+                                {isAssigning ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                                Asignar Lead
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

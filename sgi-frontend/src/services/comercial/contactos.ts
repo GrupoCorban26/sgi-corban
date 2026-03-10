@@ -62,5 +62,10 @@ export const contactosService = {
     assignBatch: async (): Promise<Contacto[]> => {
         const { data } = await api.post('/contactos/assign-batch');
         return data;
+    },
+
+    assignManual: async (ruc: string, comercial_id: number): Promise<{ success: boolean; message: string }> => {
+        const { data } = await api.post(`/contactos/asignar-manual/${ruc}`, { comercial_id });
+        return data;
     }
 };

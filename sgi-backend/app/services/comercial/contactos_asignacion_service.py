@@ -237,6 +237,48 @@ class ContactosAsignacionService:
     async def assign_leads_batch(self, user_id: int):
         """Asigna contactos a un comercial siguiendo la lógica de lotes y empresas únicas."""
         return await self.cargar_base(user_id)
+
+    async def asignar_lead_manualmente(self, ruc: str, comercial_id: int, actor_id: int):
+        """Asigna un lead (RUC) específico a un comercial de forma manual (para Jefaturas)."""
+        # Verificar si hay contactos de este RUC disponibles
+        stmt = select(ClienteContacto).where(
+            ClienteContacto.ruc == ruc,
+            ClienteContacto.estado == 'DISPONIBLE',
+            ClienteContacto.is_active == True,
+            ClienteContacto.is_client == False
+        )
+        contactos = (await self.db.execute(stmt)).scalars().all()
+        
+        if not contactos:
+            # Buscar si ya está asignado
+            stmt_asignado = select(ClienteContacto).where(
+                ClienteContacto.ruc == ruc,
+                ClienteContacto.estado.in_(['ASIGNADO', 'EN_GESTION']),
+                ClienteContacto.is_active == True
+            )
+            asignado = (await self.db.execute(stmt_asignado)).scalars().first()
+            if asignado:
+                nombre_comercial = asignado.asignado_a if asignado.asignado_a else 'Otro'
+                raise HTTPException(400, f"Este lead ya se encuentra en la cartera de otro comercial.")
+            else:
+                raise HTTPException(404, "No hay contactos disponibles para este RUC. Puedes usar la opción de 'Crear Manual'.")
+
+        # Asignar el primero de los disponibles
+        contact = contactos[0]
+        contact.asignado_a = comercial_id
+        contact.fecha_asignacion = func.now()
+        contact.lote_asignacion = 0  # 0 indica asignación manual
+        contact.estado = 'ASIGNADO'
+        contact.caso_id = None
+        contact.comentario = None
+        contact.fecha_llamada = None
+        
+        # Marcar los demás del mismo RUC como EN_GESTION
+        for c in contactos[1:]:
+            c.estado = 'EN_GESTION'
+            
+        await self.db.commit()
+        return {"success": True, "message": f"Lead {ruc} derivado exitosamente."}
     
     async def actualizar_feedback(self, contacto_id: int, caso_id: int, comentario: str, user_id: int = None):
         """Actualiza el feedback y crea Cliente si es positivo. Con TRANSACCIÓN EXPLÍCITA."""

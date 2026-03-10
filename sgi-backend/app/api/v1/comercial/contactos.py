@@ -4,8 +4,9 @@ from typing import List
 from app.database.db_connection import get_db
 from app.core.security import get_current_user_id, get_current_active_auth
 from app.core.dependencies import require_permission
+from app.core.dependencies import require_permission
 from app.services.contactos_service import ContactosService
-from app.schemas.comercial.contactos import ContactoResponse, ContactoCreate, ContactoUpdate, ContactoManualCreate
+from app.schemas.comercial.contactos import ContactoResponse, ContactoCreate, ContactoUpdate, ContactoManualCreate, AsignarLeadManual
 
 router = APIRouter(
     prefix="/contactos",
@@ -153,6 +154,18 @@ async def create_contacto_manual(
     """Crea un contacto manual asociado a un RUC y lo asigna al comercial."""
     service = ContactosService(db)
     return await service.create_contacto_manual(contacto, user_id)
+
+
+@router.post("/asignar-manual/{ruc}", dependencies=[Depends(require_permission("contactos.editar"))])
+async def asignar_lead_manualmente(
+    ruc: str,
+    datos: AsignarLeadManual,
+    db: AsyncSession = Depends(get_db),
+    actor_id: int = Depends(get_current_user_id)
+):
+    """Deriva manualmente un lead (RUC) a un comercial específico. Uso para Jefaturas."""
+    service = ContactosService(db)
+    return await service.asignar_lead_manualmente(ruc, datos.comercial_id, actor_id)
 
 
 @router.put("/{id}/feedback", dependencies=[Depends(require_permission("contactos.editar"))])

@@ -8,7 +8,7 @@ from app.core.dependencies import get_current_user_obj, resolver_comercial_ids
 from app.models.seguridad import Usuario
 from typing import List, Optional
 
-router = APIRouter()
+router = APIRouter(prefix="/comercial/inbox", tags=["inbox"])
 
 @router.post("/distribute", response_model=InboxDistributionResponse)
 async def distribute_lead(data: InboxDistribute, db: AsyncSession = Depends(get_db)):
@@ -37,13 +37,14 @@ async def get_pending_count(
 async def get_all_pending_count(
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(get_current_user_obj),
-    comercial_ids: Optional[List[int]] = Depends(resolver_comercial_ids)
+    comercial_ids: Optional[List[int]] = Depends(resolver_comercial_ids),
+    filtro_comercial_id: Optional[int] = None
 ):
     """
     Get total pending leads filtered by team.
     """
     service = InboxService(db)
-    return await service.get_all_pending_count(comercial_ids=comercial_ids)
+    return await service.get_all_pending_count(comercial_ids=comercial_ids, filtro_comercial_id=filtro_comercial_id)
 
 @router.get("/my-leads", response_model=List[InboxResponse])
 async def get_my_leads(
@@ -60,13 +61,14 @@ async def get_my_leads(
 async def get_all_leads(
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(get_current_user_obj),
-    comercial_ids: Optional[List[int]] = Depends(resolver_comercial_ids)
+    comercial_ids: Optional[List[int]] = Depends(resolver_comercial_ids),
+    filtro_comercial_id: Optional[int] = None
 ):
     """
     Get all pending leads filtered by team.
     """
     service = InboxService(db)
-    return await service.get_all_leads(comercial_ids=comercial_ids)
+    return await service.get_all_leads(comercial_ids=comercial_ids, filtro_comercial_id=filtro_comercial_id)
 
 @router.post("/{id}/convertir")
 async def convert_lead(

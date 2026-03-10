@@ -1,8 +1,6 @@
-import os
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from dotenv import load_dotenv
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
@@ -10,24 +8,19 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-logger = logging.getLogger(__name__)
-
-# Importaciones internas (ajusta las rutas según tu estructura)
+from app.core.settings import get_settings
 from app.database.db_connection import get_db
 from app.services.auth import AuthService
 from app.models.seguridad import Usuario
 
-load_dotenv()
+logger = logging.getLogger(__name__)
+
+settings = get_settings()
 
 # --- CONFIGURACIÓN ---
-# Clave secreta del .env
-SECRET_KEY = os.getenv("SECRET_KEY")
-if not SECRET_KEY:
-    raise RuntimeError("SECRET_KEY no está definida en .env. No se puede iniciar el módulo de seguridad.")
-# Algoritmo por usar
-ALGORITHM = os.getenv("ALGORITHM", "HS256")
-# Minutos de expiración del TOKEN JWT (Ahora 24 horas para permitir sliding window en BD)
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", 1440))
+SECRET_KEY = settings.SECRET_KEY
+ALGORITHM = settings.ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/login")
@@ -69,8 +62,11 @@ async def get_current_active_auth(
     try:
         # 1. Decodificar (ignorando 'exp' dado que la base de datos gestiona el Sliding Expiration de 30 mins)
         try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM], options={"verify_exp": False})
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             logger.debug(f"Token decoded successfully. Sub: {payload.get('sub')}")
+        except jwt.ExpiredSignatureError:
+            logger.warning("Token JWT expirado")
+            raise credentials_exception
         except Exception as e:
             logger.warning(f"Token Decode Failed: {e}")
             raise credentials_exception

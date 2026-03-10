@@ -8,11 +8,16 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import JSONResponse
 from datetime import datetime
 from sqlalchemy import text
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 
 # Cargar variables de entorno antes de cualquier validación
 load_dotenv()
+
+from app.core.settings import get_settings
 
 # =========================================================================
 # CONFIGURACIÓN DE LOGGING CENTRALIZADO
@@ -24,12 +29,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# =========================================================================
-# VALIDACIÓN DE VARIABLES CRÍTICAS AL STARTUP
-# =========================================================================
-if not os.getenv("SECRET_KEY"):
-    logger.critical("❌ SECRET_KEY no está definida en el archivo .env. El servidor NO puede arrancar sin ella.")
-    sys.exit(1)
+# Validación de variables críticas se hace automáticamente por Pydantic Settings
+settings = get_settings()
+logger.info(f"✅ Configuración cargada correctamente (DB: {settings.DB_NAME}@{settings.DB_SERVER})")
+
 
 # Routers
 from app.api.v1.auth import router as auth_router
@@ -56,6 +59,8 @@ from app.api.v1.comercial.chat import router as chat_router
 from app.api.v1.comercial.gestiones import router as gestiones_router
 from app.api.v1.comercial.reportes import router as reportes_router
 from app.api.v1.comercial.notificaciones import router as notificaciones_router
+from app.api.v1.comercial.leads_web import router as leads_web_router
+from app.api.v1.comercial.leads_web import router_publico as leads_web_publico_router
 from app.api.v1.administracion.asistencia import router as asistencia_router
 
 # Lifespan: tareas de inicio y cierre del servidor
@@ -88,17 +93,24 @@ app = FastAPI(
 os.makedirs("uploads/media", exist_ok=True)
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
-# CORS - Orígenes desde variable de entorno o defaults
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",")
-logger.info(f"CORS orígenes configurados: {cors_origins}")
+# CORS - Orígenes desde Settings
+logger.info(f"CORS orígenes configurados: {settings.cors_origins_list}")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=settings.cors_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Rate Limiting — handler global para errores 429
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request, exc):
+    return JSONResponse(
+        status_code=429,
+        content={"detail": "Demasiadas solicitudes. Intente nuevamente en un momento."}
+    )
 
 # Registrar routers
 app.include_router(auth_router, prefix="/api/v1")
@@ -117,15 +129,17 @@ app.include_router(casos_llamada_router, prefix="/api/v1")
 app.include_router(base_router, prefix="/api/v1")
 app.include_router(clientes_router, prefix="/api/v1")
 app.include_router(citas_router, prefix="/api/v1")
-app.include_router(inbox_router, prefix="/api/v1/comercial/inbox", tags=["inbox"])
-app.include_router(whatsapp_router, prefix="/api/v1/comercial/whatsapp", tags=["whatsapp"])
-app.include_router(chat_router, prefix="/api/v1/comercial/chat", tags=["chat"])
-app.include_router(dashboard_router, prefix="/api/v1/organizacion/dashboard", tags=["dashboard"])
-app.include_router(gestiones_router, prefix="/api/v1", tags=["gestiones"])
+app.include_router(inbox_router, prefix="/api/v1")
+app.include_router(whatsapp_router, prefix="/api/v1")
+app.include_router(chat_router, prefix="/api/v1")
+app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(gestiones_router, prefix="/api/v1")
 app.include_router(productos_oficina_router, prefix="/api/v1")
-app.include_router(reportes_router, prefix="/api/v1/comercial")
-app.include_router(notificaciones_router, prefix="/api/v1/comercial")
-app.include_router(asistencia_router, prefix="/api/v1/administracion", tags=["administracion"])
+app.include_router(reportes_router, prefix="/api/v1")
+app.include_router(notificaciones_router, prefix="/api/v1")
+app.include_router(asistencia_router, prefix="/api/v1")
+app.include_router(leads_web_router, prefix="/api/v1")
+app.include_router(leads_web_publico_router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():

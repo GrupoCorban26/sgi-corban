@@ -9,11 +9,15 @@ import {
 
 const CHAT_URL = '/comercial/chat';
 
-export const useChatConversations = () => {
+export const useChatConversations = (filtroComercialId?: number | '') => {
     return useQuery({
-        queryKey: ['chat-conversations'],
+        queryKey: ['chat-conversations', filtroComercialId],
         queryFn: async () => {
-            const { data } = await api.get<ChatConversationPreview[]>(`${CHAT_URL}/conversations`);
+            const params: Record<string, any> = {};
+            if (filtroComercialId) {
+                params.filtro_comercial_id = filtroComercialId;
+            }
+            const { data } = await api.get<ChatConversationPreview[]>(`${CHAT_URL}/conversations`, { params });
             return data;
         },
         refetchInterval: 10000, // Polling every 10s

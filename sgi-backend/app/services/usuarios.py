@@ -223,16 +223,20 @@ class UsuarioService:
             for e in empleados
         ]
 
-    async def get_comerciales(self) -> list:
-        """Obtiene usuarios con rol COMERCIAL o JEFE_COMERCIAL para dropdown"""
-        # Obtener usuarios que tengan rol COMERCIAL o JEFE_COMERCIAL
+    async def get_comerciales(self, comercial_ids: list = None) -> list:
+        """Obtiene usuarios con rol COMERCIAL o JEFE_COMERCIAL para dropdown, filtrado si aplica"""
         stmt = select(Usuario).options(
             selectinload(Usuario.roles),
             selectinload(Usuario.empleado)
         ).join(Usuario.roles).where(
             Usuario.is_active == True,
             Rol.nombre == 'COMERCIAL'
-        ).distinct()
+        )
+        
+        if comercial_ids is not None:
+            stmt = stmt.where(Usuario.id.in_(comercial_ids))
+            
+        stmt = stmt.distinct()
         
         result = await self.db.execute(stmt)
         usuarios = result.scalars().all()

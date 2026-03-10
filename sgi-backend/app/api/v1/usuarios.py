@@ -5,7 +5,7 @@ from typing import Optional
 
 from app.database.db_connection import get_db
 from app.core.security import get_current_user_id, get_current_active_auth
-from app.core.dependencies import require_permission, get_current_user_obj
+from app.core.dependencies import require_permission, get_current_user_obj, resolver_comercial_ids
 from app.services.usuarios import UsuarioService
 from app.models.seguridad import Usuario
 from app.schemas.usuario import (
@@ -44,11 +44,12 @@ async def get_empleados_disponibles(
 @router.get("/comerciales/dropdown")
 async def get_comerciales_dropdown(
     db: AsyncSession = Depends(get_db),
+    comercial_ids: list = Depends(resolver_comercial_ids),
     _: dict = Depends(get_current_active_auth)
 ):
-    """Obtiene lista de comerciales para dropdown (usuarios con rol COMERCIAL o JEFE_COMERCIAL)"""
+    """Obtiene lista de comerciales para dropdown, filtrada si corresponde."""
     service = UsuarioService(db)
-    return await service.get_comerciales()
+    return await service.get_comerciales(comercial_ids=comercial_ids)
 
 
 # ===========================================

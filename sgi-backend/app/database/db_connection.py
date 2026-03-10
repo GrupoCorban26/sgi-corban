@@ -1,37 +1,28 @@
 import asyncio
 import logging
 import urllib.parse
-import os
-from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import QueuePool
 
+from app.core.settings import get_settings
+
 logger = logging.getLogger(__name__)
 
-# 1. Cargar variables desde el .env
-load_dotenv()
+settings = get_settings()
 
-DB_USER = os.getenv("DB_USER")
-DB_PASS = os.getenv("DB_PASS")
-DB_SERVER = os.getenv("DB_SERVER")
-DB_NAME = os.getenv("DB_NAME")
-DB_DRIVER = os.getenv("DB_DRIVER")
-
-# 2. CODIFICAR contraseña y construir URL
-
-password_encoded = urllib.parse.quote_plus(DB_PASS)
+# CODIFICAR contraseña y construir URL
+password_encoded = urllib.parse.quote_plus(settings.DB_PASS)
 
 # Para Driver 18+ es vital 'TrustServerCertificate=yes' en local
 DB_URL = (
-    f"mssql+aioodbc://{DB_USER}:{password_encoded}@{DB_SERVER}/{DB_NAME}?"
-    f"driver={DB_DRIVER}&TrustServerCertificate=yes"
+    f"mssql+aioodbc://{settings.DB_USER}:{password_encoded}@{settings.DB_SERVER}/{settings.DB_NAME}?"
+    f"driver={settings.DB_DRIVER}&TrustServerCertificate=yes"
 )
 
-# 3. Crear el motor asíncrono (echo=True solo si DB_ECHO=true)
-DB_ECHO = os.getenv("DB_ECHO", "false").lower() == "true"
+# Crear el motor asíncrono
 engine = create_async_engine(
     DB_URL, 
-    echo=DB_ECHO,
+    echo=settings.DB_ECHO,
     pool_size=10,           # Conexiones que se mantienen abiertas siempre
     max_overflow=20,        # Conexiones extra en picos (total max: 30)
     pool_recycle=1800,      # Reinicia las conexiones cada 30 min

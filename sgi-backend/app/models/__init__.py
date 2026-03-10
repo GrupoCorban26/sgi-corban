@@ -16,6 +16,7 @@ from .comercial import (
     Cita, CitaComercial
 )
 from .comercial_inbox import Inbox
+from .lead_web import LeadWeb
 from .comercial_session import ConversationSession
 from .chat_message import ChatMessage
 from .cliente_historial import ClienteHistorial
