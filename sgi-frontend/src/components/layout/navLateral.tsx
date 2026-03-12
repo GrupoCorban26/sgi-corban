@@ -38,7 +38,7 @@ export default function Sidebar({ role, isOpen, setIsOpen }: SidebarProps & { is
           <p className="text-xs text-azul-300 uppercase mt-1">{role.replace('_', ' ')}</p>
         </div>
 
-        <nav className="flex-1 px-4 space-y-2">
+        <nav className="flex-1 px-4 space-y-2 overflow-y-auto pb-4 custom-scrollbar">
           {menuItems.map((item) => (
             <Link
               key={item.href}
