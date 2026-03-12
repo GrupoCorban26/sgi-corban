@@ -8,7 +8,7 @@ from app.database.db_connection import get_db
 from app.schemas.comercial.cliente import (
     ClienteCreate, 
     ClienteUpdate, 
-    ClienteMarcarPerdido, 
+    ClienteMarcarCaido, 
     ClienteCambiarEstado
 )
 from app.services.comercial.clientes_service import ClientesService
@@ -189,19 +189,19 @@ async def cambiar_estado(
     return result
 
 
-@router.post("/{id}/marcar-perdido", dependencies=[Depends(require_permission("clientes.editar"))])
-async def marcar_perdido(
+@router.post("/{id}/marcar-caido", dependencies=[Depends(require_permission("clientes.editar"))])
+async def marcar_caido(
     id: int,
-    data: ClienteMarcarPerdido,
+    data: ClienteMarcarCaido,
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id)
 ):
-    """Marca como PERDIDO. Si tiene fecha reactivación es temporal, sino se archiva."""
+    """Marca como CAIDO. Si tiene fecha seguimiento es recuperable, sino se archiva."""
     service = ClientesService(db)
-    result = await service.marcar_perdido(
+    result = await service.marcar_caido(
         id, 
-        motivo=data.motivo_perdida, 
-        fecha_reactivacion=data.fecha_reactivacion, 
+        motivo=data.motivo_caida, 
+        fecha_seguimiento=data.fecha_seguimiento_caida, 
         updated_by=current_user_id
     )
         
@@ -214,7 +214,7 @@ async def reactivar_cliente(
     db: AsyncSession = Depends(get_db),
     current_user_id: int = Depends(get_current_user_id)
 ):
-    """Reactiva un cliente PERDIDO o INACTIVO a PROSPECTO."""
+    """Reactiva un cliente CAIDO o INACTIVO."""
     service = ClientesService(db)
     result = await service.reactivar(id, updated_by=current_user_id)
         

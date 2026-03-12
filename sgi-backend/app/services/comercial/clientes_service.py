@@ -15,11 +15,11 @@ logger = logging.getLogger(__name__)
 
 # Transiciones válidas del pipeline de ventas
 TRANSICIONES_VALIDAS: dict[str, list[str]] = {
-    "PROSPECTO":          ["EN_NEGOCIACION", "PERDIDO"],
-    "EN_NEGOCIACION":     ["CERRADA", "PERDIDO", "PROSPECTO"],
-    "CERRADA":            ["CARGA_ENTREGADA", "PERDIDO"],
-    "CARGA_ENTREGADA":    ["PROSPECTO"],  # Ciclo: puede volver a ser prospecto para nueva operación
-    "PERDIDO":            ["PROSPECTO"],
+    "PROSPECTO":          ["EN_NEGOCIACION", "CAIDO", "INACTIVO"],
+    "EN_NEGOCIACION":     ["CERRADA", "CAIDO", "PROSPECTO"],
+    "CERRADA":            ["EN_OPERACION", "CAIDO"],
+    "EN_OPERACION":       ["EN_NEGOCIACION", "CAIDO"],  # Solo al completar servicio
+    "CAIDO":              ["EN_NEGOCIACION", "INACTIVO"],
     "INACTIVO":           ["PROSPECTO"],
 }
 
@@ -129,8 +129,8 @@ class ClientesService:
             func.sum(case((Cliente.tipo_estado == 'PROSPECTO', 1), else_=0)).label('prospectos'),
             func.sum(case((Cliente.tipo_estado == 'EN_NEGOCIACION', 1), else_=0)).label('en_negociacion'),
             func.sum(case((Cliente.tipo_estado == 'CERRADA', 1), else_=0)).label('cerradas'),
-            func.sum(case((Cliente.tipo_estado == 'CARGA_ENTREGADA', 1), else_=0)).label('carga_entregada'),
-            func.sum(case((Cliente.tipo_estado == 'PERDIDO', 1), else_=0)).label('perdidos'),
+            func.sum(case((Cliente.tipo_estado == 'EN_OPERACION', 1), else_=0)).label('en_operacion'),
+            func.sum(case((Cliente.tipo_estado == 'CAIDO', 1), else_=0)).label('caidos'),
             func.sum(case((Cliente.tipo_estado == 'INACTIVO', 1), else_=0)).label('inactivos')
         ).where(base_filter)
         
@@ -139,11 +139,11 @@ class ClientesService:
             
         row = (await self.db.execute(stmt)).first()
         
-        # Stats por origen — "convertidos" = CERRADA + CARGA_ENTREGADA
+        # Stats por origen — "convertidos" = CERRADA + EN_OPERACION
         stmt_origen = select(
             Cliente.origen,
             func.count().label('total'),
-            func.sum(case((Cliente.tipo_estado.in_(['CERRADA', 'CARGA_ENTREGADA']), 1), else_=0)).label('convertidos')
+            func.sum(case((Cliente.tipo_estado.in_(['CERRADA', 'EN_OPERACION']), 1), else_=0)).label('convertidos')
         ).where(base_filter).group_by(Cliente.origen)
         
         if comercial_ids:
@@ -166,8 +166,8 @@ class ClientesService:
             "prospectos": row.prospectos or 0,
             "en_negociacion": row.en_negociacion or 0,
             "cerradas": row.cerradas or 0,
-            "carga_entregada": row.carga_entregada or 0,
-            "perdidos": row.perdidos or 0,
+            "en_operacion": row.en_operacion or 0,
+            "caidos": row.caidos or 0,
             "inactivos": row.inactivos or 0,
             "por_origen": origenes
         }
@@ -396,8 +396,8 @@ class ClientesService:
             await self.db.rollback()
             raise HTTPException(status_code=400, detail=f"Error al cambiar estado: {str(e)}")
 
-    async def marcar_perdido(self, id: int, motivo: str, fecha_reactivacion: date, updated_by: int) -> dict:
-        """Marca como PERDIDO. Si no hay fecha de reactivación, archiva a INACTIVO."""
+    async def marcar_caido(self, id: int, motivo: str, fecha_seguimiento: date, updated_by: int) -> dict:
+        """Marca como CAIDO. Si no hay fecha de seguimiento, archiva a INACTIVO."""
         try:
             result = await self.db.execute(select(Cliente).where(Cliente.id == id, Cliente.is_active == True))
             cliente = result.scalar()
@@ -405,7 +405,7 @@ class ClientesService:
             if not cliente:
                 raise HTTPException(status_code=400, detail="Cliente no encontrado")
             
-            if not fecha_reactivacion:
+            if not fecha_seguimiento:
                 return await self.archivar(id, updated_by)
             
             estado_anterior = cliente.tipo_estado
@@ -414,18 +414,18 @@ class ClientesService:
                 updated_naive = cliente.updated_at.replace(tzinfo=None)
                 tiempo_en_estado = int((datetime.now() - updated_naive).total_seconds() / 60)
             
-            cliente.tipo_estado = "PERDIDO"
-            cliente.motivo_perdida = motivo
-            cliente.fecha_perdida = datetime.now().date()
-            cliente.fecha_reactivacion = fecha_reactivacion
-            cliente.proxima_fecha_contacto = fecha_reactivacion
+            cliente.tipo_estado = "CAIDO"
+            cliente.motivo_caida = motivo
+            cliente.fecha_caida = datetime.now().date()
+            cliente.fecha_seguimiento_caida = fecha_seguimiento
+            cliente.proxima_fecha_contacto = fecha_seguimiento
             cliente.updated_by = updated_by
             cliente.updated_at = datetime.now()
             
             await self._registrar_historial(
                 cliente_id=id,
                 estado_anterior=estado_anterior,
-                estado_nuevo="PERDIDO",
+                estado_nuevo="CAIDO",
                 motivo=motivo,
                 origen_cambio="MANUAL",
                 tiempo_en_estado_anterior=tiempo_en_estado,
@@ -433,13 +433,13 @@ class ClientesService:
             )
             
             await self.db.commit()
-            return {"success": 1, "message": "Cliente marcado como perdido (temporalmente)"}
+            return {"success": 1, "message": "Cliente marcado como caído (recuperable)"}
         except Exception as e:
             await self.db.rollback()
-            raise HTTPException(status_code=400, detail=f"Error al marcar perdido: {str(e)}")
+            raise HTTPException(status_code=400, detail=f"Error al marcar caído: {str(e)}")
 
     async def reactivar(self, id: int, updated_by: int) -> dict:
-        """Reactiva un cliente PERDIDO o INACTIVO a PROSPECTO."""
+        """Reactiva un cliente CAIDO o INACTIVO a EN_NEGOCIACION (si caído) o PROSPECTO (si inactivo)."""
         try:
             result = await self.db.execute(select(Cliente).where(Cliente.id == id))
             cliente = result.scalar()

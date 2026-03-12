@@ -51,10 +51,15 @@ class Cliente(Base):
     comentario_ultima_llamada = Column(String(500))
     proxima_fecha_contacto = Column(Date)
     
-    # Pipeline de Ventas
+    # Pipeline de Ventas (legacy — mantener por retrocompatibilidad)
     motivo_perdida = Column(String(50), nullable=True)
     fecha_perdida = Column(Date, nullable=True)
     fecha_reactivacion = Column(Date, nullable=True)
+    
+    # Pipeline de Ventas — CAIDO
+    motivo_caida = Column(String(100), nullable=True)
+    fecha_caida = Column(Date, nullable=True)
+    fecha_seguimiento_caida = Column(Date, nullable=True)
     
     tipo_estado = Column(String(20), default="PROSPECTO", nullable=False)
     origen = Column(String(50))  # BASE_DATOS, PUBLICIDAD_META, CARTERA_PROPIA, WHATSAPP, REFERIDO, OTRO

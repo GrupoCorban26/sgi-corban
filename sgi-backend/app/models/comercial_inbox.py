@@ -12,7 +12,7 @@ class Inbox(Base):
     mensaje_inicial = Column(UnicodeText)
     nombre_whatsapp = Column(Unicode(100))
     asignado_a = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=True)
-    estado = Column(String(20), default="PENDIENTE", nullable=False) # PENDIENTE, CONVERTIDO, DESCARTADO
+    estado = Column(String(20), default="NUEVO", nullable=False) # NUEVO, PENDIENTE, EN_GESTION, COTIZADO, CIERRE, DESCARTADO
     tipo_interes = Column(String(30), nullable=True) # IMPORTACION, ASESORIA, DUDAS
     fecha_recepcion = Column(DateTime(timezone=True), server_default=func.now())
     fecha_asignacion = Column(DateTime(timezone=True), nullable=True)

@@ -156,7 +156,7 @@ class ContactosAsignacionService:
                     func.count(func.distinct(Cliente.ruc)).label('total')
                 ).where(
                     Cliente.ruc.isnot(None),
-                    Cliente.tipo_estado.in_(['PERDIDO', 'INACTIVO'])
+                    Cliente.tipo_estado.in_(['CAIDO', 'INACTIVO'])
                 ).group_by(Cliente.tipo_estado)
                 resultado_excluidos = (await self.db.execute(stmt_excluidos_pipeline)).all()
                 rucs_excluidos_info = {row.tipo_estado: row.total for row in resultado_excluidos}

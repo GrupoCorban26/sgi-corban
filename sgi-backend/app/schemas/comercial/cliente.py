@@ -10,7 +10,7 @@ OrigenCliente = Literal[
 ]
 
 EstadoCliente = Literal[
-    "PROSPECTO", "EN_NEGOCIACION", "CERRADA", "CARGA_ENTREGADA", "PERDIDO", "INACTIVO"
+    "PROSPECTO", "EN_NEGOCIACION", "CERRADA", "EN_OPERACION", "CAIDO", "INACTIVO"
 ]
 
 
@@ -27,10 +27,15 @@ class ClienteBase(BaseModel):
     ultimo_contacto: Optional[datetime] = None
     proxima_fecha_contacto: Optional[date] = None
 
-    # Pipeline fields
+    # Pipeline fields (legacy)
     motivo_perdida: Optional[str] = Field(None, max_length=50)
     fecha_perdida: Optional[date] = None
     fecha_reactivacion: Optional[date] = None
+
+    # Pipeline fields — CAIDO
+    motivo_caida: Optional[str] = Field(None, max_length=100)
+    fecha_caida: Optional[date] = None
+    fecha_seguimiento_caida: Optional[date] = None
 
 
 class ClienteCreate(ClienteBase):
@@ -66,9 +71,9 @@ class ClienteDropdown(BaseModel):
     ruc: Optional[str] = None
 
 
-class ClienteMarcarPerdido(BaseModel):
-    motivo_perdida: str = Field(..., max_length=50)
-    fecha_reactivacion: Optional[date] = None
+class ClienteMarcarCaido(BaseModel):
+    motivo_caida: str = Field(..., max_length=100)
+    fecha_seguimiento_caida: Optional[date] = None
 
 
 class ClienteCambiarEstado(BaseModel):

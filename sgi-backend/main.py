@@ -61,6 +61,7 @@ from app.api.v1.comercial.reportes import router as reportes_router
 from app.api.v1.comercial.notificaciones import router as notificaciones_router
 from app.api.v1.comercial.leads_web import router as leads_web_router
 from app.api.v1.comercial.leads_web import router_publico as leads_web_publico_router
+from app.api.v1.comercial.analytics_buzon import router as analytics_buzon_router
 from app.api.v1.administracion.asistencia import router as asistencia_router
 
 # Lifespan: tareas de inicio y cierre del servidor
@@ -140,6 +141,7 @@ app.include_router(notificaciones_router, prefix="/api/v1")
 app.include_router(asistencia_router, prefix="/api/v1")
 app.include_router(leads_web_router, prefix="/api/v1")
 app.include_router(leads_web_publico_router, prefix="/api/v1")
+app.include_router(analytics_buzon_router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():
