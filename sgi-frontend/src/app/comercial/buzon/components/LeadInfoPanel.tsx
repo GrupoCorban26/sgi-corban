@@ -21,7 +21,6 @@ const ESTADOS_MAP = [
     { value: 'NUEVO', label: 'Nuevo Lead', color: 'text-blue-600' },
     { value: 'PENDIENTE', label: 'Pendiente de Atención', color: 'text-amber-600' },
     { value: 'EN_GESTION', label: 'En Gestión Activa', color: 'text-emerald-600' },
-    { value: 'SEGUIMIENTO', label: 'Seguimiento / Espera', color: 'text-purple-600' },
     { value: 'COTIZADO', label: 'Cotización Enviada', color: 'text-cyan-600' },
 ];
 

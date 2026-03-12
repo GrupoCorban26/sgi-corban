@@ -87,9 +87,9 @@ export default function BaseComercialPage() {
 
       // Mostrar info de RUCs excluidos si hay
       const excluidos = result.rucs_excluidos;
-      if (excluidos && (excluidos.PERDIDO || excluidos.INACTIVO)) {
+      if (excluidos && (excluidos.CAIDO || excluidos.INACTIVO)) {
         const partes = [];
-        if (excluidos.PERDIDO) partes.push(`${excluidos.PERDIDO} perdidos`);
+        if (excluidos.CAIDO) partes.push(`${excluidos.CAIDO} caídos`);
         if (excluidos.INACTIVO) partes.push(`${excluidos.INACTIVO} inactivos`);
         toast.info(`RUCs excluidos: ${partes.join(', ')}`, { duration: 5000 });
       }

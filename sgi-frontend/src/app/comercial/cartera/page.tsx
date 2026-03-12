@@ -23,19 +23,19 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useClientes, useClientesStats } from '@/hooks/comercial/useClientes';
-import { Cliente, ClienteMarcarPerdido } from '@/types/cliente';
+import { Cliente, ClienteMarcarCaido } from '@/types/cliente';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import ModalCliente from './components/modal-cliente';
 import ModalContactosCliente from './components/modal-contactos-cliente';
-import ModalMarcarPerdido from './components/modal-marcar-perdido';
+import ModalMarcarCaido from './components/modal-marcar-perdido';
 import ModalRegistrarGestion from './components/ModalRegistrarGestion';
 
 const ESTADO_COLORS: Record<string, string> = {
   'PROSPECTO': 'bg-sky-100 text-sky-700',
   'EN_NEGOCIACION': 'bg-amber-100 text-amber-700',
   'CERRADA': 'bg-green-100 text-green-700',
-  'CARGA_ENTREGADA': 'bg-emerald-100 text-emerald-700',
-  'PERDIDO': 'bg-red-100 text-red-700',
+  'EN_OPERACION': 'bg-indigo-100 text-indigo-700',
+  'CAIDO': 'bg-red-100 text-red-700',
   'INACTIVO': 'bg-gray-100 text-gray-500',
 };
 
@@ -43,8 +43,8 @@ const ESTADO_LABELS: Record<string, string> = {
   'PROSPECTO': 'Prospecto',
   'EN_NEGOCIACION': 'En negociación',
   'CERRADA': 'Cerrada',
-  'CARGA_ENTREGADA': 'Carga entregada',
-  'PERDIDO': 'Perdido',
+  'EN_OPERACION': 'En operación',
+  'CAIDO': 'Caído',
   'INACTIVO': 'Inactivo',
 };
 
@@ -112,7 +112,7 @@ export default function CarteraPage() {
     isFetching,
     deleteMutation,
     cambiarEstadoMutation,
-    marcarPerdidoMutation,
+    marcarCaidoMutation,
     reactivarMutation,
     archivarMutation
   } = useClientes(busqueda, tipoEstado, null, page, pageSize);
@@ -176,18 +176,18 @@ export default function CarteraPage() {
     }
   };
 
-  const handleOpenMarcarPerdido = (cliente: Cliente) => {
+  const handleOpenMarcarCaido = (cliente: Cliente) => {
     setClienteToMarkLost(cliente);
     setIsPerdidoModalOpen(true);
   };
 
-  const handleConfirmMarcarPerdido = async (data: ClienteMarcarPerdido) => {
+  const handleConfirmMarcarCaido = async (data: ClienteMarcarCaido) => {
     if (!clienteToMarkLost) return;
     try {
-      await marcarPerdidoMutation.mutateAsync({ id: clienteToMarkLost.id, data });
-      toast.success('Cliente marcado como perdido');
+      await marcarCaidoMutation.mutateAsync({ id: clienteToMarkLost.id, data });
+      toast.success('Cliente marcado como caído');
     } catch (error: any) {
-      const message = error?.response?.data?.detail || 'Error al marcar como perdido';
+      const message = error?.response?.data?.detail || 'Error al marcar como caído';
       toast.error(message);
     }
   };
@@ -242,9 +242,9 @@ export default function CarteraPage() {
           <div className="bg-gradient-to-br from-red-500 to-red-600 p-4 rounded-xl text-white shadow-lg shadow-red-200">
             <div className="flex items-center gap-2 mb-1">
               <UserMinus className="w-5 h-5 opacity-80" />
-              <span className="text-sm opacity-80">Perdidos</span>
+              <span className="text-sm opacity-80">Caídos</span>
             </div>
-            <span className="text-2xl font-bold">{(stats.perdidos ?? 0).toLocaleString()}</span>
+            <span className="text-2xl font-bold">{(stats.caidos ?? 0).toLocaleString()}</span>
           </div>
         </div>
       )}
@@ -275,8 +275,8 @@ export default function CarteraPage() {
               <option value="PROSPECTO">Prospectos</option>
               <option value="EN_NEGOCIACION">En Negociación</option>
               <option value="CERRADA">Cerradas</option>
-              <option value="CARGA_ENTREGADA">Carga Entregada</option>
-              <option value="PERDIDO">Perdidos</option>
+              <option value="EN_OPERACION">En Operación</option>
+              <option value="CAIDO">Caídos</option>
               <option value="INACTIVO">Inactivos</option>
             </select>
             <button className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors text-gray-600">
@@ -381,9 +381,9 @@ export default function CarteraPage() {
                               <UserCheck size={16} />
                             </button>
                             <button
-                              onClick={() => handleOpenMarcarPerdido(cliente)}
+                              onClick={() => handleOpenMarcarCaido(cliente)}
                               className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-colors cursor-pointer"
-                              title="Marcar Perdido"
+                              title="Marcar Caído"
                             >
                               <UserMinus size={16} />
                             </button>
@@ -392,7 +392,7 @@ export default function CarteraPage() {
 
                         {cliente.tipo_estado === 'CERRADA' && (
                           <button
-                            onClick={() => handleCambiarEstado(cliente, 'CARGA_ENTREGADA')}
+                            onClick={() => handleCambiarEstado(cliente, 'EN_OPERACION')}
                             className="p-2 hover:bg-emerald-100 text-emerald-600 rounded-lg transition-colors cursor-pointer"
                             title="Marcar Carga Entregada"
                           >
@@ -400,7 +400,7 @@ export default function CarteraPage() {
                           </button>
                         )}
 
-                        {cliente.tipo_estado === 'PERDIDO' && (
+                        {cliente.tipo_estado === 'CAIDO' && (
                           <button
                             onClick={() => handleReactivar(cliente)}
                             className="p-2 hover:bg-yellow-100 text-yellow-600 rounded-lg transition-colors cursor-pointer"
@@ -492,11 +492,11 @@ export default function CarteraPage() {
         razonSocial={contactosRazonSocial}
       />
 
-      <ModalMarcarPerdido
+      <ModalMarcarCaido
         isOpen={isPerdidoModalOpen}
         onClose={() => { setIsPerdidoModalOpen(false); setClienteToMarkLost(null); }}
-        onConfirm={handleConfirmMarcarPerdido}
-        isLoading={marcarPerdidoMutation.isPending}
+        onConfirm={handleConfirmMarcarCaido}
+        isLoading={marcarCaidoMutation.isPending}
         clienteNombre={clienteToMarkLost?.razon_social || ''}
       />
 

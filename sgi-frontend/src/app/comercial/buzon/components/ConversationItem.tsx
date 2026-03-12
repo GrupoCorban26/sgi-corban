@@ -12,7 +12,6 @@ const ESTADO_COLORS: Record<string, { bg: string; text: string; dot: string }> =
     NUEVO: { bg: 'bg-blue-50', text: 'text-blue-700', dot: 'bg-blue-500' },
     PENDIENTE: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-500' },
     EN_GESTION: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500' },
-    SEGUIMIENTO: { bg: 'bg-purple-50', text: 'text-purple-700', dot: 'bg-purple-500' },
     COTIZADO: { bg: 'bg-cyan-50', text: 'text-cyan-700', dot: 'bg-cyan-500' },
 };
 
@@ -20,7 +19,6 @@ const ESTADO_LABELS: Record<string, string> = {
     NUEVO: 'Nuevo',
     PENDIENTE: 'Pendiente',
     EN_GESTION: 'En gestión',
-    SEGUIMIENTO: 'Seguimiento',
     COTIZADO: 'Cotizado',
 };
 

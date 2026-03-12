@@ -1,5 +1,6 @@
 import api from '@/lib/axios';
 import { LeadWeb, LeadWebFiltros, LeadWebDescartarRequest, LeadWebConvertirRequest } from '@/types/lead-web';
+import { AnalyticsBuzonResponse, AnalyticsBuzonFiltros } from '@/types/analytics-buzon';
 
 const BASE_URL = '/comercial/leads-web';
 
@@ -44,6 +45,17 @@ export const leadsWebService = {
         const { data } = await api.post(`${BASE_URL}/${id}/asignar`, null, {
             params: { comercial_id: comercialId }
         });
+        return data;
+    },
+
+    // =============================================
+    // Analytics del Buzón (WhatsApp + Web)
+    // =============================================
+    obtenerAnalyticsBuzon: async (filtros?: AnalyticsBuzonFiltros): Promise<AnalyticsBuzonResponse> => {
+        const params: Record<string, string> = {};
+        if (filtros?.fecha_desde) params.fecha_desde = filtros.fecha_desde;
+        if (filtros?.fecha_hasta) params.fecha_hasta = filtros.fecha_hasta;
+        const { data } = await api.get<AnalyticsBuzonResponse>('/comercial/analytics/buzon', { params });
         return data;
     },
 };

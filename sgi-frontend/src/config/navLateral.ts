@@ -13,6 +13,7 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
     { label: 'Cartera', href: '/comercial/cartera', icon: Users },
     { label: 'Buzón', href: '/comercial/buzon', icon: Package },
     { label: 'Leads Web', href: '/comercial/leads-web', icon: Globe },
+    { label: 'Analytics Buzón', href: '/comercial/analytics', icon: BarChart3 },
   ],
   administrador: [
     { label: 'Inicio', href: '/administracion/', icon: Home },
@@ -23,6 +24,7 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
     { label: 'Cumpleaños', href: '/administracion/cumpleanos', icon: Users },
     { label: 'Asistencias', href: '/administracion/asistencias', icon: Clock },
     { label: 'Rendimiento', href: '/administracion/rendimiento', icon: BarChart3 },
+    { label: 'Analytics Buzón', href: '/comercial/analytics', icon: BarChart3 },
   ],
   jefa_comercial: [
     { label: 'Inicio', href: '/comercial', icon: Home },
@@ -30,6 +32,7 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
     { label: 'Cartera Global', href: '/comercial/cartera-global', icon: Database },
     { label: 'Buzón', href: '/comercial/buzon', icon: Package },
     { label: 'Leads Web', href: '/comercial/leads-web', icon: Globe },
+    { label: 'Analytics Buzón', href: '/comercial/analytics', icon: BarChart3 },
     { label: 'Reportes', href: '/sistemas/reportes', icon: BarChart3 },
     { label: 'Hist. Llamadas', href: '/sistemas/reportes-llamadas', icon: Phone },
   ],
@@ -41,6 +44,7 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
   sistemas: [
     { label: 'Inicio', href: '/sistemas', icon: Home },
     { label: 'Reportes', href: '/sistemas/reportes', icon: BarChart3 },
+    { label: 'Analytics Buzón', href: '/comercial/analytics', icon: BarChart3 },
     { label: 'Hist. Llamadas', href: '/sistemas/reportes-llamadas', icon: Phone },
     { label: 'Transacciones', href: '/sistemas/transacciones', icon: ArrowRightLeft },
     { label: 'Contactos', href: '/sistemas/contactos', icon: Users },

@@ -12,7 +12,7 @@ export interface Cliente {
     ultimo_contacto: string | null;
     comentario_ultima_llamada: string | null;
     proxima_fecha_contacto: string | null;
-    tipo_estado: 'PROSPECTO' | 'EN_NEGOCIACION' | 'CERRADA' | 'CARGA_ENTREGADA' | 'PERDIDO' | 'INACTIVO';
+    tipo_estado: 'PROSPECTO' | 'EN_NEGOCIACION' | 'CERRADA' | 'EN_OPERACION' | 'CAIDO' | 'INACTIVO';
     motivo_perdida?: string | null;
     fecha_perdida?: string | null;
     fecha_reactivacion?: string | null;
@@ -55,14 +55,14 @@ export interface ClienteStats {
     prospectos: number;
     en_negociacion: number;
     cerradas: number;
-    carga_entregada: number;
-    perdidos: number;
+    en_operacion: number;
+    caidos: number;
     inactivos: number;
 }
 
-export interface ClienteMarcarPerdido {
-    motivo_perdida: string;
-    fecha_reactivacion?: string | null;
+export interface ClienteMarcarCaido {
+    motivo_caida: string;
+    fecha_seguimiento_caida?: string | null;
 }
 
 export interface ClienteCambiarEstado {

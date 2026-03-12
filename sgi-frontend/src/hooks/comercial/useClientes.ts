@@ -8,7 +8,7 @@ import {
     ClienteUpdate,
     Cliente,
     ClienteCambiarEstado,
-    ClienteMarcarPerdido
+    ClienteMarcarCaido
 } from '@/types/cliente';
 
 const CLIENTES_URL = '/clientes';
@@ -88,10 +88,10 @@ export const useClientes = (
         },
     });
 
-    // 6. Marcar Perdido
-    const marcarPerdidoMutation = useMutation({
-        mutationFn: async ({ id, data }: { id: number; data: ClienteMarcarPerdido }) => {
-            const { data: response } = await api.post<ClienteOperationResult>(`${CLIENTES_URL}/${id}/marcar-perdido`, data);
+    // 6. Marcar Caído
+    const marcarCaidoMutation = useMutation({
+        mutationFn: async ({ id, data }: { id: number; data: ClienteMarcarCaido }) => {
+            const { data: response } = await api.post<ClienteOperationResult>(`${CLIENTES_URL}/${id}/marcar-caido`, data);
             return response;
         },
         onSuccess: () => {
@@ -138,7 +138,7 @@ export const useClientes = (
         updateMutation,
         deleteMutation,
         cambiarEstadoMutation,
-        marcarPerdidoMutation,
+        marcarCaidoMutation,
         reactivarMutation,
         archivarMutation
     };

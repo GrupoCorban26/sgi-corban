@@ -30,15 +30,15 @@ const ESTADOS_PIPELINE: Record<string, { label: string; color: string }> = {
     PROSPECTO: { label: 'Prospecto', color: 'bg-sky-100 text-sky-700 border-sky-300' },
     EN_NEGOCIACION: { label: 'En negociación', color: 'bg-amber-100 text-amber-700 border-amber-300' },
     CERRADA: { label: 'Cerrada', color: 'bg-green-100 text-green-700 border-green-300' },
-    CARGA_ENTREGADA: { label: 'Carga entregada', color: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+    EN_OPERACION: { label: 'En operación', color: 'bg-indigo-100 text-indigo-700 border-indigo-300' },
 };
 
 // Transiciones válidas (debe coincidir con el backend)
 const TRANSICIONES: Record<string, string[]> = {
     PROSPECTO: ['EN_NEGOCIACION'],
     EN_NEGOCIACION: ['CERRADA', 'PROSPECTO'],
-    CERRADA: ['CARGA_ENTREGADA'],
-    CARGA_ENTREGADA: ['PROSPECTO'],
+    CERRADA: ['EN_OPERACION'],
+    EN_OPERACION: ['EN_NEGOCIACION'],
 };
 
 export default function ModalRegistrarGestion({ clienteId, clienteNombre, estadoActual, isOpen, onClose }: Props) {
