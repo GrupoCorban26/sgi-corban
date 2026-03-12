@@ -2,17 +2,17 @@ import React, { useState } from 'react';
 import { ModalBase, ModalHeader, ModalFooter } from '@/components/ui/modal';
 import { AlertCircle, AlertTriangle, Archive, Calendar, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { ClienteMarcarPerdido } from '@/types/cliente';
+import { ClienteMarcarCaido } from '@/types/cliente';
 
 interface ModalMarcarPerdidoProps {
     isOpen: boolean;
     onClose: () => void;
-    onConfirm: (data: ClienteMarcarPerdido) => Promise<void>;
+    onConfirm: (data: ClienteMarcarCaido) => Promise<void>;
     isLoading: boolean;
     clienteNombre: string;
 }
 
-const MOTIVOS_PERDIDA = [
+const MOTIVOS_CAIDA = [
     "Precios elevados",
     "Servicio no disponible",
     "Eligió competencia",
@@ -22,19 +22,19 @@ const MOTIVOS_PERDIDA = [
 ];
 
 export default function ModalMarcarPerdido({ isOpen, onClose, onConfirm, isLoading, clienteNombre }: ModalMarcarPerdidoProps) {
-    const [motivo, setMotivo] = useState(MOTIVOS_PERDIDA[0]);
+    const [motivo, setMotivo] = useState(MOTIVOS_CAIDA[0]);
     const [otroMotivo, setOtroMotivo] = useState('');
     const [puedeReintentar, setPuedeReintentar] = useState(false);
     const [fechaReactivacion, setFechaReactivacion] = useState('');
 
     const handleSubmit = async () => {
         const motivoFinal = motivo === 'Otro' ? otroMotivo : motivo;
-        if (!motivoFinal) return toast.error('Ingrese el motivo de pérdida');
-        if (puedeReintentar && !fechaReactivacion) return toast.error('Seleccione una fecha de reactivación');
+        if (!motivoFinal) return toast.error('Ingrese el motivo de caída');
+        if (puedeReintentar && !fechaReactivacion) return toast.error('Seleccione una fecha de seguimiento');
 
         await onConfirm({
-            motivo_perdida: motivoFinal,
-            fecha_reactivacion: puedeReintentar ? fechaReactivacion : null
+            motivo_caida: motivoFinal,
+            fecha_seguimiento_caida: puedeReintentar ? fechaReactivacion : null
         });
 
         onClose();
@@ -42,7 +42,7 @@ export default function ModalMarcarPerdido({ isOpen, onClose, onConfirm, isLoadi
     };
 
     const resetForm = () => {
-        setMotivo(MOTIVOS_PERDIDA[0]);
+        setMotivo(MOTIVOS_CAIDA[0]);
         setOtroMotivo('');
         setPuedeReintentar(false);
         setFechaReactivacion('');
@@ -63,7 +63,7 @@ export default function ModalMarcarPerdido({ isOpen, onClose, onConfirm, isLoadi
                 <div className="space-y-2">
                     <label className="text-sm font-medium text-gray-700">Motivo de pérdida</label>
                     <div className="grid grid-cols-1 gap-2">
-                        {MOTIVOS_PERDIDA.map((m) => (
+                        {MOTIVOS_CAIDA.map((m) => (
                             <label key={m} className={`
                                 flex items-center p-3 border rounded-xl cursor-pointer transition-all
                                 ${motivo === m ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-200 hover:bg-gray-50'}
