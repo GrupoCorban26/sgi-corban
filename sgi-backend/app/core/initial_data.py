@@ -48,7 +48,7 @@ ROLES_DEFINICION = {
     ],
     "ADMIN": [ # Organizativo
         "empleados.listar", "empleados.ver", "empleados.crear", "empleados.editar", "empleados.eliminar",
-        "usuarios.listar", 
+        "usuarios.listar", "reportes.ver_comercial"
     ],
     "JEFE_COMERCIAL": [
         "clientes.listar", "clientes.ver_todo", "clientes.crear", "clientes.editar", "clientes.desactivar",
