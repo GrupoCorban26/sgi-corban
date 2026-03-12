@@ -15,12 +15,12 @@ interface DashboardLayoutProps {
 const ROLE_TO_MENU: Record<string, Role> = {
     'ADMIN': 'administrador',
     'SISTEMAS': 'sistemas',
-    'GERENCIA': 'administrador',
+    'GERENCIA': 'gerencia',
     'JEFE_COMERCIAL': 'jefa_comercial',
     'PRICING': 'pricing',
     'COMERCIAL': 'comercial',
     'OPERACIONES': 'comercial',
-    'RRHH': 'administrador',
+    'AUDITOR': 'auditor',
 };
 
 function getRoleFromCookie(): Role {

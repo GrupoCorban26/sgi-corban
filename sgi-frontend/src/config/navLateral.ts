@@ -39,9 +39,23 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
     { label: 'Hist. Llamadas', href: '/sistemas/reportes-llamadas', icon: Phone },
   ],
   pricing: [
-    { label: 'Inicio', href: '/dashboard', icon: Home },
-    { label: 'Tarifario', href: '/tarifas', icon: BarChart3 },
-    { label: 'Cotizaciones', href: '/cotizaciones', icon: ArrowRightLeft },
+    { label: 'Cartera', href: '/comercial/cartera', icon: Users },
+    { label: 'Reportes', href: '/sistemas/reportes', icon: BarChart3 },
+    { label: 'Hist. Llamadas', href: '/sistemas/reportes-llamadas', icon: Phone },
+    { label: 'Analytics Buzón', href: '/comercial/analytics', icon: BarChart3 },
+  ],
+  gerencia: [
+    { label: 'Inicio', href: '/administracion/', icon: Home },
+    { label: 'Organización', href: '/administracion/organizacion', icon: Building2 },
+    { label: 'Reportes', href: '/sistemas/reportes', icon: BarChart3 },
+    { label: 'Hist. Llamadas', href: '/sistemas/reportes-llamadas', icon: Phone },
+    { label: 'Analytics Buzón', href: '/comercial/analytics', icon: BarChart3 },
+  ],
+  auditor: [
+    { label: 'Reportes', href: '/sistemas/reportes', icon: BarChart3 },
+    { label: 'Hist. Llamadas', href: '/sistemas/reportes-llamadas', icon: Phone },
+    { label: 'Leads Web', href: '/comercial/leads-web', icon: Globe },
+    { label: 'Analytics Buzón', href: '/comercial/analytics', icon: BarChart3 },
   ],
   sistemas: [
     { label: 'Inicio', href: '/sistemas', icon: Home },

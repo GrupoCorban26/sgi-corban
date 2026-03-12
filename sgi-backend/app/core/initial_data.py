@@ -46,9 +46,10 @@ ROLES_DEFINICION = {
         "empleados.listar", "empleados.ver",
         "importaciones.cargar", "reportes.ver_general"
     ],
-    "ADMIN": [ # Organizativo
+    "ADMIN": [  # Organizativo + Reportes
         "empleados.listar", "empleados.ver", "empleados.crear", "empleados.editar", "empleados.eliminar",
-        "usuarios.listar", "reportes.ver_comercial"
+        "usuarios.listar", "clientes.listar",
+        "reportes.ver_comercial", "reportes.ver_general"
     ],
     "JEFE_COMERCIAL": [
         "clientes.listar", "clientes.ver_todo", "clientes.crear", "clientes.editar", "clientes.desactivar",
@@ -64,5 +65,19 @@ ROLES_DEFINICION = {
     "AUDITOR": [
         "reportes.ver_comercial", "reportes.ver_general",
         "usuarios.listar", "empleados.listar", "clientes.listar", "clientes.ver_todo"
-    ]
+    ],
+    "PRICING": [
+        "clientes.listar", "clientes.crear", "clientes.editar",
+        "contactos.listar",
+        "empleados.listar",
+        "reportes.ver_comercial", "reportes.ver_general"
+    ],
+    "GERENCIA": [  # Supervisor de lectura — acceso global sin escritura
+        "clientes.listar", "clientes.ver_todo",
+        "contactos.listar",
+        "empleados.listar", "empleados.ver",
+        "usuarios.listar",
+        "reportes.ver_comercial", "reportes.ver_general"
+    ],
+    "OPERACIONES": []  # Stub — permisos se definirán cuando se implemente el módulo
 }

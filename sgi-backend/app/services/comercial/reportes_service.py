@@ -166,7 +166,7 @@ class ReportesLlamadasService:
 
     async def get_bot_analytics(self, fecha_inicio: date, fecha_fin: date, comercial_ids: list = None) -> dict:
         """KPIs del bot para decisiones de Sistemas: tipo de interés, leads por hora, motivos de descarte."""
-        from sqlalchemy import extract, or_
+        from sqlalchemy import extract, or_, Date
         import os
         
         dt_inicio = datetime.combine(fecha_inicio, datetime.min.time())
@@ -226,11 +226,11 @@ class ReportesLlamadasService:
 
         # 4. Leads por día (tendencia)
         stmt_dia = select(
-            func.cast(Inbox.fecha_recepcion, date).label('fecha'),
+            func.cast(Inbox.fecha_recepcion, Date()).label('fecha'),
             func.count().label('total')
         ).where(condicion_base).group_by(
-            func.cast(Inbox.fecha_recepcion, date)
-        ).order_by(func.cast(Inbox.fecha_recepcion, date))
+            func.cast(Inbox.fecha_recepcion, Date())
+        ).order_by(func.cast(Inbox.fecha_recepcion, Date()))
         result_dia = await self.db.execute(stmt_dia)
         por_dia = [{"fecha": row.fecha.isoformat() if row.fecha else None, "total": row.total} for row in result_dia.all()]
 

@@ -53,7 +53,7 @@ async def get_current_user_obj(
 
 
 # Roles que ven información de TODOS los comerciales (sin restricción de equipo)
-ROLES_VER_TODO = ["ADMIN", "GERENCIA", "SISTEMAS"]
+ROLES_VER_TODO = ["ADMIN", "GERENCIA", "SISTEMAS", "PRICING"]
 
 
 async def resolver_comercial_ids(

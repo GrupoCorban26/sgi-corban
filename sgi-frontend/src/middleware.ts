@@ -7,14 +7,14 @@ const PUBLIC_PATHS = ['/login', '/api'];
 
 // Mapeo de ROLES a las rutas que pueden acceder
 const ROLE_ALLOWED_PATHS: Record<string, string[]> = {
-    'ADMIN': ['/administracion', '/sistemas', '/comercial', '/pricing', '/operaciones'],
-    'SISTEMAS': ['/sistemas', '/administracion'],
-    'GERENCIA': ['/administracion', '/comercial', '/sistemas'],
+    'ADMIN': ['/administracion', '/sistemas/reportes', '/sistemas/reportes-llamadas', '/comercial/analytics'],
+    'SISTEMAS': ['/sistemas', '/administracion', '/comercial'],
+    'GERENCIA': ['/administracion', '/comercial', '/sistemas/reportes', '/sistemas/reportes-llamadas'],
     'JEFE_COMERCIAL': ['/comercial', '/sistemas/reportes', '/sistemas/reportes-llamadas'],
-    'PRICING': ['/pricing', '/comercial'],
+    'PRICING': ['/comercial', '/sistemas/reportes', '/sistemas/reportes-llamadas'],
     'COMERCIAL': ['/comercial'],
     'OPERACIONES': ['/operaciones'],
-    'RRHH': ['/administracion'],
+    'AUDITOR': ['/sistemas/reportes', '/sistemas/reportes-llamadas', '/comercial/analytics', '/comercial/leads-web'],
 };
 
 // Ruta por defecto para cada rol (a donde redirigir si accede a ruta no permitida)
@@ -23,10 +23,10 @@ const ROLE_DEFAULT_PATH: Record<string, string> = {
     'SISTEMAS': '/sistemas',
     'GERENCIA': '/administracion',
     'JEFE_COMERCIAL': '/comercial',
-    'PRICING': '/pricing',
+    'PRICING': '/comercial',
     'COMERCIAL': '/comercial',
     'OPERACIONES': '/operaciones',
-    'RRHH': '/administracion',
+    'AUDITOR': '/sistemas/reportes',
 };
 
 
