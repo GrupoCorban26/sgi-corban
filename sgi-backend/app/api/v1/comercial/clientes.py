@@ -23,6 +23,8 @@ from app.core.security import (
 )
 from app.core.dependencies import require_permission, resolver_comercial_ids
 
+from sqlalchemy import and_
+
 router = APIRouter(prefix="/clientes", tags=["Clientes"])
 
 # Lista de roles que pueden ver información global (admin/gerencia/sistemas)

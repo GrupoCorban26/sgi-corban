@@ -9,6 +9,7 @@ class ContactoBase(BaseModel):
     email: Optional[str] = Field(None, max_length=100)
     origen: Optional[str] = Field(None, max_length=30)
     is_client: bool = Field(False)
+    is_principal: bool = Field(False)
 
 class ContactoCreate(ContactoBase):
     pass

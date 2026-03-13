@@ -4,7 +4,6 @@ from typing import List
 from app.database.db_connection import get_db
 from app.core.security import get_current_user_id, get_current_active_auth
 from app.core.dependencies import require_permission
-from app.core.dependencies import require_permission
 from app.services.contactos_service import ContactosService
 from app.schemas.comercial.contactos import ContactoResponse, ContactoCreate, ContactoUpdate, ContactoManualCreate, AsignarLeadManual
 
@@ -48,6 +47,19 @@ async def create_contacto(
     """Crea un nuevo contacto."""
     service = ContactosService(db)
     return await service.create_contacto(contacto.dict())
+
+
+@router.put("/principal/{ruc}/{id}", response_model=bool, dependencies=[Depends(require_permission("contactos.editar"))])
+async def set_contacto_principal(
+    ruc: str,
+    id: int,
+    is_principal: bool = Query(True, description="Si es True, lo marca como principal y desmarca el resto. Si es False, solo lo desmarca."),
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
+):
+    """Establece o quita un contacto como principal para un RUC específico."""
+    service = ContactosService(db)
+    return await service.set_contacto_principal(ruc, id, is_principal)
 
 
 @router.put("/{id}", response_model=bool, dependencies=[Depends(require_permission("contactos.editar"))])

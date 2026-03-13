@@ -4,7 +4,7 @@ Responsabilidad única: crear, leer, actualizar, eliminar y listar contactos.
 """
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, or_, case
+from sqlalchemy import func, or_, case, update
 from app.models.comercial import ClienteContacto, Cliente, CasoLlamada, RegistroImportacion
 
 
@@ -76,6 +76,30 @@ class ContactosCrudService:
         if contacto:
             contacto.is_active = False
             await self.db.commit()
+        return True
+
+    async def set_contacto_principal(self, ruc: str, contacto_id: int, is_principal: bool = True):
+        """Marca o desmarca un contacto como principal para el mismo RUC."""
+        # 1. Verificar que el contacto existe y pertenece al RUC
+        contacto = await self.db.get(ClienteContacto, contacto_id)
+        if not contacto or contacto.ruc != ruc:
+            return False
+            
+        if is_principal:
+            # 2. Desmarcar todos los del RUC
+            await self.db.execute(
+                update(ClienteContacto)
+                .where(ClienteContacto.ruc == ruc)
+                .values(is_principal=False)
+            )
+            
+            # 3. Marcar el seleccionado como principal
+            contacto.is_principal = True
+        else:
+            # Solo desmarcar el seleccionado
+            contacto.is_principal = False
+        
+        await self.db.commit()
         return True
 
     # =========================================================================

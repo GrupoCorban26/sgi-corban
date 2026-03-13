@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { useBaseComercial } from '@/hooks/comercial/useBaseComercial';
 import { ContactoAsignado, CasoLlamada } from '@/types/base-comercial';
 import { MultiSelect } from '@/components/ui/MultiSelect';
+import ModalContactosCliente from '../cartera/components/modal-contactos-cliente';
 
 // Colores para estados de feedback
 const ESTADO_STYLES = {
@@ -48,10 +49,10 @@ export default function BaseComercialPage() {
   // Estado de feedback local para todos los contactos
   const [feedbackLocal, setFeedbackLocal] = useState<{ [key: number]: { contesto: boolean | null; caso_id: number; comentario: string } }>({});
 
-  // Estado para modal de contacto manual
-  const [manualModal, setManualModal] = useState<{ isOpen: boolean; ruc: string; razonSocial: string }>({ isOpen: false, ruc: '', razonSocial: '' });
-  const [manualForm, setManualForm] = useState({ nombre: '', cargo: '', telefono: '', email: '' });
-  const [crearComoProspecto, setCrearComoProspecto] = useState(false);
+  // Estado para modal de contactos (Modal avanzado compartido con Cartera)
+  const [isContactosModalOpen, setIsContactosModalOpen] = useState(false);
+  const [contactosRuc, setContactosRuc] = useState('');
+  const [contactosRazonSocial, setContactosRazonSocial] = useState('');
 
   // Estado para rastrear filas editadas DESPUÉS de guardar (necesitan re-guardar)
   const [editedAfterSave, setEditedAfterSave] = useState<Set<number>>(new Set());
@@ -125,45 +126,6 @@ export default function BaseComercialPage() {
       refetch();
     } catch {
       toast.error('Error al guardar feedback');
-    }
-  };
-
-  const handleCreateManual = async () => {
-    if (!manualForm.telefono && !manualForm.email) {
-      toast.error('Al menos un dato de contacto (teléfono o email) es obligatorio');
-      return;
-    }
-
-    try {
-      const resultado = await crearContactoManual({
-        ruc: manualModal.ruc,
-        nombre: manualForm.nombre,
-        telefono: manualForm.telefono,
-        cargo: manualForm.cargo,
-        email: manualForm.email,
-        crear_como_prospecto: crearComoProspecto
-      });
-
-      // Toasts diferenciados según resultado
-      if (resultado.prospecto_creado) {
-        toast.success('Prospecto creado y agregado a tu cartera', {
-          description: `${manualForm.nombre} aparecerá en tu cartera como PROSPECTO`,
-          duration: 5000
-        });
-      } else if (resultado.cliente_ya_existia) {
-        toast.info('Este RUC ya tiene un cliente en cartera. Contacto vinculado.', { duration: 4000 });
-      } else if (resultado.actualizado) {
-        toast.warning('Se encontró un contacto existente con ese teléfono. Se actualizaron sus datos.', { duration: 4000 });
-      } else {
-        toast.success('Contacto creado y asignado');
-      }
-
-      setManualModal({ isOpen: false, ruc: '', razonSocial: '' });
-      setManualForm({ nombre: '', cargo: '', telefono: '', email: '' });
-      setCrearComoProspecto(false);
-      refetch();
-    } catch (error: any) {
-      toast.error(error.response?.data?.detail || 'Error al crear contacto');
     }
   };
 
@@ -318,9 +280,9 @@ export default function BaseComercialPage() {
                         </span>
                         <button
                           onClick={() => {
-                            setManualModal({ isOpen: true, ruc: contacto.ruc, razonSocial: contacto.razon_social });
-                            setManualForm({ nombre: '', cargo: '', telefono: '', email: '' });
-                            setCrearComoProspecto(false);
+                            setContactosRuc(contacto.ruc || '');
+                            setContactosRazonSocial(contacto.razon_social || '');
+                            setIsContactosModalOpen(true);
                           }}
                           className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 mt-1"
                           title="Agregar otro contacto a esta empresa"
@@ -507,118 +469,14 @@ export default function BaseComercialPage() {
           </button>
         </div>
       )}
-      {/* Modal Contacto Manual */}
-      {manualModal.isOpen && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">Nuevo Contacto</h3>
-                <p className="text-xs text-gray-500">{manualModal.razonSocial} ({manualModal.ruc})</p>
-              </div>
-              <button onClick={() => setManualModal({ ...manualModal, isOpen: false })} className="p-1 hover:bg-gray-100 rounded-lg">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo</label>
-                <input
-                  type="text"
-                  value={manualForm.nombre}
-                  onChange={e => setManualForm({ ...manualForm, nombre: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                  placeholder="Ej: Juan Perez"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono/Celular</label>
-                  <input
-                    type="text"
-                    value={manualForm.telefono}
-                    onChange={e => setManualForm({ ...manualForm, telefono: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                    placeholder="999..."
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Cargo</label>
-                  <input
-                    type="text"
-                    value={manualForm.cargo}
-                    onChange={e => setManualForm({ ...manualForm, cargo: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                    placeholder="Ej: Gerente"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
-                <input
-                  type="email"
-                  value={manualForm.email}
-                  onChange={e => setManualForm({ ...manualForm, email: e.target.value })}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
-                  placeholder="correo@ejemplo.com"
-                />
-              </div>
-            </div>
-            <p className="text-xs text-gray-400 mt-1">* Al menos un dato de contacto (teléfono o email) es requerido</p>
-
-            {/* Toggle: Crear como Prospecto en Cartera */}
-            <div
-              onClick={() => setCrearComoProspecto(!crearComoProspecto)}
-              className={`
-                mt-2 flex items-start gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all duration-200
-                ${crearComoProspecto
-                  ? 'bg-indigo-50 border-indigo-400 shadow-sm'
-                  : 'bg-gray-50 border-gray-200 hover:border-gray-300'
-                }
-              `}
-            >
-              <div className={`
-                mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all
-                ${crearComoProspecto
-                  ? 'bg-indigo-600 border-indigo-600'
-                  : 'bg-white border-gray-300'
-                }
-              `}>
-                {crearComoProspecto && <CheckCircle2 size={14} className="text-white" />}
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <Briefcase size={16} className={crearComoProspecto ? 'text-indigo-600' : 'text-gray-400'} />
-                  <span className={`text-sm font-semibold ${crearComoProspecto ? 'text-indigo-700' : 'text-gray-700'}`}>
-                    Crear como prospecto en cartera
-                  </span>
-                </div>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  El contacto irá directamente a tu cartera para gestión comercial
-                </p>
-              </div>
-            </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button
-                onClick={() => setManualModal({ ...manualModal, isOpen: false })}
-                className="px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 rounded-lg"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleCreateManual}
-                disabled={isCreandoContactoManual || !manualForm.nombre || !manualForm.telefono}
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg disabled:opacity-50 flex items-center gap-2"
-              >
-                {isCreandoContactoManual ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
-                Guardar Contacto
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Modal Contactos Avanzado (Compartido con Cartera) */}
+      <ModalContactosCliente
+        isOpen={isContactosModalOpen}
+        onClose={() => setIsContactosModalOpen(false)}
+        ruc={contactosRuc}
+        razonSocial={contactosRazonSocial}
+      />
     </div>
   );
 }

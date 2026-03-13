@@ -51,8 +51,9 @@ export default function CitasPage() {
         try {
             await terminateMutation.mutateAsync(citaId);
             toast.success('Cita finalizada correctamente');
-        } catch (error: any) {
-            toast.error(error.response?.data?.detail || 'Error al finalizar');
+        } catch (error: unknown) {
+            const axiosErr = error as { response?: { data?: { detail?: string } } };
+            toast.error(axiosErr.response?.data?.detail || 'Error al finalizar');
         }
     };
 

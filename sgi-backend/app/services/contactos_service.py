@@ -55,6 +55,10 @@ class ContactosService:
     async def delete_contacto(self, id: int):
         """Desactiva un contacto (soft delete)."""
         return await self._crud_service.delete_contacto(id)
+        
+    async def set_contacto_principal(self, ruc: str, contacto_id: int, is_principal: bool = True):
+        """Marca o desmarca un contacto como principal para el mismo RUC."""
+        return await self._crud_service.set_contacto_principal(ruc, contacto_id, is_principal)
 
     # =========================================================================
     # LISTADO Y ESTADÍSTICAS (delegado a ContactosCrudService)

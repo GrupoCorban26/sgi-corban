@@ -62,8 +62,9 @@ const ModalDevolucionContent = ({ activoData }: { activoData: Activo }) => {
             await devolverMutation.mutateAsync({ id: activoData.id, data });
             toast.success('Activo devuelto correctamente');
             handleClose();
-        } catch (error: any) {
-            toast.error(error.response?.data?.detail || 'Error al procesar devolución');
+        } catch (error: unknown) {
+            const axiosErr = error as { response?: { data?: { detail?: string } } };
+            toast.error(axiosErr.response?.data?.detail || 'Error al procesar devolución');
         }
     };
 

@@ -19,7 +19,9 @@ import {
   History,
   Archive,
   UserMinus,
-  Phone
+  Phone,
+  Truck,
+  UserPlus
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useClientes, useClientesStats } from '@/hooks/comercial/useClientes';
@@ -186,8 +188,9 @@ export default function CarteraPage() {
     try {
       await marcarCaidoMutation.mutateAsync({ id: clienteToMarkLost.id, data });
       toast.success('Cliente marcado como caído');
-    } catch (error: any) {
-      const message = error?.response?.data?.detail || 'Error al marcar como caído';
+    } catch (error: unknown) {
+      const axiosErr = error as { response?: { data?: { detail?: string } } };
+      const message = axiosErr?.response?.data?.detail || 'Error al marcar como caído';
       toast.error(message);
     }
   };
@@ -210,11 +213,32 @@ export default function CarteraPage() {
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-4 rounded-xl text-white shadow-lg shadow-indigo-200">
+            <div className="flex items-center gap-2 mb-1">
+              <Truck className="w-5 h-5 opacity-80" />
+              <span className="text-sm opacity-80">Seguimiento de carga</span>
+            </div>
+            <span className="text-2xl font-bold">{(stats.en_operacion ?? 0).toLocaleString()}</span>
+          </div>
+          <div className="bg-gradient-to-br from-green-500 to-green-600 p-4 rounded-xl text-white shadow-lg shadow-green-200">
+            <div className="flex items-center gap-2 mb-1">
+              <UserCheck className="w-5 h-5 opacity-80" />
+              <span className="text-sm opacity-80">Cerradas</span>
+            </div>
+            <span className="text-2xl font-bold">{(stats.cerradas ?? 0).toLocaleString()}</span>
+          </div>
+          <div className="bg-gradient-to-br from-teal-500 to-teal-600 p-4 rounded-xl text-white shadow-lg shadow-teal-200">
+            <div className="flex items-center gap-2 mb-1">
+              <UserPlus className="w-5 h-5 opacity-80" />
+              <span className="text-sm opacity-80">Nuevos clientes</span>
+            </div>
+            <span className="text-2xl font-bold">{(stats.nuevos_clientes ?? 0).toLocaleString()}</span>
+          </div>
           <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-4 rounded-xl text-white shadow-lg shadow-blue-200">
             <div className="flex items-center gap-2 mb-1">
               <Building2 className="w-5 h-5 opacity-80" />
-              <span className="text-sm opacity-80">Total</span>
+              <span className="text-sm opacity-80">Total cartera</span>
             </div>
             <span className="text-2xl font-bold">{(stats.total ?? 0).toLocaleString()}</span>
           </div>
@@ -224,20 +248,6 @@ export default function CarteraPage() {
               <span className="text-sm opacity-80">Prospectos</span>
             </div>
             <span className="text-2xl font-bold">{(stats.prospectos ?? 0).toLocaleString()}</span>
-          </div>
-          <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-4 rounded-xl text-white shadow-lg shadow-indigo-200">
-            <div className="flex items-center gap-2 mb-1">
-              <History className="w-5 h-5 opacity-80" />
-              <span className="text-sm opacity-80">En Negociación</span>
-            </div>
-            <span className="text-2xl font-bold">{(stats.en_negociacion ?? 0).toLocaleString()}</span>
-          </div>
-          <div className="bg-gradient-to-br from-green-500 to-green-600 p-4 rounded-xl text-white shadow-lg shadow-green-200">
-            <div className="flex items-center gap-2 mb-1">
-              <UserCheck className="w-5 h-5 opacity-80" />
-              <span className="text-sm opacity-80">Cerradas</span>
-            </div>
-            <span className="text-2xl font-bold">{(stats.cerradas ?? 0).toLocaleString()}</span>
           </div>
           <div className="bg-gradient-to-br from-red-500 to-red-600 p-4 rounded-xl text-white shadow-lg shadow-red-200">
             <div className="flex items-center gap-2 mb-1">
@@ -422,6 +432,17 @@ export default function CarteraPage() {
                           title="Registrar Gestión"
                         >
                           <Phone size={16} />
+                        </button>
+                        <button
+                          onClick={() => {
+                            setContactosRuc(cliente.ruc || '');
+                            setContactosRazonSocial(cliente.razon_social || '');
+                            setIsContactosModalOpen(true);
+                          }}
+                          className="p-2 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-colors cursor-pointer"
+                          title="Gestionar Contactos"
+                        >
+                          <Users size={16} />
                         </button>
                         <button
                           onClick={() => handleOpenEdit(cliente)}

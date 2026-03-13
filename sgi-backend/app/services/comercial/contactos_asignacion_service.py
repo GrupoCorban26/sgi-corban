@@ -310,8 +310,9 @@ class ContactosAsignacionService:
             contact.updated_at = func.now()
             
             if is_positive or cliente_existe:
-                contact.is_client = True
-                 
+                await self.db.execute(
+                    update(ClienteContacto).where(ClienteContacto.ruc == contact.ruc).values(is_client=True)
+                )
             # Guardar en Historial
             historial = HistorialLlamada(
                 contacto_id=contact.id,

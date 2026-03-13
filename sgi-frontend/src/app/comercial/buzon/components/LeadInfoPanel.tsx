@@ -65,8 +65,9 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
             });
             toast.success('Lead asignado exitosamente');
             onChangeConv({ ...selectedConv, estado: 'PENDIENTE', modo: 'ASESOR' });
-        } catch (error: any) {
-            toast.error(error?.response?.data?.detail || 'Error al asignar');
+        } catch (error: unknown) {
+            const axiosErr = error as { response?: { data?: { detail?: string } } };
+            toast.error(axiosErr?.response?.data?.detail || 'Error al asignar');
         } finally {
             setIsAssigning(false);
         }

@@ -42,8 +42,9 @@ function ModalAsignacionContent({ activoData }: { activoData: Activo }) {
             await asignarMutation.mutateAsync({ id: activoData.id, data });
             toast.success('Activo asignado correctamenete');
             handleClose();
-        } catch (error: any) {
-            toast.error(error.response?.data?.detail || 'Error al asignar activo');
+        } catch (error: unknown) {
+            const axiosErr = error as { response?: { data?: { detail?: string } } };
+            toast.error(axiosErr.response?.data?.detail || 'Error al asignar activo');
         }
     };
 

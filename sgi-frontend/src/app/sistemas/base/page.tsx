@@ -73,8 +73,9 @@ export default function BasePage() {
                 setIsAssignModalOpen(false);
                 loadData(); // recargar la tabla para mostrar el nuevo estado
             }
-        } catch (error: any) {
-            toast.error(error?.response?.data?.detail || 'Error al derivar lead');
+        } catch (error: unknown) {
+            const axiosErr = error as { response?: { data?: { detail?: string } } };
+            toast.error(axiosErr?.response?.data?.detail || 'Error al derivar lead');
         } finally {
             setIsAssigning(false);
         }

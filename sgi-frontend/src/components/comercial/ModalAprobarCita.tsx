@@ -34,8 +34,9 @@ export default function ModalAprobarCita({ isOpen, onClose, cita }: ModalAprobar
             });
             toast.success('Cita aprobada correctamente');
             onClose();
-        } catch (error: any) {
-            toast.error(error.response?.data?.detail || 'Error al aprobar cita');
+        } catch (error: unknown) {
+            const axiosErr = error as { response?: { data?: { detail?: string } } };
+            toast.error(axiosErr.response?.data?.detail || 'Error al aprobar cita');
         }
     };
 
@@ -52,8 +53,9 @@ export default function ModalAprobarCita({ isOpen, onClose, cita }: ModalAprobar
             });
             toast.success('Cita rechazada');
             onClose();
-        } catch (error: any) {
-            toast.error(error.response?.data?.detail || 'Error al rechazar cita');
+        } catch (error: unknown) {
+            const axiosErr = error as { response?: { data?: { detail?: string } } };
+            toast.error(axiosErr.response?.data?.detail || 'Error al rechazar cita');
         }
     };
 

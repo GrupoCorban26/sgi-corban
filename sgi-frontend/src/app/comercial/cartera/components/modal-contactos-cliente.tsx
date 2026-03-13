@@ -17,6 +17,7 @@ interface Contacto {
     cargo: string | null;
     telefono: string;
     correo: string | null;
+    is_principal: boolean;
 }
 
 interface ModalProps {
@@ -75,7 +76,7 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
     }, [isOpen, ruc, loadContactos]);
 
     // Manejar cambios en campos editados
-    const handleFieldChange = (id: number, field: string, value: string) => {
+    const handleFieldChange = (id: number, field: string, value: string | boolean) => {
         setEditedRows(prev => ({
             ...prev,
             [id]: {
@@ -85,12 +86,27 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
         }));
     };
 
-    // Obtener valor del campo (editado o original)
-    const getFieldValue = (contacto: Contacto, field: keyof Contacto): string => {
-        if (editedRows[contacto.id]?.[field] !== undefined) {
-            return editedRows[contacto.id][field] as string || '';
-        }
-        return (contacto[field] as string) || '';
+    // Obtener valor string de un campo (editado o original) — para inputs de texto
+    const getStringField = (contacto: Contacto, field: keyof Contacto): string => {
+        const value = editedRows[contacto.id]?.[field] !== undefined
+            ? editedRows[contacto.id][field]
+            : contacto[field];
+        return (value as string) ?? '';
+    };
+
+    // Obtener valor boolean de un campo (editado o original) — para checkboxes
+    const getBoolField = (contacto: Contacto, field: keyof Contacto): boolean => {
+        const value = editedRows[contacto.id]?.[field] !== undefined
+            ? editedRows[contacto.id][field]
+            : contacto[field];
+        return !!value;
+    };
+
+    // Helper genérico para lógica interna (save, etc.)
+    const getFieldValue = (contacto: Contacto, field: keyof Contacto) => {
+        return editedRows[contacto.id]?.[field] !== undefined
+            ? editedRows[contacto.id][field]
+            : contacto[field];
     };
 
     // Verificar si hay cambios en una fila
@@ -113,6 +129,26 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
 
             await api.put(`/contactos/${contacto.id}`, updateData);
 
+            // También evaluar si se cambió is_principal
+            const newIsPrincipal = getFieldValue(contacto, 'is_principal');
+            if (newIsPrincipal !== contacto.is_principal) {
+                await api.put(`/contactos/principal/${ruc}/${contacto.id}?is_principal=${newIsPrincipal}`);
+                
+                // Si este se marca como principal, los demás editados que sean true deben volver a false
+                if (newIsPrincipal === true) {
+                    setEditedRows(prev => {
+                        const nextRows = { ...prev };
+                        Object.keys(nextRows).forEach((k) => {
+                            const keyNum = Number(k);
+                            if (keyNum !== contacto.id && nextRows[keyNum].is_principal === true) {
+                                nextRows[keyNum].is_principal = false;
+                            }
+                        });
+                        return nextRows;
+                    });
+                }
+            }
+
             toast.success('Contacto actualizado');
             setEditedRows(prev => {
                 const newRows = { ...prev };
@@ -126,6 +162,13 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
         } finally {
             setSavingId(null);
         }
+    };
+
+    // Refrescar padre al cerrar el modal si hubo cambios en los contactos principales
+    const onModalClose = () => {
+        // En un mundo ideal el padre reaccionaría, acá forzamos reload para Cartera.
+        setTimeout(() => { if (typeof window !== 'undefined') window.location.reload(); }, 1000); 
+        handleClose();
     };
 
     // Crear nuevo contacto
@@ -183,6 +226,9 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
                             <table className="w-full text-sm">
                                 <thead className="bg-gray-50">
                                     <tr className="text-gray-600 text-xs uppercase">
+                                        <th className="px-3 py-2 text-center font-semibold w-16">
+                                            Principal
+                                        </th>
                                         <th className="px-3 py-2 text-left font-semibold">
                                             <div className="flex items-center gap-1">
                                                 <Phone size={12} /> Teléfono
@@ -216,10 +262,23 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
                                     ) : (
                                         contactos.map((contacto) => (
                                             <tr key={contacto.id} className={hasChanges(contacto.id) ? 'bg-yellow-50' : ''}>
+                                                <td className="px-3 py-2 text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        name={`principal_contact_${contacto.id}`}
+                                                        checked={getBoolField(contacto, 'is_principal')}
+                                                        onChange={(e) => {
+                                                            const isChecked = e.target.checked;
+                                                            handleFieldChange(contacto.id, 'is_principal', isChecked);
+                                                        }}
+                                                        className="h-4 w-4 text-indigo-600 cursor-pointer rounded"
+                                                        title="Marcar o desmarcar como contacto principal"
+                                                    />
+                                                </td>
                                                 <td className="px-2 py-2">
                                                     <input
                                                         type="text"
-                                                        value={getFieldValue(contacto, 'telefono')}
+                                                        value={getStringField(contacto, 'telefono')}
                                                         onChange={(e) => handleFieldChange(contacto.id, 'telefono', e.target.value)}
                                                         className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/50 outline-none"
                                                         placeholder="Teléfono"
@@ -228,7 +287,7 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
                                                 <td className="px-2 py-2">
                                                     <input
                                                         type="text"
-                                                        value={getFieldValue(contacto, 'nombre')}
+                                                        value={getStringField(contacto, 'nombre')}
                                                         onChange={(e) => handleFieldChange(contacto.id, 'nombre', e.target.value)}
                                                         className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/50 outline-none"
                                                         placeholder="Nombre del contacto"
@@ -237,7 +296,7 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
                                                 <td className="px-2 py-2">
                                                     <input
                                                         type="text"
-                                                        value={getFieldValue(contacto, 'cargo')}
+                                                        value={getStringField(contacto, 'cargo')}
                                                         onChange={(e) => handleFieldChange(contacto.id, 'cargo', e.target.value)}
                                                         className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/50 outline-none"
                                                         placeholder="Cargo"
@@ -246,7 +305,7 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
                                                 <td className="px-2 py-2">
                                                     <input
                                                         type="email"
-                                                        value={getFieldValue(contacto, 'correo')}
+                                                        value={getStringField(contacto, 'correo')}
                                                         onChange={(e) => handleFieldChange(contacto.id, 'correo', e.target.value)}
                                                         className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/50 outline-none"
                                                         placeholder="correo@empresa.com"
@@ -360,7 +419,7 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
             <ModalFooter>
                 <button
                     type="button"
-                    onClick={handleClose}
+                    onClick={onModalClose}
                     className="cursor-pointer flex-1 px-4 py-2.5 bg-indigo-600 text-white rounded-xl text-sm font-semibold hover:bg-indigo-700 shadow-lg shadow-indigo-200 flex items-center justify-center gap-2"
                 >
                     Listo

@@ -96,8 +96,9 @@ export default function ModalSalidaCampo({ isOpen, onClose, salidaToEdit }: Moda
                 toast.success('Salida a campo programada correctamente');
             }
             onClose();
-        } catch (error: any) {
-            toast.error(error.response?.data?.detail || 'Error al guardar');
+        } catch (error: unknown) {
+            const axiosErr = error as { response?: { data?: { detail?: string } } };
+            toast.error(axiosErr.response?.data?.detail || 'Error al guardar');
         }
     };
 

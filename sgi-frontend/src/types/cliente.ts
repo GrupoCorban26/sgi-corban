@@ -58,6 +58,7 @@ export interface ClienteStats {
     en_operacion: number;
     caidos: number;
     inactivos: number;
+    nuevos_clientes: number;
 }
 
 export interface ClienteMarcarCaido {

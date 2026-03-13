@@ -93,7 +93,7 @@ export default function ContactosPage() {
             const res = await contactosService.upload(file);
             setLastUploadStatus(res.message || 'Carga exitosa');
             loadContactos();
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error(error);
             throw error;
         }
@@ -134,8 +134,9 @@ export default function ContactosPage() {
             toast.success('Caso eliminado correctamente');
             loadCasos();
             setConfirmDelete({ isOpen: false, id: null });
-        } catch (error: any) {
-            const msg = error.response?.data?.detail || 'Error al eliminar';
+        } catch (error: unknown) {
+            const axiosErr = error as { response?: { data?: { detail?: string } } };
+            const msg = axiosErr.response?.data?.detail || 'Error al eliminar';
             toast.error(msg);
         } finally {
             setIsDeleting(false);

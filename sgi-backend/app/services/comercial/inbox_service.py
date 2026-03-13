@@ -1,7 +1,7 @@
 import asyncio
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import and_, func
+from sqlalchemy import and_, func, update
 from sqlalchemy.orm import selectinload
 from app.models.comercial_inbox import Inbox
 from app.models.seguridad import Usuario, Rol, usuarios_roles
@@ -291,12 +291,57 @@ class InboxService:
                 )
             
             # Trazabilidad: vincular el cliente con su lead de origen
+            cliente = None
             if client_id:
                 cliente = await self.db.get(Cliente, client_id)
                 if cliente:
                     cliente.inbox_origen_id = lead_id
                     if not cliente.origen:
                         cliente.origen = "WHATSAPP"
+                        
+            # Crear ClienteContacto principal con el teléfono del lead
+            if cliente and cliente.ruc and lead.telefono:
+                phone = lead.telefono.replace(" ", "").replace("+", "")
+                if phone.startswith("51"):
+                    phone = phone[2:]
+                
+                existing_contact = await self.db.execute(
+                    select(ClienteContacto).where(
+                        and_(
+                            ClienteContacto.ruc == cliente.ruc,
+                            ClienteContacto.telefono.like(f"%{phone}%"),
+                            ClienteContacto.is_active == True
+                        )
+                    )
+                )
+                contacto_existente = existing_contact.scalars().first()
+                
+                # Desmarcar temporalmente cualquier otro como principal para este ruc si vamos a asentar este
+                await self.db.execute(
+                    update(ClienteContacto).where(
+                        ClienteContacto.ruc == cliente.ruc
+                    ).values(is_principal=False)
+                )
+                
+                if contacto_existente:
+                    contacto_existente.is_client = True
+                    contacto_existente.is_principal = True
+                else:
+                    nuevo_contacto = ClienteContacto(
+                        ruc=cliente.ruc,
+                        nombre=lead.nombre_whatsapp or "Contacto WhatsApp",
+                        telefono=phone,
+                        origen='WHATSAPP',
+                        is_client=True,
+                        is_active=True,
+                        is_principal=True,
+                        estado='GESTIONADO',
+                        asignado_a=lead.asignado_a,
+                        fecha_asignacion=datetime.now(),
+                        fecha_llamada=datetime.now(),
+                        lote_asignacion=0
+                    )
+                    self.db.add(nuevo_contacto)
             
             await self.db.commit()
             return True

@@ -94,6 +94,7 @@ class ClienteContacto(Base):
     origen = Column(String(30))
     is_client = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
+    is_principal = Column(Boolean, default=False, nullable=False)
     
     # Asignación
     asignado_a = Column(Integer, ForeignKey("seg.usuarios.id"))

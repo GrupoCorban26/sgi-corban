@@ -23,9 +23,9 @@ export const ExcelUploader: React.FC<ExcelUploaderProps> = ({ onUpload, label })
         try {
             await onUpload(file);
             setUploadStatus('success');
-        } catch (error: any) {
+        } catch (error: unknown) {
             setUploadStatus('error');
-            setErrorMessage(error.message || 'Error al subir el archivo');
+            setErrorMessage(error instanceof Error ? error.message : 'Error al subir el archivo');
             console.error(error);
         } finally {
             setIsUploading(false);

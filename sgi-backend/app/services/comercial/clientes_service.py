@@ -2,7 +2,7 @@ from fastapi import HTTPException
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import text, func, or_, case
+from sqlalchemy import func, case, or_, desc, update, and_
 from sqlalchemy.orm import selectinload
 from app.schemas.comercial.cliente import ClienteCreate, ClienteUpdate
 from app.models.comercial import Cliente, ClienteContacto
@@ -40,11 +40,15 @@ class ClientesService:
         """Lista clientes con paginación y filtros. Filtra por lista de IDs (usuario o empleado)."""
         offset = (page - 1) * page_size
         
-        # Subquery para obtener el teléfono del contacto asociado al cliente
+        # Subquery para obtener el teléfono del contacto principal asociado al cliente
         subq_telefono = (
             select(ClienteContacto.telefono)
-            .where(ClienteContacto.ruc == Cliente.ruc, ClienteContacto.is_client == True)
-            .order_by(ClienteContacto.fecha_llamada.desc(), ClienteContacto.created_at.desc())
+            .where(ClienteContacto.ruc == Cliente.ruc)
+            .order_by(
+                ClienteContacto.is_principal.desc(), 
+                ClienteContacto.fecha_llamada.desc(), 
+                ClienteContacto.created_at.desc()
+            )
             .limit(1)
             .scalar_subquery()
             .label("telefono_contacto")
@@ -123,6 +127,9 @@ class ClientesService:
         """Estadísticas de clientes con desglose por origen."""
         base_filter = Cliente.is_active == True
         
+        from datetime import datetime, timedelta
+        hace_30_dias = datetime.now() - timedelta(days=30)
+        
         # Stats por estado
         stmt = select(
             func.count().label('total'),
@@ -131,7 +138,12 @@ class ClientesService:
             func.sum(case((Cliente.tipo_estado == 'CERRADA', 1), else_=0)).label('cerradas'),
             func.sum(case((Cliente.tipo_estado == 'EN_OPERACION', 1), else_=0)).label('en_operacion'),
             func.sum(case((Cliente.tipo_estado == 'CAIDO', 1), else_=0)).label('caidos'),
-            func.sum(case((Cliente.tipo_estado == 'INACTIVO', 1), else_=0)).label('inactivos')
+            func.sum(case((Cliente.tipo_estado == 'INACTIVO', 1), else_=0)).label('inactivos'),
+            func.sum(case((
+                and_(
+                    Cliente.tipo_estado.in_(['CERRADA', 'EN_OPERACION']),
+                    Cliente.updated_at >= hace_30_dias
+                ), 1), else_=0)).label('nuevos_clientes')
         ).where(base_filter)
         
         if comercial_ids:
@@ -289,6 +301,13 @@ class ClientesService:
             self.db.add(nuevo_cliente)
             await self.db.flush()
             
+            # Si se crea sin RUC (ej. lead convertido manual o prospecto persona natural),
+            # auto-generamos un pseudo-RUC para no romper la vinculación obligatoria
+            # que exige ClienteContacto (ruc = String(11), nullable=False)
+            if not nuevo_cliente.ruc:
+                nuevo_cliente.ruc = f"ID-{nuevo_cliente.id:08d}"
+                await self.db.flush()
+            
             # Registrar evento inicial en historial
             await self._registrar_historial(
                 cliente_id=nuevo_cliente.id,
@@ -321,6 +340,13 @@ class ClientesService:
             # Actualizar solo los campos proporcionados
             update_data = cliente.model_dump(exclude_unset=True)
             for field, value in update_data.items():
+                if field == "ruc" and value != db_cliente.ruc:
+                    # Cascadear el cambio de RUC a todos los contactos para no perder la vinculación
+                    await self.db.execute(
+                        update(ClienteContacto)
+                        .where(ClienteContacto.ruc == db_cliente.ruc)
+                        .values(ruc=value)
+                    )
                 if hasattr(db_cliente, field):
                     setattr(db_cliente, field, value)
             

@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { X, Loader2, UserPlus } from 'lucide-react';
+import { Loader2, UserPlus } from 'lucide-react';
 import { toast } from 'sonner';
+import { ModalBase, ModalHeader, ModalFooter } from '@/components/ui/modal';
 
 import { useLineas } from '@/hooks/organizacion/useLineas';
 import { useEmpleadosParaSelect } from '@/hooks/organizacion/useEmpleado';
@@ -37,28 +38,21 @@ export default function ModalAsignarEmpleado({ isOpen, onClose, linea }: ModalAs
             onClose();
             setEmpleadoId(null);
             setObservaciones('');
-        } catch (error: any) {
-            toast.error(error.response?.data?.detail || 'Error al asignar la línea');
+        } catch (error: unknown) {
+            const err = error as { response?: { data?: { detail?: string } } };
+            toast.error(err?.response?.data?.detail || 'Error al asignar la línea');
         }
     };
 
-    if (!isOpen || !linea) return null;
-
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4">
-                {/* Header */}
-                <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                    <div className="flex items-center gap-2">
-                        <UserPlus className="text-green-600" size={20} />
-                        <h2 className="text-lg font-semibold text-gray-900">Asignar Empleado</h2>
-                    </div>
-                    <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded-lg transition-colors">
-                        <X size={20} className="text-gray-500" />
-                    </button>
-                </div>
+        <ModalBase isOpen={isOpen} onClose={onClose} maxWidth="max-w-md">
+            <ModalHeader
+                icon={<UserPlus size={20} className="text-green-600" />}
+                title="Asignar Empleado"
+            />
 
-                {/* Info */}
+            {/* Info */}
+            {linea && (
                 <div className="p-4 bg-green-50 border-b border-green-100">
                     <p className="text-sm text-green-800">
                         <strong>Línea:</strong> {linea.numero} ({linea.gmail})
@@ -76,69 +70,68 @@ export default function ModalAsignarEmpleado({ isOpen, onClose, linea }: ModalAs
                         </div>
                     )}
                 </div>
+            )}
 
-                {/* Form */}
-                <form onSubmit={handleSubmit} className="p-4 space-y-4">
-                    {!linea.activo_id ? (
-                        <>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Empleado *</label>
-                                <select
-                                    value={empleadoId ?? ''}
-                                    onChange={(e) => setEmpleadoId(e.target.value ? Number(e.target.value) : null)}
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none text-sm"
-                                    required
-                                >
-                                    <option value="">Seleccionar empleado...</option>
-                                    {empleados.map((emp) => (
-                                        <option key={emp.id} value={emp.id}>{emp.nombre_completo}</option>
-                                    ))}
-                                </select>
-                            </div>
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="p-5 space-y-4">
+                {linea && !linea.activo_id ? (
+                    <>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Empleado *</label>
+                            <select
+                                value={empleadoId ?? ''}
+                                onChange={(e) => setEmpleadoId(e.target.value ? Number(e.target.value) : null)}
+                                className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none text-sm"
+                                required
+                            >
+                                <option value="">Seleccionar empleado...</option>
+                                {empleados.map((emp) => (
+                                    <option key={emp.id} value={emp.id}>{emp.nombre_completo}</option>
+                                ))}
+                            </select>
+                        </div>
 
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
-                                <textarea
-                                    value={observaciones}
-                                    onChange={(e) => setObservaciones(e.target.value)}
-                                    rows={2}
-                                    placeholder="Notas adicionales..."
-                                    className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none text-sm resize-none"
-                                />
-                            </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Observaciones</label>
+                            <textarea
+                                value={observaciones}
+                                onChange={(e) => setObservaciones(e.target.value)}
+                                rows={2}
+                                placeholder="Notas adicionales..."
+                                className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:ring-2 focus:ring-green-500 focus:border-transparent outline-none text-sm resize-none"
+                            />
+                        </div>
 
-                            {/* Botones */}
-                            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
-                                <button
-                                    type="button"
-                                    onClick={onClose}
-                                    className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={asignarEmpleadoMutation.isPending || !empleadoId}
-                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50 text-sm font-medium"
-                                >
-                                    {asignarEmpleadoMutation.isPending && <Loader2 size={16} className="animate-spin" />}
-                                    Asignar
-                                </button>
-                            </div>
-                        </>
-                    ) : (
-                        <div className="flex justify-end gap-3 pt-4">
+                        <ModalFooter>
                             <button
                                 type="button"
                                 onClick={onClose}
-                                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+                                className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
                             >
-                                Cerrar
+                                Cancelar
                             </button>
-                        </div>
-                    )}
-                </form>
-            </div>
-        </div>
+                            <button
+                                type="submit"
+                                disabled={asignarEmpleadoMutation.isPending || !empleadoId}
+                                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors disabled:opacity-50 text-sm font-semibold shadow-lg shadow-green-200"
+                            >
+                                {asignarEmpleadoMutation.isPending && <Loader2 size={16} className="animate-spin" />}
+                                Asignar
+                            </button>
+                        </ModalFooter>
+                    </>
+                ) : (
+                    <ModalFooter>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="flex-1 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors"
+                        >
+                            Cerrar
+                        </button>
+                    </ModalFooter>
+                )}
+            </form>
+        </ModalBase>
     );
 }
