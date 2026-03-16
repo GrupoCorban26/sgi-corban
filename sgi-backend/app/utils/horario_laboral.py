@@ -31,12 +31,6 @@ FERIADOS_FIJOS = [
     (12, 25),  # Navidad
 ]
 
-# Feriados variables 2026 (Semana Santa - cambian cada año)
-FERIADOS_VARIABLES_2026 = [
-    date(2026, 4, 9),   # Jueves Santo
-    date(2026, 4, 10),  # Viernes Santo
-]
-
 # Horarios por día de semana (weekday: 0=Lunes ... 6=Domingo)
 HORARIO_LABORAL = {
     0: (time(8, 0), time(18, 0)),  # Lunes
@@ -54,11 +48,39 @@ DIAS_SEMANA = {
 }
 
 
+def _calcular_pascua(year: int) -> date:
+    """Algoritmo de Butcher para calcular la fecha de Domingo de Pascua."""
+    a = year % 19
+    b = year // 100
+    c = year % 100
+    d = b // 4
+    e = b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i = c // 4
+    k = c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    month = (h + l - 7 * m + 114) // 31
+    day = ((h + l - 7 * m + 114) % 31) + 1
+    return date(year, month, day)
+
+
+def feriados_variables(year: int) -> list:
+    """Retorna Jueves y Viernes Santo del año indicado (dinámico)."""
+    pascua = _calcular_pascua(year)
+    return [
+        pascua - timedelta(days=3),  # Jueves Santo
+        pascua - timedelta(days=2),  # Viernes Santo
+    ]
+
+
 def es_feriado(fecha: date) -> bool:
     """Verifica si una fecha es feriado peruano."""
     if (fecha.month, fecha.day) in FERIADOS_FIJOS:
         return True
-    if fecha in FERIADOS_VARIABLES_2026:
+    if fecha in feriados_variables(fecha.year):
         return True
     return False
 

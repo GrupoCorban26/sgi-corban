@@ -1,4 +1,5 @@
-import asyncio
+import logging
+import os
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import and_, func, update
@@ -12,8 +13,7 @@ from app.utils.horario_laboral import calcular_segundos_horario_laboral
 from app.core.query_helpers import aplicar_filtro_comercial
 from datetime import datetime
 
-# Lock global para prevenir condiciones de carrera en el Round Robin
-_round_robin_lock = asyncio.Lock()
+logger = logging.getLogger(__name__)
 
 
 class InboxService:
@@ -29,7 +29,7 @@ class InboxService:
         # 2. Check if already exists in Inbox (PENDIENTE or NUEVO)
         query_inbox = select(Inbox).where(
             and_(
-                Inbox.telefono.like(f"%{phone}%"), 
+                Inbox.telefono == phone, 
                 Inbox.estado.in_(['PENDIENTE', 'NUEVO'])
             )
         ).order_by(Inbox.id.desc())
@@ -47,7 +47,7 @@ class InboxService:
 
         # 3. Check if exists in Clientes or ClienteContactos
         # Buscar en Contactos primero
-        query_contacto = select(ClienteContacto).where(and_(ClienteContacto.telefono.like(f"%{phone}%"), ClienteContacto.is_active == True))
+        query_contacto = select(ClienteContacto).where(and_(ClienteContacto.telefono == phone, ClienteContacto.is_active == True))
         result_contacto = await self.db.execute(query_contacto)
         contacto = result_contacto.scalars().first()
 
@@ -73,84 +73,76 @@ class InboxService:
 
         if not assigned_user:
             # 4. New Lead or Unassigned Client: Assign via Round-Robin
-            # Lock para prevenir que dos clientes concurrentes obtengan el mismo comercial
-            async with _round_robin_lock:
-                # Obtener todos los comerciales activos
-                query_users = select(Usuario).join(Usuario.roles).where(
-                    and_(
-                        Rol.nombre == 'COMERCIAL',
-                        Usuario.is_active == True
-                    )
-                ).options(selectinload(Usuario.empleado))
-                
-                result_users = await self.db.execute(query_users)
-                all_commercials = result_users.scalars().all()
-                
-                if not all_commercials:
-                    raise Exception("No active commercials found")
-                
-                # Filtrar comerciales por JEFE_COMERCIAL si está configurado en .env
-                import os
-                bot_jefe_id_str = os.getenv("BOT_JEFE_COMERCIAL_ID")
-                if bot_jefe_id_str:
-                    try:
-                        jefe_id_val = int(bot_jefe_id_str)
-                        # Filtrar dejando רק a los comerciales cuyo jefe_id en su Empleado coincida
-                        filtered_commercials = [c for c in all_commercials if c.empleado and c.empleado.jefe_id == jefe_id_val]
-                        
-                        if filtered_commercials:
-                            all_commercials = filtered_commercials
-                        else:
-                            import logging
-                            logging.getLogger(__name__).warning(
-                                f"No se encontraron comerciales activos bajo el jefe_id={jefe_id_val}. Fallback a todos los comerciales."
-                            )
-                    except ValueError:
-                        pass
-                
-                # Filtrar solo los disponibles en buzón
-                disponibles = [c for c in all_commercials if c.disponible_buzon]
-                
-                # Fallback: si nadie está disponible, asignar al que tenga menos leads pendientes
-                if not disponibles:
-                    import logging
-                    logging.getLogger(__name__).warning(
-                        "No hay comerciales disponibles en buzón. Usando fallback: comercial con menos leads."
-                    )
-                    # Contar leads pendientes por comercial
-                    counts = {}
-                    for c in all_commercials:
-                        count_query = select(func.count()).select_from(Inbox).where(
-                            and_(Inbox.asignado_a == c.id, Inbox.estado == 'PENDIENTE')
-                        )
-                        result_count = await self.db.execute(count_query)
-                        counts[c.id] = result_count.scalar() or 0
+            # FIX 4: Lock de BD en vez de asyncio.Lock (funciona con --workers N)
+            # Obtenemos todos los comerciales activos primero
+            query_users = select(Usuario).join(Usuario.roles).where(
+                and_(
+                    Rol.nombre == 'COMERCIAL',
+                    Usuario.is_active == True
+                )
+            ).options(selectinload(Usuario.empleado))
+            
+            result_users = await self.db.execute(query_users)
+            all_commercials = result_users.scalars().all()
+            
+            if not all_commercials:
+                raise Exception("No active commercials found")
+            
+            # Filtrar comerciales por JEFE_COMERCIAL si está configurado en .env
+            bot_jefe_id_str = os.getenv("BOT_JEFE_COMERCIAL_ID")
+            if bot_jefe_id_str:
+                try:
+                    jefe_id_val = int(bot_jefe_id_str)
+                    filtered_commercials = [c for c in all_commercials if c.empleado and c.empleado.jefe_id == jefe_id_val]
                     
-                    # Ordenar por menor cantidad de leads pendientes
-                    all_commercials_sorted = sorted(all_commercials, key=lambda c: counts[c.id])
-                    assigned_user = all_commercials_sorted[0]
-                else:
-                    # Round-Robin normal entre los disponibles
-                    commercials_sorted = sorted(disponibles, key=lambda u: u.id)
-                    
-                    # Get the most recently assigned lead (must have an assignee)
-                    last_assigned_query = select(Inbox).where(
-                        Inbox.asignado_a.isnot(None)
-                    ).order_by(Inbox.id.desc()).limit(1)
-                    last_result = await self.db.execute(last_assigned_query)
-                    last_lead = last_result.scalar_one_or_none()
-                    
-                    if last_lead and last_lead.asignado_a:
-                        # Find the index of the last assigned commercial
-                        commercial_ids = [c.id for c in commercials_sorted]
-                        if last_lead.asignado_a in commercial_ids:
-                            last_index = commercial_ids.index(last_lead.asignado_a)
-                            next_index = (last_index + 1) % len(commercials_sorted)
-                        else:
-                            next_index = 0
-                        assigned_user = commercials_sorted[next_index]
+                    if filtered_commercials:
+                        all_commercials = filtered_commercials
                     else:
-                        assigned_user = commercials_sorted[0]
+                        logger.warning(
+                            f"No se encontraron comerciales activos bajo el jefe_id={jefe_id_val}. Fallback a todos los comerciales."
+                        )
+                except ValueError:
+                    pass
+            
+            # Filtrar solo los disponibles en buzón
+            disponibles = [c for c in all_commercials if c.disponible_buzon]
+            
+            # Fallback: si nadie está disponible, asignar al que tenga menos leads pendientes
+            if not disponibles:
+                logger.warning(
+                    "No hay comerciales disponibles en buzón. Usando fallback: comercial con menos leads."
+                )
+                counts = {}
+                for c in all_commercials:
+                    count_query = select(func.count()).select_from(Inbox).where(
+                        and_(Inbox.asignado_a == c.id, Inbox.estado == 'PENDIENTE')
+                    )
+                    result_count = await self.db.execute(count_query)
+                    counts[c.id] = result_count.scalar() or 0
+                
+                all_commercials_sorted = sorted(all_commercials, key=lambda c: counts[c.id])
+                assigned_user = all_commercials_sorted[0]
+            else:
+                # Round-Robin con lock de BD (with_for_update bloquea la fila)
+                commercials_sorted = sorted(disponibles, key=lambda u: u.id)
+                
+                # Lock de BD: SELECT ... FOR UPDATE sobre el último lead asignado
+                last_assigned_query = select(Inbox).where(
+                    Inbox.asignado_a.isnot(None)
+                ).order_by(Inbox.id.desc()).limit(1).with_for_update()
+                last_result = await self.db.execute(last_assigned_query)
+                last_lead = last_result.scalar_one_or_none()
+                
+                if last_lead and last_lead.asignado_a:
+                    commercial_ids = [c.id for c in commercials_sorted]
+                    if last_lead.asignado_a in commercial_ids:
+                        last_index = commercial_ids.index(last_lead.asignado_a)
+                        next_index = (last_index + 1) % len(commercials_sorted)
+                    else:
+                        next_index = 0
+                    assigned_user = commercials_sorted[next_index]
+                else:
+                    assigned_user = commercials_sorted[0]
         
         # 5. Create or Update Inbox Entry
         if existing_inbox and existing_inbox.estado == 'NUEVO':
@@ -425,7 +417,7 @@ class InboxService:
         
         # Limpiar sesiones del bot para este teléfono
         query_sessions = select(ConversationSession).where(
-            ConversationSession.telefono.like(f"%{lead.telefono}%")
+            ConversationSession.telefono == lead.telefono
         )
         result_sessions = await self.db.execute(query_sessions)
         for session in result_sessions.scalars().all():

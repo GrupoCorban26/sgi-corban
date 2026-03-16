@@ -25,6 +25,7 @@ const ESTADO_COLORS: Record<string, string> = {
     'EN_NEGOCIACION': 'bg-amber-100 text-amber-700',
     'CERRADA': 'bg-green-100 text-green-700',
     'EN_OPERACION': 'bg-indigo-100 text-indigo-700',
+    'CARGA_ENTREGADA': 'bg-emerald-100 text-emerald-700',
     'CAIDO': 'bg-red-100 text-red-700',
     'INACTIVO': 'bg-gray-100 text-gray-500',
 };
@@ -34,6 +35,7 @@ const ESTADO_LABELS: Record<string, string> = {
     'EN_NEGOCIACION': 'En negociación',
     'CERRADA': 'Cerrada',
     'EN_OPERACION': 'En operación',
+    'CARGA_ENTREGADA': 'Carga entregada',
     'CAIDO': 'Caído',
     'INACTIVO': 'Inactivo',
 };
@@ -184,6 +186,7 @@ export default function CarteraGlobalPage() {
                             <option value="EN_NEGOCIACION">En Negociación</option>
                             <option value="CERRADA">Cerradas</option>
                             <option value="EN_OPERACION">En Operación</option>
+                            <option value="CARGA_ENTREGADA">Carga Entregada</option>
                             <option value="CAIDO">Caídos</option>
                             <option value="INACTIVO">Inactivos</option>
                         </select>

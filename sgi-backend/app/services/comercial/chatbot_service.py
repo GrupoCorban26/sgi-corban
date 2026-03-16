@@ -141,7 +141,7 @@ class ChatbotService:
                 # Verificar si tiene un lead activo con asesor asignado
                 query_inbox_activo = select(Inbox).where(
                     and_(
-                        Inbox.telefono.like(f"%{phone}%"),
+                        Inbox.telefono == phone,
                         Inbox.estado.in_(['PENDIENTE', 'EN_GESTION'])
                     )
                 ).order_by(Inbox.id.desc())
@@ -242,7 +242,7 @@ class ChatbotService:
     async def _handle_asesor(self, session, data, phone, tipo_interes="ASESORIA", mensaje_contexto=None):
         """Verifica si el cliente ya tiene un lead/comercial asignado, si no, asigna uno por Round Robin."""
         query_inbox = select(Inbox).where(
-            and_(Inbox.telefono.like(f"%{phone}%"), Inbox.estado == 'PENDIENTE')
+            and_(Inbox.telefono == phone, Inbox.estado == 'PENDIENTE')
         ).order_by(Inbox.id.desc())
         result = await self.db.execute(query_inbox)
         lead_reciente = result.scalars().first()
@@ -953,7 +953,7 @@ class ChatbotService:
     async def _get_active_session(self, phone: str):
         query = select(ConversationSession).where(
             and_(
-                ConversationSession.telefono.like(f"%{phone}%"),
+                ConversationSession.telefono == phone,
                 or_(
                     ConversationSession.expires_at.is_(None),
                     ConversationSession.expires_at > datetime.now()
@@ -967,7 +967,7 @@ class ChatbotService:
         """Find an expired session for this phone (for timeout notification)."""
         query = select(ConversationSession).where(
             and_(
-                ConversationSession.telefono.like(f"%{phone}%"),
+                ConversationSession.telefono == phone,
                 ConversationSession.expires_at <= datetime.now()
             )
         )
@@ -986,6 +986,13 @@ class ChatbotService:
             logger.warning(f"Error limpiando sesiones expiradas: {e}")
 
     async def _create_session(self, phone: str, estado: str, datos: dict = None):
+        # FIX 5: Eliminar sesiones previas para este teléfono (evita duplicados)
+        existing = await self.db.execute(
+            select(ConversationSession).where(ConversationSession.telefono == phone)
+        )
+        for old_session in existing.scalars().all():
+            await self.db.delete(old_session)
+
         session = ConversationSession(
             telefono=phone,
             estado=estado,

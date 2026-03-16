@@ -18,8 +18,9 @@ TRANSICIONES_VALIDAS: dict[str, list[str]] = {
     "PROSPECTO":          ["EN_NEGOCIACION", "CAIDO", "INACTIVO"],
     "EN_NEGOCIACION":     ["CERRADA", "CAIDO", "PROSPECTO"],
     "CERRADA":            ["EN_OPERACION", "CAIDO"],
-    "EN_OPERACION":       ["EN_NEGOCIACION", "CAIDO"],  # Solo al completar servicio
-    "CAIDO":              ["EN_NEGOCIACION", "INACTIVO"],
+    "EN_OPERACION":       ["CARGA_ENTREGADA"],  # No se cae, solo avanza
+    "CARGA_ENTREGADA":    ["PROSPECTO", "EN_NEGOCIACION"],  # Reinicia ciclo
+    "CAIDO":              ["PROSPECTO", "INACTIVO"],
     "INACTIVO":           ["PROSPECTO"],
 }
 
@@ -137,11 +138,12 @@ class ClientesService:
             func.sum(case((Cliente.tipo_estado == 'EN_NEGOCIACION', 1), else_=0)).label('en_negociacion'),
             func.sum(case((Cliente.tipo_estado == 'CERRADA', 1), else_=0)).label('cerradas'),
             func.sum(case((Cliente.tipo_estado == 'EN_OPERACION', 1), else_=0)).label('en_operacion'),
+            func.sum(case((Cliente.tipo_estado == 'CARGA_ENTREGADA', 1), else_=0)).label('carga_entregada'),
             func.sum(case((Cliente.tipo_estado == 'CAIDO', 1), else_=0)).label('caidos'),
             func.sum(case((Cliente.tipo_estado == 'INACTIVO', 1), else_=0)).label('inactivos'),
             func.sum(case((
                 and_(
-                    Cliente.tipo_estado.in_(['CERRADA', 'EN_OPERACION']),
+                    Cliente.tipo_estado.in_(['CERRADA', 'EN_OPERACION', 'CARGA_ENTREGADA']),
                     Cliente.updated_at >= hace_30_dias
                 ), 1), else_=0)).label('nuevos_clientes')
         ).where(base_filter)
@@ -155,7 +157,7 @@ class ClientesService:
         stmt_origen = select(
             Cliente.origen,
             func.count().label('total'),
-            func.sum(case((Cliente.tipo_estado.in_(['CERRADA', 'EN_OPERACION']), 1), else_=0)).label('convertidos')
+            func.sum(case((Cliente.tipo_estado.in_(['CERRADA', 'EN_OPERACION', 'CARGA_ENTREGADA']), 1), else_=0)).label('convertidos')
         ).where(base_filter).group_by(Cliente.origen)
         
         if comercial_ids:
@@ -179,8 +181,10 @@ class ClientesService:
             "en_negociacion": row.en_negociacion or 0,
             "cerradas": row.cerradas or 0,
             "en_operacion": row.en_operacion or 0,
+            "carga_entregada": row.carga_entregada or 0,
             "caidos": row.caidos or 0,
             "inactivos": row.inactivos or 0,
+            "nuevos_clientes": row.nuevos_clientes or 0,
             "por_origen": origenes
         }
 

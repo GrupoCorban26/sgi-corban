@@ -10,7 +10,7 @@ OrigenCliente = Literal[
 ]
 
 EstadoCliente = Literal[
-    "PROSPECTO", "EN_NEGOCIACION", "CERRADA", "EN_OPERACION", "CAIDO", "INACTIVO"
+    "PROSPECTO", "EN_NEGOCIACION", "CERRADA", "EN_OPERACION", "CARGA_ENTREGADA", "CAIDO", "INACTIVO"
 ]
 
 

@@ -61,7 +61,7 @@ class Cliente(Base):
     fecha_caida = Column(Date, nullable=True)
     fecha_seguimiento_caida = Column(Date, nullable=True)
     
-    tipo_estado = Column(String(20), default="PROSPECTO", nullable=False)
+    tipo_estado = Column(String(30), default="PROSPECTO", nullable=False)
     origen = Column(String(50))  # BASE_DATOS, PUBLICIDAD_META, CARTERA_PROPIA, WHATSAPP, REFERIDO, OTRO
     sub_origen = Column(String(100), nullable=True)  # Detalle adicional (ej. nombre de campaña Meta)
     inbox_origen_id = Column(Integer, ForeignKey("comercial.inbox.id"), nullable=True)  # Lead de WhatsApp que originó este cliente

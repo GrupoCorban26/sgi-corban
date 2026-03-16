@@ -1,35 +1,32 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Search,
   Plus,
   Building2,
   Users,
   UserCheck,
-  UserX,
+  UserMinus,
   Edit2,
-  Trash2,
   Loader2,
   AlertCircle,
   ChevronLeft,
   ChevronRight,
   Filter,
-  ArrowRight,
-  History,
-  Archive,
-  UserMinus,
   Phone,
   Truck,
-  UserPlus
+  UserPlus,
+  ClipboardList,
+  MoreHorizontal,
+  Archive,
+  PackageCheck
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useClientes, useClientesStats } from '@/hooks/comercial/useClientes';
-import { Cliente, ClienteMarcarCaido } from '@/types/cliente';
+import { Cliente } from '@/types/cliente';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
 import ModalCliente from './components/modal-cliente';
-import ModalContactosCliente from './components/modal-contactos-cliente';
-import ModalMarcarCaido from './components/modal-marcar-perdido';
 import ModalRegistrarGestion from './components/ModalRegistrarGestion';
 
 const ESTADO_COLORS: Record<string, string> = {
@@ -37,6 +34,7 @@ const ESTADO_COLORS: Record<string, string> = {
   'EN_NEGOCIACION': 'bg-amber-100 text-amber-700',
   'CERRADA': 'bg-green-100 text-green-700',
   'EN_OPERACION': 'bg-indigo-100 text-indigo-700',
+  'CARGA_ENTREGADA': 'bg-emerald-100 text-emerald-700',
   'CAIDO': 'bg-red-100 text-red-700',
   'INACTIVO': 'bg-gray-100 text-gray-500',
 };
@@ -46,6 +44,7 @@ const ESTADO_LABELS: Record<string, string> = {
   'EN_NEGOCIACION': 'En negociación',
   'CERRADA': 'Cerrada',
   'EN_OPERACION': 'En operación',
+  'CARGA_ENTREGADA': 'Carga entregada',
   'CAIDO': 'Caído',
   'INACTIVO': 'Inactivo',
 };
@@ -77,6 +76,54 @@ const formatDate = (dateStr: string | null) => {
   });
 };
 
+// Componente de menú contextual
+function ActionMenu({ cliente, onEdit, onArchive }: {
+  cliente: Cliente;
+  onEdit: () => void;
+  onArchive: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    if (open) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={menuRef}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="p-2 hover:bg-gray-100 text-gray-500 rounded-lg transition-colors cursor-pointer"
+        title="Más opciones"
+      >
+        <MoreHorizontal size={16} />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1 min-w-[140px]">
+          <button
+            onClick={() => { onEdit(); setOpen(false); }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
+          >
+            <Edit2 size={14} /> Editar
+          </button>
+          <button
+            onClick={() => { onArchive(); setOpen(false); }}
+            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 cursor-pointer"
+          >
+            <Archive size={14} /> Archivar
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function CarteraPage() {
   const [busqueda, setBusqueda] = useState('');
   const [tipoEstado, setTipoEstado] = useState<string | null>(null);
@@ -89,19 +136,12 @@ export default function CarteraPage() {
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [clienteToDelete, setClienteToDelete] = useState<Cliente | null>(null);
 
-  // Modal Perdido
-  const [isPerdidoModalOpen, setIsPerdidoModalOpen] = useState(false);
-  const [clienteToMarkLost, setClienteToMarkLost] = useState<Cliente | null>(null);
-
-  // Modal de contactos
-  const [isContactosModalOpen, setIsContactosModalOpen] = useState(false);
-  const [contactosRuc, setContactosRuc] = useState('');
-  const [contactosRazonSocial, setContactosRazonSocial] = useState('');
-
   // Modal de gestión
   const [isGestionModalOpen, setIsGestionModalOpen] = useState(false);
   const [gestionClienteId, setGestionClienteId] = useState<number | null>(null);
   const [gestionClienteNombre, setGestionClienteNombre] = useState('');
+  const [gestionClienteRuc, setGestionClienteRuc] = useState('');
+  const [gestionClienteRazonSocial, setGestionClienteRazonSocial] = useState('');
   const [gestionEstadoActual, setGestionEstadoActual] = useState('');
 
   // Data
@@ -113,10 +153,6 @@ export default function CarteraPage() {
     isError,
     isFetching,
     deleteMutation,
-    cambiarEstadoMutation,
-    marcarCaidoMutation,
-    reactivarMutation,
-    archivarMutation
   } = useClientes(busqueda, tipoEstado, null, page, pageSize);
 
   const { data: stats } = useClientesStats();
@@ -137,12 +173,6 @@ export default function CarteraPage() {
     setIsModalOpen(true);
   };
 
-  const handleClienteCreado = (ruc: string, razonSocial: string) => {
-    setContactosRuc(ruc);
-    setContactosRazonSocial(razonSocial);
-    setIsContactosModalOpen(true);
-  };
-
   const handleOpenDelete = (cliente: Cliente) => {
     setClienteToDelete(cliente);
     setIsConfirmOpen(true);
@@ -160,39 +190,13 @@ export default function CarteraPage() {
     }
   };
 
-  const handleCambiarEstado = async (cliente: Cliente, nuevoEstado: string) => {
-    try {
-      await cambiarEstadoMutation.mutateAsync({ id: cliente.id, nuevoEstado });
-      toast.success(`Estado actualizado a ${nuevoEstado}`);
-    } catch {
-      toast.error('Error al actualizar estado');
-    }
-  };
-
-  const handleReactivar = async (cliente: Cliente) => {
-    try {
-      await reactivarMutation.mutateAsync(cliente.id);
-      toast.success('Cliente reactivado a Prospecto');
-    } catch {
-      toast.error('Error al reactivar cliente');
-    }
-  };
-
-  const handleOpenMarcarCaido = (cliente: Cliente) => {
-    setClienteToMarkLost(cliente);
-    setIsPerdidoModalOpen(true);
-  };
-
-  const handleConfirmMarcarCaido = async (data: ClienteMarcarCaido) => {
-    if (!clienteToMarkLost) return;
-    try {
-      await marcarCaidoMutation.mutateAsync({ id: clienteToMarkLost.id, data });
-      toast.success('Cliente marcado como caído');
-    } catch (error: unknown) {
-      const axiosErr = error as { response?: { data?: { detail?: string } } };
-      const message = axiosErr?.response?.data?.detail || 'Error al marcar como caído';
-      toast.error(message);
-    }
+  const handleOpenGestion = (cliente: Cliente) => {
+    setGestionClienteId(cliente.id);
+    setGestionClienteNombre(cliente.razon_social);
+    setGestionClienteRuc(cliente.ruc || '');
+    setGestionClienteRazonSocial(cliente.razon_social || '');
+    setGestionEstadoActual(cliente.tipo_estado);
+    setIsGestionModalOpen(true);
   };
 
   return (
@@ -213,48 +217,55 @@ export default function CarteraPage() {
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-4 rounded-xl text-white shadow-lg shadow-indigo-200">
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+          <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-3.5 rounded-xl text-white shadow-lg shadow-indigo-200">
             <div className="flex items-center gap-2 mb-1">
-              <Truck className="w-5 h-5 opacity-80" />
-              <span className="text-sm opacity-80">Seguimiento de carga</span>
+              <Truck className="w-4 h-4 opacity-80" />
+              <span className="text-xs opacity-80">En operación</span>
             </div>
-            <span className="text-2xl font-bold">{(stats.en_operacion ?? 0).toLocaleString()}</span>
+            <span className="text-xl font-bold">{(stats.en_operacion ?? 0).toLocaleString()}</span>
           </div>
-          <div className="bg-gradient-to-br from-green-500 to-green-600 p-4 rounded-xl text-white shadow-lg shadow-green-200">
+          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-3.5 rounded-xl text-white shadow-lg shadow-emerald-200">
             <div className="flex items-center gap-2 mb-1">
-              <UserCheck className="w-5 h-5 opacity-80" />
-              <span className="text-sm opacity-80">Cerradas</span>
+              <PackageCheck className="w-4 h-4 opacity-80" />
+              <span className="text-xs opacity-80">Carga entregada</span>
             </div>
-            <span className="text-2xl font-bold">{(stats.cerradas ?? 0).toLocaleString()}</span>
+            <span className="text-xl font-bold">{(stats.carga_entregada ?? 0).toLocaleString()}</span>
           </div>
-          <div className="bg-gradient-to-br from-teal-500 to-teal-600 p-4 rounded-xl text-white shadow-lg shadow-teal-200">
+          <div className="bg-gradient-to-br from-green-500 to-green-600 p-3.5 rounded-xl text-white shadow-lg shadow-green-200">
             <div className="flex items-center gap-2 mb-1">
-              <UserPlus className="w-5 h-5 opacity-80" />
-              <span className="text-sm opacity-80">Nuevos clientes</span>
+              <UserCheck className="w-4 h-4 opacity-80" />
+              <span className="text-xs opacity-80">Cerradas</span>
             </div>
-            <span className="text-2xl font-bold">{(stats.nuevos_clientes ?? 0).toLocaleString()}</span>
+            <span className="text-xl font-bold">{(stats.cerradas ?? 0).toLocaleString()}</span>
           </div>
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-4 rounded-xl text-white shadow-lg shadow-blue-200">
+          <div className="bg-gradient-to-br from-teal-500 to-teal-600 p-3.5 rounded-xl text-white shadow-lg shadow-teal-200">
             <div className="flex items-center gap-2 mb-1">
-              <Building2 className="w-5 h-5 opacity-80" />
-              <span className="text-sm opacity-80">Total cartera</span>
+              <UserPlus className="w-4 h-4 opacity-80" />
+              <span className="text-xs opacity-80">Nuevos clientes</span>
             </div>
-            <span className="text-2xl font-bold">{(stats.total ?? 0).toLocaleString()}</span>
+            <span className="text-xl font-bold">{(stats.nuevos_clientes ?? 0).toLocaleString()}</span>
           </div>
-          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 p-4 rounded-xl text-white shadow-lg shadow-yellow-200">
+          <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3.5 rounded-xl text-white shadow-lg shadow-blue-200">
             <div className="flex items-center gap-2 mb-1">
-              <Users className="w-5 h-5 opacity-80" />
-              <span className="text-sm opacity-80">Prospectos</span>
+              <Building2 className="w-4 h-4 opacity-80" />
+              <span className="text-xs opacity-80">Total cartera</span>
             </div>
-            <span className="text-2xl font-bold">{(stats.prospectos ?? 0).toLocaleString()}</span>
+            <span className="text-xl font-bold">{(stats.total ?? 0).toLocaleString()}</span>
           </div>
-          <div className="bg-gradient-to-br from-red-500 to-red-600 p-4 rounded-xl text-white shadow-lg shadow-red-200">
+          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 p-3.5 rounded-xl text-white shadow-lg shadow-yellow-200">
             <div className="flex items-center gap-2 mb-1">
-              <UserMinus className="w-5 h-5 opacity-80" />
-              <span className="text-sm opacity-80">Caídos</span>
+              <Users className="w-4 h-4 opacity-80" />
+              <span className="text-xs opacity-80">Prospectos</span>
             </div>
-            <span className="text-2xl font-bold">{(stats.caidos ?? 0).toLocaleString()}</span>
+            <span className="text-xl font-bold">{(stats.prospectos ?? 0).toLocaleString()}</span>
+          </div>
+          <div className="bg-gradient-to-br from-red-500 to-red-600 p-3.5 rounded-xl text-white shadow-lg shadow-red-200">
+            <div className="flex items-center gap-2 mb-1">
+              <UserMinus className="w-4 h-4 opacity-80" />
+              <span className="text-xs opacity-80">Caídos</span>
+            </div>
+            <span className="text-xl font-bold">{(stats.caidos ?? 0).toLocaleString()}</span>
           </div>
         </div>
       )}
@@ -286,6 +297,7 @@ export default function CarteraPage() {
               <option value="EN_NEGOCIACION">En Negociación</option>
               <option value="CERRADA">Cerradas</option>
               <option value="EN_OPERACION">En Operación</option>
+              <option value="CARGA_ENTREGADA">Carga Entregada</option>
               <option value="CAIDO">Caídos</option>
               <option value="INACTIVO">Inactivos</option>
             </select>
@@ -370,96 +382,21 @@ export default function CarteraPage() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {/* Acciones Pipeline */}
-                        {cliente.tipo_estado === 'PROSPECTO' && (
-                          <button
-                            onClick={() => handleCambiarEstado(cliente, 'EN_NEGOCIACION')}
-                            className="p-2 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-colors cursor-pointer"
-                            title="Avanzar a Negociación"
-                          >
-                            <ArrowRight size={16} />
-                          </button>
-                        )}
-
-                        {cliente.tipo_estado === 'EN_NEGOCIACION' && (
-                          <>
-                            <button
-                              onClick={() => handleCambiarEstado(cliente, 'CERRADA')}
-                              className="p-2 hover:bg-green-100 text-green-600 rounded-lg transition-colors cursor-pointer"
-                              title="Cerrar Venta"
-                            >
-                              <UserCheck size={16} />
-                            </button>
-                            <button
-                              onClick={() => handleOpenMarcarCaido(cliente)}
-                              className="p-2 hover:bg-red-100 text-red-600 rounded-lg transition-colors cursor-pointer"
-                              title="Marcar Caído"
-                            >
-                              <UserMinus size={16} />
-                            </button>
-                          </>
-                        )}
-
-                        {cliente.tipo_estado === 'CERRADA' && (
-                          <button
-                            onClick={() => handleCambiarEstado(cliente, 'EN_OPERACION')}
-                            className="p-2 hover:bg-emerald-100 text-emerald-600 rounded-lg transition-colors cursor-pointer"
-                            title="Marcar Carga Entregada"
-                          >
-                            <UserCheck size={16} />
-                          </button>
-                        )}
-
-                        {cliente.tipo_estado === 'CAIDO' && (
-                          <button
-                            onClick={() => handleReactivar(cliente)}
-                            className="p-2 hover:bg-yellow-100 text-yellow-600 rounded-lg transition-colors cursor-pointer"
-                            title="Reactivar Prospecto"
-                          >
-                            <History size={16} />
-                          </button>
-                        )}
-
-                        {/* Edición Genérica */}
+                        {/* Acción principal: Registrar Gestión */}
                         <button
-                          onClick={() => {
-                            setGestionClienteId(cliente.id);
-                            setGestionClienteNombre(cliente.razon_social);
-                            setGestionEstadoActual(cliente.tipo_estado);
-                            setIsGestionModalOpen(true);
-                          }}
-                          className="p-2 hover:bg-emerald-100 text-emerald-600 rounded-lg transition-colors cursor-pointer"
+                          onClick={() => handleOpenGestion(cliente)}
+                          className="p-2 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors cursor-pointer"
                           title="Registrar Gestión"
                         >
-                          <Phone size={16} />
-                        </button>
-                        <button
-                          onClick={() => {
-                            setContactosRuc(cliente.ruc || '');
-                            setContactosRazonSocial(cliente.razon_social || '');
-                            setIsContactosModalOpen(true);
-                          }}
-                          className="p-2 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-colors cursor-pointer"
-                          title="Gestionar Contactos"
-                        >
-                          <Users size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleOpenEdit(cliente)}
-                          className="p-2 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors cursor-pointer"
-                          title="Editar"
-                        >
-                          <Edit2 size={16} />
+                          <ClipboardList size={16} />
                         </button>
 
-                        {/* Archivar / Eliminar */}
-                        <button
-                          onClick={() => handleOpenDelete(cliente)}
-                          className="p-2 hover:bg-gray-100 text-gray-600 rounded-lg transition-colors cursor-pointer"
-                          title="Archivar"
-                        >
-                          <Archive size={16} />
-                        </button>
+                        {/* Menú contextual: Editar + Archivar */}
+                        <ActionMenu
+                          cliente={cliente}
+                          onEdit={() => handleOpenEdit(cliente)}
+                          onArchive={() => handleOpenDelete(cliente)}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -503,22 +440,6 @@ export default function CarteraPage() {
         isOpen={isModalOpen}
         onClose={() => { setIsModalOpen(false); setClienteToEdit(null); }}
         clienteToEdit={clienteToEdit}
-        onClienteCreado={handleClienteCreado}
-      />
-
-      <ModalContactosCliente
-        isOpen={isContactosModalOpen}
-        onClose={() => { setIsContactosModalOpen(false); setContactosRuc(''); setContactosRazonSocial(''); }}
-        ruc={contactosRuc}
-        razonSocial={contactosRazonSocial}
-      />
-
-      <ModalMarcarCaido
-        isOpen={isPerdidoModalOpen}
-        onClose={() => { setIsPerdidoModalOpen(false); setClienteToMarkLost(null); }}
-        onConfirm={handleConfirmMarcarCaido}
-        isLoading={marcarCaidoMutation.isPending}
-        clienteNombre={clienteToMarkLost?.razon_social || ''}
       />
 
       <ConfirmModal
@@ -536,6 +457,8 @@ export default function CarteraPage() {
         <ModalRegistrarGestion
           clienteId={gestionClienteId}
           clienteNombre={gestionClienteNombre}
+          clienteRuc={gestionClienteRuc}
+          clienteRazonSocial={gestionClienteRazonSocial}
           estadoActual={gestionEstadoActual}
           isOpen={isGestionModalOpen}
           onClose={() => { setIsGestionModalOpen(false); setGestionClienteId(null); }}

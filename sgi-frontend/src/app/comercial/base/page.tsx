@@ -242,11 +242,11 @@ export default function BaseComercialPage() {
             <p className="text-sm">Haz clic en &quot;Cargar Base&quot; para obtener 50 contactos</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
+          <div className="overflow-auto max-h-[calc(100vh-280px)] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar-track]:bg-gray-50 [&::-webkit-scrollbar-track]:rounded-lg [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-lg hover:[&::-webkit-scrollbar-thumb]:bg-gray-400">
+            <table className="w-full text-sm relative">
+              <thead className="bg-gray-50 border-b sticky top-0 z-20 shadow-sm">
                 <tr className="text-gray-600 text-xs uppercase">
-                  <th className="px-4 py-3 text-left font-semibold">RUC</th>
+                  <th className="px-4 py-3 text-left font-semibold whitespace-nowrap">RUC</th>
                   <th className="px-4 py-3 text-left font-semibold">Razón Social</th>
                   <th className="px-4 py-3 text-left font-semibold">Teléfono</th>
                   <th className="px-4 py-3 text-left font-semibold">Correo</th>
@@ -291,16 +291,10 @@ export default function BaseComercialPage() {
                         </button>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2 text-gray-600">
-                          <Phone size={14} className="text-indigo-400" />
-                          <span className="text-xs">{contacto.telefono}</span>
-                        </div>
+                        <span className="text-xs text-gray-700">{contacto.telefono || '-'}</span>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2 text-gray-500">
-                          <Mail size={14} className="text-indigo-400" />
-                          <span className="text-xs truncate max-w-[140px]">{contacto.correo || '-'}</span>
-                        </div>
+                        <span className="text-xs text-gray-700 truncate max-w-[140px] block" title={contacto.correo || ''}>{contacto.correo || '-'}</span>
                       </td>
                       {/* CONTESTÓ - Dropdown moderno siempre visible */}
                       <td className="px-3 py-2">
