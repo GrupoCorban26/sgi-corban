@@ -42,9 +42,9 @@ class ClientesService:
         """Lista clientes con paginación y filtros. Filtra por lista de IDs (usuario o empleado)."""
         offset = (page - 1) * page_size
         
-        # Subquery para obtener el teléfono y correo del contacto principal asociado al cliente
-        subq_contacto = (
-            select(ClienteContacto.telefono, ClienteContacto.correo)
+        # Subqueries for telefono and correo using correlate to evaluate per-row
+        subq_telefono = (
+            select(ClienteContacto.telefono)
             .where(ClienteContacto.ruc == Cliente.ruc)
             .order_by(
                 ClienteContacto.is_principal.desc(), 
@@ -52,15 +52,43 @@ class ClientesService:
                 ClienteContacto.created_at.desc()
             )
             .limit(1)
-            .subquery()
+            .correlate(Cliente)
+            .scalar_subquery()
+        )
+        
+        subq_correo = (
+            select(ClienteContacto.correo)
+            .where(ClienteContacto.ruc == Cliente.ruc)
+            .order_by(
+                ClienteContacto.is_principal.desc(), 
+                ClienteContacto.fecha_llamada.desc(), 
+                ClienteContacto.created_at.desc()
+            )
+            .limit(1)
+            .correlate(Cliente)
+            .scalar_subquery()
+        )
+        
+        subq_nombre_contacto = (
+            select(ClienteContacto.nombre)
+            .where(ClienteContacto.ruc == Cliente.ruc)
+            .order_by(
+                ClienteContacto.is_principal.desc(), 
+                ClienteContacto.fecha_llamada.desc(), 
+                ClienteContacto.created_at.desc()
+            )
+            .limit(1)
+            .correlate(Cliente)
+            .scalar_subquery()
         )
 
         stmt = select(
             Cliente,
             Area.nombre.label("area_nombre"),
             func.concat(Empleado.nombres, ' ', Empleado.apellido_paterno).label("comercial_nombre"),
-            subq_contacto.c.telefono.label("telefono_contacto"),
-            subq_contacto.c.correo.label("correo_contacto")
+            subq_telefono.label("telefono_contacto"),
+            subq_correo.label("correo_contacto"),
+            subq_nombre_contacto.label("nombre_contacto")
         ).outerjoin(Area, Cliente.area_encargada_id == Area.id) \
          .outerjoin(Usuario, Cliente.comercial_encargado_id == Usuario.id) \
          .outerjoin(Empleado, Usuario.empleado_id == Empleado.id) \
@@ -119,6 +147,7 @@ class ClientesService:
                 "comercial_nombre": row[2],
                 "telefono": row[3], # Inyectando el teléfono
                 "correo": row[4], # Inyectando el correo
+                "nombre_contacto": row[5], # Nombre del contacto principal
                 "ultimo_contacto": c.ultimo_contacto,
                 "comentario_ultima_llamada": c.comentario_ultima_llamada,
                 "proxima_fecha_contacto": c.proxima_fecha_contacto,

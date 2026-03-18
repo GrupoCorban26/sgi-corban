@@ -40,7 +40,6 @@ def crear_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
-    # Nota: No necesitamos update individual de 'role' porque ya viene en 'data'
     return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
 # --- DEPENDENCIAS DE SEGURIDAD (LOS GUARDIAS) ---
@@ -51,7 +50,9 @@ async def get_current_active_auth(
 ) -> dict:
     """
     DEPENDENCIA MAESTRA: 
-    Merged login/active session check.
+    1. Decodifica el JWT para obtener identidad (sub, roles, permisos)
+    2. Verifica sesión activa en BD (no revocada, no expirada por inactividad)
+    3. Extiende la sesión (sliding expiration) automáticamente
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -60,7 +61,7 @@ async def get_current_active_auth(
     )
     
     try:
-        # 1. Decodificar (ignorando 'exp' dado que la base de datos gestiona el Sliding Expiration de 30 mins)
+        # 1. Decodificar JWT para obtener identidad
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             logger.debug(f"Token decoded successfully. Sub: {payload.get('sub')}")
@@ -76,18 +77,12 @@ async def get_current_active_auth(
             logger.warning("Token missing 'sub' (user_id)")
             raise credentials_exception
             
-        # 2. Verificar sesión activa en la tabla de base de datos
-        # Esto comprueba Revocación + Inactividad (30 min)
+        # 2. Verificar sesión activa en BD + Extender (una sola operación)
         auth_svc = AuthService(db)
-        is_active = await auth_svc.verificar_sesion_activa(token)
+        is_active = await auth_svc.verificar_y_extender_sesion(token)
         if not is_active:
             logger.warning(f"Session check failed for user {user_id}")
             raise credentials_exception
-            
-        # 3. EXPANSIÓN DE SESIÓN (Sliding Expiration)
-        # Si la sesión es válida, intentamos extenderla
-        # await extender_sesion(db, token) # Comentado temporalmente para aislar el problema si es DB write
-        await auth_svc.extender_sesion(token) 
             
         return payload
 

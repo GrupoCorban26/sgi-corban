@@ -95,3 +95,15 @@ async def logout(
         pass
         
     return {"message": "Sesión cerrada exitosamente"}
+
+@router.get("/ping")
+async def session_ping(
+    _payload: dict = Depends(security.get_current_active_auth)
+):
+    """
+    Endpoint liviano de keep-alive.
+    Al pasar por get_current_active_auth, automáticamente verifica
+    y extiende la sesión en BD (sliding expiration).
+    Retorna 200 si la sesión es válida, 401 si expiró.
+    """
+    return {"status": "ok"}

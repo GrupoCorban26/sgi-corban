@@ -35,6 +35,14 @@ interface ModalContentProps {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
 
+// Enmascarar teléfono: muestra solo los últimos 5 dígitos
+const maskPhone = (phone: string): string => {
+    if (!phone || phone.length <= 5) return phone || '';
+    const visible = phone.slice(-5);
+    const masked = '*'.repeat(phone.length - 5);
+    return masked + visible;
+};
+
 
 
 // ============================================
@@ -124,7 +132,7 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
                 nombre: getFieldValue(contacto, 'nombre') || null,
                 cargo: getFieldValue(contacto, 'cargo') || null,
                 telefono: getFieldValue(contacto, 'telefono'),
-                correo: getFieldValue(contacto, 'correo') || null
+                email: getFieldValue(contacto, 'correo') || null
             };
 
             await api.put(`/contactos/${contacto.id}`, updateData);
@@ -185,7 +193,7 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
                 nombre: newContacto.nombre || null,
                 cargo: newContacto.cargo || null,
                 telefono: newContacto.telefono,
-                correo: newContacto.correo || null
+                email: newContacto.correo || null
             });
 
             toast.success('Contacto agregado');
@@ -260,7 +268,14 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
                                             </td>
                                         </tr>
                                     ) : (
-                                        contactos.map((contacto) => (
+                                        contactos.map((contacto) => {
+                                            // Campos de solo lectura: si el valor original existe, no se puede editar
+                                            const telefonoOriginal = contacto.telefono?.trim();
+                                            const nombreOriginal = contacto.nombre?.trim();
+                                            const cargoOriginal = contacto.cargo?.trim();
+                                            const correoOriginal = (contacto.correo as string)?.trim();
+
+                                            return (
                                             <tr key={contacto.id} className={hasChanges(contacto.id) ? 'bg-yellow-50' : ''}>
                                                 <td className="px-3 py-2 text-center">
                                                     <input
@@ -276,40 +291,56 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
                                                     />
                                                 </td>
                                                 <td className="px-2 py-2">
-                                                    <input
-                                                        type="text"
-                                                        value={getStringField(contacto, 'telefono')}
-                                                        onChange={(e) => handleFieldChange(contacto.id, 'telefono', e.target.value)}
-                                                        className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/50 outline-none"
-                                                        placeholder="Teléfono"
-                                                    />
+                                                    {telefonoOriginal ? (
+                                                        <span className="text-sm text-gray-700 px-2 py-1.5 block">{maskPhone(telefonoOriginal)}</span>
+                                                    ) : (
+                                                        <input
+                                                            type="text"
+                                                            value={getStringField(contacto, 'telefono')}
+                                                            onChange={(e) => handleFieldChange(contacto.id, 'telefono', e.target.value)}
+                                                            className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/50 outline-none"
+                                                            placeholder="Teléfono"
+                                                        />
+                                                    )}
                                                 </td>
                                                 <td className="px-2 py-2">
-                                                    <input
-                                                        type="text"
-                                                        value={getStringField(contacto, 'nombre')}
-                                                        onChange={(e) => handleFieldChange(contacto.id, 'nombre', e.target.value)}
-                                                        className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/50 outline-none"
-                                                        placeholder="Nombre del contacto"
-                                                    />
+                                                    {nombreOriginal ? (
+                                                        <span className="text-sm text-gray-700 px-2 py-1.5 block">{nombreOriginal}</span>
+                                                    ) : (
+                                                        <input
+                                                            type="text"
+                                                            value={getStringField(contacto, 'nombre')}
+                                                            onChange={(e) => handleFieldChange(contacto.id, 'nombre', e.target.value)}
+                                                            className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/50 outline-none"
+                                                            placeholder="Nombre del contacto"
+                                                        />
+                                                    )}
                                                 </td>
                                                 <td className="px-2 py-2">
-                                                    <input
-                                                        type="text"
-                                                        value={getStringField(contacto, 'cargo')}
-                                                        onChange={(e) => handleFieldChange(contacto.id, 'cargo', e.target.value)}
-                                                        className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/50 outline-none"
-                                                        placeholder="Cargo"
-                                                    />
+                                                    {cargoOriginal ? (
+                                                        <span className="text-sm text-gray-700 px-2 py-1.5 block">{cargoOriginal}</span>
+                                                    ) : (
+                                                        <input
+                                                            type="text"
+                                                            value={getStringField(contacto, 'cargo')}
+                                                            onChange={(e) => handleFieldChange(contacto.id, 'cargo', e.target.value)}
+                                                            className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/50 outline-none"
+                                                            placeholder="Cargo"
+                                                        />
+                                                    )}
                                                 </td>
                                                 <td className="px-2 py-2">
-                                                    <input
-                                                        type="email"
-                                                        value={getStringField(contacto, 'correo')}
-                                                        onChange={(e) => handleFieldChange(contacto.id, 'correo', e.target.value)}
-                                                        className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/50 outline-none"
-                                                        placeholder="correo@empresa.com"
-                                                    />
+                                                    {correoOriginal ? (
+                                                        <span className="text-sm text-gray-700 px-2 py-1.5 block">{correoOriginal}</span>
+                                                    ) : (
+                                                        <input
+                                                            type="email"
+                                                            value={getStringField(contacto, 'correo')}
+                                                            onChange={(e) => handleFieldChange(contacto.id, 'correo', e.target.value)}
+                                                            className="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500/50 outline-none"
+                                                            placeholder="correo@empresa.com"
+                                                        />
+                                                    )}
                                                 </td>
                                                 <td className="px-2 py-2 text-center">
                                                     {hasChanges(contacto.id) ? (
@@ -330,7 +361,8 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
                                                     )}
                                                 </td>
                                             </tr>
-                                        ))
+                                            );
+                                        })
                                     )}
 
                                     {/* Nueva fila para agregar */}

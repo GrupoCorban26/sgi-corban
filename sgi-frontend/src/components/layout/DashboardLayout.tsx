@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import NavLateral from '@/components/layout/navLateral';
 import { Header } from '@/components/layout/Header';
 import { Role, MENU_ROLES } from '@/config/navLateral';
+import { useSessionKeepAlive } from '@/hooks/useSessionKeepAlive';
 import Cookies from 'js-cookie';
 import type { UserData } from '@/types/usuario';
 
@@ -49,6 +50,9 @@ function getRoleFromCookie(): Role {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
     const [role, setRole] = useState<Role | null>(null);
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+    // Keep-alive: ping al backend cada 10 min para mantener la sesión activa
+    useSessionKeepAlive(10);
 
     useEffect(() => {
         setRole(getRoleFromCookie());

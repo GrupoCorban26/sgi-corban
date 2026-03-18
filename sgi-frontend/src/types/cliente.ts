@@ -21,6 +21,7 @@ export interface Cliente {
     created_at: string | null;
     telefono?: string | null;
     correo?: string | null;
+    nombre_contacto?: string | null;
 }
 
 export interface ClienteCreate {

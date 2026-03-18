@@ -342,6 +342,7 @@ export default function CarteraPage() {
                 <tr className="text-gray-500 text-[11px] uppercase tracking-wider">
                   <th className="px-6 py-4 font-semibold whitespace-nowrap">RUC</th>
                   <th className="px-6 py-4 font-semibold">Razón Social</th>
+                  <th className="px-6 py-4 font-semibold">Nombre Contacto</th>
                   <th className="px-6 py-4 font-semibold">Teléfono</th>
                   <th className="px-6 py-4 font-semibold">Correo</th>
                   <th className="px-6 py-4 font-semibold">Estado</th>
@@ -362,6 +363,11 @@ export default function CarteraPage() {
                       {cliente.nombre_comercial && (
                         <div className="text-xs text-gray-500">{cliente.nombre_comercial}</div>
                       )}
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-600">
+                        {cliente.nombre_contacto || '-'}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-600">

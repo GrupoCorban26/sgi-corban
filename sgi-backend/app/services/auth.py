@@ -9,6 +9,9 @@ from app.models.administrativo import Empleado, Area, Cargo
 
 logger = logging.getLogger(__name__)
 
+# Tiempo de inactividad permitido (en minutos)
+SESSION_INACTIVITY_MINUTES = 30
+
 
 class AuthService:
     """Servicio de autenticación y gestión de sesiones."""
@@ -98,7 +101,7 @@ class AuthService:
     ):
         """Registra una nueva sesión activa en la base de datos."""
         try:
-            expira = datetime.now(timezone.utc) + timedelta(minutes=30)
+            expira = datetime.now(timezone.utc) + timedelta(minutes=SESSION_INACTIVITY_MINUTES)
             token_hash = self._hash_token(token)
 
             nueva_sesion = Sesion(
@@ -131,8 +134,15 @@ class AuthService:
             logger.error(f"Error revocando sesión: {e}")
             return False
 
-    async def verificar_sesion_activa(self, token: str) -> bool:
-        """Verifica si existe una sesión activa y no revocada para este token."""
+    async def verificar_y_extender_sesion(self, token: str) -> bool:
+        """
+        Verifica si la sesión está activa y la extiende en una sola operación.
+        Combina verificación + sliding expiration en un solo SELECT + UPDATE
+        para reducir queries a la BD.
+        
+        Retorna True si la sesión es válida y fue extendida.
+        Retorna False si la sesión no existe, está revocada o expiró por inactividad.
+        """
         try:
             token_hash = self._hash_token(token)
             query = select(Sesion).where(Sesion.refresh_token == token_hash)
@@ -140,41 +150,26 @@ class AuthService:
             sesion = result.scalars().first()
 
             if not sesion:
+                logger.warning("Sesión no encontrada en BD")
                 return False
 
             if sesion.es_revocado:
+                logger.warning("Sesión revocada")
                 return False
 
-            if sesion.expira_en.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
+            now = datetime.now(timezone.utc)
+            expira_en = sesion.expira_en.replace(tzinfo=timezone.utc)
+
+            if expira_en < now:
+                logger.warning("Sesión expirada por inactividad")
                 return False
+
+            # Sliding Expiration: SIEMPRE resetear el contador a 30 min
+            # desde ahora en cada request autenticado exitoso
+            sesion.expira_en = now + timedelta(minutes=SESSION_INACTIVITY_MINUTES)
+            await self.db.commit()
 
             return True
         except Exception as e:
-            logger.error(f"Error verificando sesión: {e}")
+            logger.error(f"Error verificando/extendiendo sesión: {e}")
             return False
-
-    async def extender_sesion(self, token: str):
-        """
-        Extiende la vida de la sesión si está próxima a vencer (Sliding Expiration).
-        Se llama en cada request autenticado.
-        """
-        try:
-            token_hash = self._hash_token(token)
-            query = select(Sesion).where(Sesion.refresh_token == token_hash)
-            result = await self.db.execute(query)
-            sesion = result.scalars().first()
-
-            if not sesion or sesion.es_revocado:
-                return
-
-            now = datetime.now(timezone.utc)
-            tiempo_restante = sesion.expira_en.replace(tzinfo=timezone.utc) - now
-
-            # Solo extender si le queda menos de 25 min (evita write en cada request)
-            if tiempo_restante.total_seconds() < (25 * 60):
-                sesion.expira_en = now + timedelta(minutes=30)
-                await self.db.commit()
-
-        except Exception as e:
-            logger.error(f"Error extendiendo sesión: {e}")
-

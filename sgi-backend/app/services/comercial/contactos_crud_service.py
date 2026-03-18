@@ -40,6 +40,7 @@ class ContactosCrudService:
 
         nuevo_contacto = ClienteContacto(
             ruc=data['ruc'],
+            nombre=data.get('nombre'),
             cargo=data.get('cargo'),
             telefono=data['telefono'],
             correo=data.get('email'),
@@ -60,6 +61,7 @@ class ContactosCrudService:
         if not contacto: 
             return False
         
+        if "nombre" in data: contacto.nombre = data["nombre"]
         if "cargo" in data: contacto.cargo = data["cargo"]
         if "telefono" in data: contacto.telefono = data["telefono"]
         if "email" in data: contacto.correo = data["email"]
