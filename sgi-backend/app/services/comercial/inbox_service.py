@@ -349,11 +349,17 @@ class InboxService:
             if request_data:
                 lead.motivo_descarte = request_data.get('motivo_descarte')
                 lead.comentario_descarte = request_data.get('comentario_descarte')
-                
-            # Iniciar flujo interactivo de despedida
-            from app.services.comercial.chatbot_service import ChatbotService
-            bot_svc = ChatbotService(self.db)
-            await bot_svc.initiate_post_atencion(lead.telefono, lead.id)
+            
+            # Solo enviar mensaje si el frontend lo solicita (default: True)
+            enviar_mensaje = request_data.get('enviar_mensaje', True) if request_data else True
+            
+            if enviar_mensaje:
+                try:
+                    from app.services.comercial.chatbot_service import ChatbotService
+                    bot_svc = ChatbotService(self.db)
+                    await bot_svc.send_despedida(lead.telefono, lead.id)
+                except Exception as e:
+                    logger.warning(f"Error enviando despedida al descartar: {e}")
                 
             await self.db.commit()
             return True

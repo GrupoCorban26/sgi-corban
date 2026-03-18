@@ -127,6 +127,7 @@ function ActionMenu({ cliente, onEdit, onArchive }: {
 export default function CarteraPage() {
   const [busqueda, setBusqueda] = useState('');
   const [tipoEstado, setTipoEstado] = useState<string | null>(null);
+  const [filtroFecha, setFiltroFecha] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const pageSize = 15;
 
@@ -153,7 +154,7 @@ export default function CarteraPage() {
     isError,
     isFetching,
     deleteMutation,
-  } = useClientes(busqueda, tipoEstado, null, page, pageSize);
+  } = useClientes(busqueda, tipoEstado, null, filtroFecha, page, pageSize);
 
   const { data: stats } = useClientesStats();
 
@@ -301,6 +302,16 @@ export default function CarteraPage() {
               <option value="CAIDO">Caídos</option>
               <option value="INACTIVO">Inactivos</option>
             </select>
+            <select
+              value={filtroFecha || ''}
+              onChange={(e) => { setFiltroFecha(e.target.value || null); setPage(1); }}
+              className="px-3 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer"
+            >
+              <option value="">Todas las fechas</option>
+              <option value="hoy">Hoy</option>
+              <option value="proximos_7_dias">Próximos 7 días</option>
+              <option value="vencidos">Vencidos</option>
+            </select>
             <button className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors text-gray-600">
               <Filter size={16} /> Más Filtros
             </button>
@@ -308,7 +319,7 @@ export default function CarteraPage() {
         </div>
 
         {/* Table */}
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[calc(100vh-280px)] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar-track]:bg-gray-50 [&::-webkit-scrollbar-track]:rounded-lg [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-lg hover:[&::-webkit-scrollbar-thumb]:bg-gray-400">
           {isLoading ? (
             <div className="flex flex-col items-center justify-center h-64 text-gray-400">
               <Loader2 size={40} className="animate-spin mb-3" />
@@ -323,15 +334,16 @@ export default function CarteraPage() {
             <div className="flex flex-col items-center justify-center h-64 text-gray-400">
               <Building2 size={40} className="mb-3" />
               <p className="text-sm font-medium">No hay clientes</p>
-              <p className="text-xs">Agrega tu primer cliente haciendo clic en &quot;Nuevo Cliente&quot;</p>
+              <p className="text-xs">Agrega tu primer cliente haciendo clic en "Nuevo Cliente"</p>
             </div>
           ) : (
-            <table className="w-full text-left">
-              <thead>
-                <tr className="bg-gray-50 text-gray-500 text-[11px] uppercase tracking-wider">
-                  <th className="px-6 py-4 font-semibold">RUC</th>
+            <table className="w-full text-left relative">
+              <thead className="bg-gray-50 border-b sticky top-0 z-20 shadow-sm">
+                <tr className="text-gray-500 text-[11px] uppercase tracking-wider">
+                  <th className="px-6 py-4 font-semibold whitespace-nowrap">RUC</th>
                   <th className="px-6 py-4 font-semibold">Razón Social</th>
                   <th className="px-6 py-4 font-semibold">Teléfono</th>
+                  <th className="px-6 py-4 font-semibold">Correo</th>
                   <th className="px-6 py-4 font-semibold">Estado</th>
                   <th className="px-6 py-4 font-semibold">Últ. Contacto</th>
                   <th className="px-6 py-4 font-semibold">Próx. Contacto</th>
@@ -352,9 +364,13 @@ export default function CarteraPage() {
                       )}
                     </td>
                     <td className="px-6 py-4">
-                      <div className="flex items-center gap-2 text-gray-600">
-                        <Phone size={14} className="text-indigo-400" />
-                        <span className="text-sm">{cliente.telefono || '-'}</span>
+                      <div className="text-sm text-gray-600">
+                        {cliente.telefono || '-'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-600 max-w-[150px] truncate" title={cliente.correo || ''}>
+                        {cliente.correo || '-'}
                       </div>
                     </td>
                     <td className="px-6 py-4">

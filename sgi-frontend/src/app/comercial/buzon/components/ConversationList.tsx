@@ -14,9 +14,9 @@ interface Props {
 
 const TABS = [
     { id: 'all', label: 'Todos', emoji: '' },
-    { id: 'NUEVO', label: 'Nuevos', emoji: '🆕' },
-    { id: 'EN_GESTION', label: 'Gestión', emoji: '💬' },
     { id: 'PENDIENTE', label: 'Pendientes', emoji: '⏳' },
+    { id: 'EN_GESTION', label: 'Gestión', emoji: '💬' },
+    { id: 'COTIZADO', label: 'Cotizados', emoji: '📋' },
 ];
 
 export default function ConversationList({ selectedId, onSelect }: Props) {
@@ -54,9 +54,9 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
     // Contadores por estado
     const counts = {
         all: conversations.length,
-        NUEVO: conversations.filter(c => c.estado === 'NUEVO').length,
-        EN_GESTION: conversations.filter(c => c.estado === 'EN_GESTION').length,
         PENDIENTE: conversations.filter(c => c.estado === 'PENDIENTE').length,
+        EN_GESTION: conversations.filter(c => c.estado === 'EN_GESTION').length,
+        COTIZADO: conversations.filter(c => c.estado === 'COTIZADO').length,
     };
 
     const totalNoLeidos = conversations.reduce((sum, c) => sum + c.mensajes_no_leidos, 0);

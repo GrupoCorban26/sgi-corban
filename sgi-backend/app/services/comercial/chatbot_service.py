@@ -1,9 +1,20 @@
-import asyncio
+"""
+Servicio del chatbot Corby — Grupo Corban SGI.
+
+Máquina de estados que procesa mensajes entrantes de WhatsApp y retorna
+la respuesta apropiada.  El bot NO usa IA generativa; todas las respuestas
+son deterministas basadas en botones y detección de intención por keywords.
+
+Estados posibles de sesión:
+  MENU                  → Esperando selección del menú principal
+  COTIZAR_REQUERIMIENTOS → Esperando texto con requerimientos de cotización
+  COTIZAR_CONFIRMAR      → Esperando confirmación "¿eso es todo?"
+  ATENDIDO               → Lead asignado a comercial; bot en silencio
+"""
+
 import json
 import logging
-import re
-import httpx
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import and_, or_, delete
@@ -11,80 +22,43 @@ from sqlalchemy.orm import selectinload
 
 from app.models.comercial_session import ConversationSession
 from app.models.comercial_inbox import Inbox
-from app.models.comercial import Cliente, ClienteContacto, Cita
-from app.models.seguridad import Usuario, Rol
+from app.models.seguridad import Usuario
 from app.schemas.comercial.whatsapp import WhatsAppIncoming, WhatsAppResponse, BotMessage
 from app.schemas.comercial.inbox import InboxDistribute
 from app.services.comercial.inbox_service import InboxService
 from app.services.comercial.chat_service import ChatService
 from app.schemas.comercial.chat import ChatMessageCreate
+from app.utils.horario_laboral import es_horario_laboral
+
+from app.services.comercial.bot_messages import (
+    MSG_BIENVENIDA,
+    MSG_MENU_REGRESO,
+    MENU_BUTTONS,
+    MSG_ASESOR_ASIGNADO,
+    MSG_ASESOR_ASIGNADO_FUERA_HORARIO,
+    MSG_ASESOR_EXISTENTE,
+    MSG_ASESOR_EXISTENTE_FUERA_HORARIO,
+    MSG_COTIZAR_PEDIR_REQ,
+    MSG_COTIZAR_CONFIRMAR,
+    MSG_COTIZAR_AGREGAR_MAS,
+    MSG_COTIZAR_FALLBACK,
+    MSG_COTIZAR_DERIVADO,
+    MSG_COTIZAR_DERIVADO_FUERA_HORARIO,
+    COTIZAR_CONFIRM_BUTTONS,
+    MSG_CARGA_LISTA_ASIGNADO,
+    MSG_CARGA_LISTA_ASIGNADO_FUERA_HORARIO,
+    MSG_DESPEDIDA,
+    MSG_CANCELADO,
+    MSG_HORARIO_INFO,
+    MSG_ERROR_OCUPADOS,
+    MSG_ERROR_INESPERADO,
+    KEYWORDS_COTIZACION,
+    KEYWORDS_CARGA,
+)
 
 logger = logging.getLogger(__name__)
 
-
-# ==========================================
-# CONSTANTS
-# ==========================================
-
-MENSAJE_BIENVENIDA = "Hola, soy Corby🤖, tu asistente virtual del Grupo Corban. ¿En qué puedo ayudarte hoy?🤗"
-MENSAJE_MENU_REGRESO = "¿En qué más puedo ayudarte? 😊"
-
-MENU_BUTTONS = [
-    {"id": "btn_asesor", "title": "Hablar con un asesor"},
-    {"id": "btn_cotizar", "title": "Quiero cotizar"},
-    {"id": "btn_agendar", "title": "Agendar visita"},
-]
-
-VISIT_TYPE_BUTTONS = [
-    {"id": "btn_nos_visita", "title": "Los visitaré"},
-    {"id": "btn_los_visitamos", "title": "Visítenme"},
-    {"id": "btn_volver", "title": "⬅️ Volver"},
-]
-
-CONFIRM_BUTTONS = [
-    {"id": "btn_confirmar", "title": "✅ Confirmar"},
-    {"id": "btn_cancelar", "title": "❌ Cancelar"},
-    {"id": "btn_volver", "title": "⬅️ Volver"},
-]
-
-COTIZAR_CONFIRM_BUTTONS = [
-    {"id": "btn_cotizar_listo", "title": "✅ Eso es todo"},
-    {"id": "btn_cotizar_mas", "title": "📝 Agregar más"},
-    {"id": "btn_volver", "title": "⬅️ Volver"},
-]
-
 SESSION_TIMEOUT_MINUTES = 30
-ATENDIDO_TIMEOUT_MINUTES = 5
-COTIZAR_VENTANA_GRACIA_SEGUNDOS = 60
-
-POST_ATENCION_CONFIRM_BUTTONS = [
-    {"id": "btn_otra_consulta", "title": "📬 Nueva consulta"},
-    {"id": "btn_finalizar", "title": "👋 Finalizar chat"}
-]
-
-# Importar utilidades de horario laboral desde módulo compartido
-from app.utils.horario_laboral import (
-    DIAS_SEMANA,
-    es_feriado as _es_feriado,
-    es_dia_habil as _es_dia_habil,
-    es_horario_laboral,
-    proximos_dias_habiles as _proximos_dias_habiles,
-)
-
-
-def _sanitizar_ruc(texto: str) -> str:
-    """Clean RUC input: remove spaces, dashes, dots, 'RUC:' prefix."""
-    texto = texto.strip().upper()
-    texto = re.sub(r'^RUC[\s:]*', '', texto)
-    texto = re.sub(r'[\s\-\.\,]', '', texto)
-    return texto
-
-
-def _sanitizar_razon_social(texto: str) -> str:
-    """Clean razón social: remove emojis, limit to 100 chars."""
-    texto = re.sub(r'[\U00010000-\U0010ffff]', '', texto, flags=re.UNICODE)
-    texto = texto.strip()
-    return texto[:100]
 
 
 # ==========================================
@@ -95,26 +69,31 @@ class ChatbotService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    def _is_working_hours(self) -> bool:
-        """Verifica si la hora actual está dentro del horario laboral."""
-        return es_horario_laboral()
-
+    # =====================================================================
+    # PUNTO DE ENTRADA PRINCIPAL
+    # =====================================================================
 
     async def process_message(self, data: WhatsAppIncoming) -> WhatsAppResponse:
-        """Punto de entrada principal: procesa un mensaje entrante y retorna la respuesta del bot."""
+        """Procesa un mensaje entrante y retorna la respuesta del bot."""
 
         # 1. Normalizar teléfono
         phone = data.from_number.replace(" ", "").replace("+", "")
         if phone.startswith("51"):
             phone = phone[2:]
 
-        # 2. Limpieza de sesiones expiradas (oportunista)
+        # 2. Limpieza oportunista de sesiones expiradas
         await self._cleanup_expired_sessions()
 
-        # 3. Obtener sesión activa
+        # 3. Verificar si tiene un lead activo con asesor asignado
+        lead_activo = await self._get_lead_activo(phone)
+        if lead_activo and lead_activo.asignado_a:
+            # El webhook ya guardó el mensaje en chat; bot no responde
+            return WhatsAppResponse(action="no_action", messages=[])
+
+        # 4. Obtener sesión activa del bot
         session = await self._get_active_session(phone)
 
-        # 4. Comandos globales
+        # 5. Comandos globales
         text_lower = data.message_text.strip().lower()
         button_id = data.button_id
 
@@ -129,256 +108,157 @@ class ChatbotService:
                 await self._delete_session(session)
             return WhatsAppResponse(
                 action="send_text",
-                messages=[BotMessage(type="text", content="Operación cancelada. Escribe *menu* cuando quieras volver a empezar. 👋")]
+                messages=[BotMessage(type="text", content=MSG_CANCELADO)],
             )
 
-        # 5. Si no hay sesión activa
+        # 6. Si no hay sesión activa
         if not session:
-            # Si presionó un botón del menú principal, crear sesión y procesar
-            if button_id in ("btn_asesor", "btn_cotizar", "btn_agendar"):
+            if button_id in ("btn_asesor", "btn_cotizar", "btn_carga"):
+                # Presionó un botón del menú → crear sesión y procesar
                 session = await self._create_session(phone, "MENU")
             else:
-                # Verificar si tiene un lead activo con asesor asignado
-                query_inbox_activo = select(Inbox).where(
-                    and_(
-                        Inbox.telefono == phone,
-                        Inbox.estado.in_(['PENDIENTE', 'EN_GESTION'])
-                    )
-                ).order_by(Inbox.id.desc())
-                result_inbox_activo = await self.db.execute(query_inbox_activo)
-                lead_activo = result_inbox_activo.scalars().first()
-
-                if lead_activo and lead_activo.asignado_a:
-                    # Reconectar: recrear sesión ATENDIDO para que el mensaje llegue al asesor
-                    query_user = select(Usuario).options(selectinload(Usuario.empleado)).where(
-                        Usuario.id == lead_activo.asignado_a
-                    )
-                    result_user = await self.db.execute(query_user)
-                    user = result_user.scalar_one_or_none()
-                    nombre_comercial = self._get_user_name(user)
-
-                    datos_atendido = {"asesor_nombre": nombre_comercial, "inbox_id": lead_activo.id}
-                    session = await self._create_session(phone, "ATENDIDO", datos_atendido)
-                    session.expires_at = datetime.now() + timedelta(minutes=ATENDIDO_TIMEOUT_MINUTES)
-                    await self.db.commit()
-                    return await self._handle_atendido(session, data, phone)
-
-                # Sin lead activo → bienvenida con menú
+                # Primera interacción o lead cerrado → mostrar bienvenida
                 return self._send_menu()
 
-        # 6. Enrutar según estado actual
-        state = session.estado if session else "MENU"
+        # 7. Enrutar según estado actual
+        state = session.estado
 
         try:
             if state == "MENU":
                 return await self._handle_menu(session, data, phone)
-            elif state == "ATENDIDO":
-                return await self._handle_atendido(session, data, phone)
             elif state == "COTIZAR_REQUERIMIENTOS":
                 return await self._handle_cotizar_requerimientos(session, data, phone)
             elif state == "COTIZAR_CONFIRMAR":
                 return await self._handle_cotizar_confirmar(session, data, phone)
-            elif state == "COTIZAR_PROCESANDO":
-                # Legacy: sesiones antiguas, redirigir al nuevo flujo
-                return await self._handle_cotizar_confirmar(session, data, phone)
-            elif state == "AGENDAR_RUC":
-                return await self._handle_agendar_ruc(session, data)
-            elif state == "AGENDAR_TIPO":
-                return await self._handle_agendar_tipo(session, data)
-            elif state == "AGENDAR_UBICACION":
-                return await self._handle_agendar_ubicacion(session, data)
-            elif state == "AGENDAR_FECHA":
-                return await self._handle_agendar_fecha(session, data)
-            elif state == "AGENDAR_HORA":
-                return await self._handle_agendar_hora(session, data)
-            elif state == "AGENDAR_CONFIRMAR":
-                return await self._handle_agendar_confirmar(session, data, phone)
-            elif state == "POST_ATENCION_CONFIRMAR":
-                return await self._handle_post_atencion_confirmar(session, data, phone)
-            elif state == "SILENCIO_POST_ATENCION":
-                # Fallback para sesiones antiguas abandonadas
-                await self._delete_session(session)
-                return self._send_menu(es_regreso=True)
+            elif state == "ATENDIDO":
+                # Bot en silencio total: el webhook ya guardó el mensaje
+                return WhatsAppResponse(action="no_action", messages=[])
             else:
+                # Estado desconocido → resetear
                 await self._delete_session(session)
                 return self._send_menu()
         except Exception as e:
-            logger.error(f"Error en chatbot (state={state}, phone={phone}): {e}", exc_info=True)
+            logger.error(
+                f"Error en chatbot (state={state}, phone={phone}): {e}",
+                exc_info=True,
+            )
             return WhatsAppResponse(
                 action="send_text",
-                messages=[BotMessage(type="text", content="Ocurrió un error inesperado. Escribe *menu* para volver a empezar. 🔄")]
+                messages=[BotMessage(type="text", content=MSG_ERROR_INESPERADO)],
             )
 
-    # ===================== MENU HANDLER =====================
+    # =====================================================================
+    # HANDLERS
+    # =====================================================================
 
-    async def _handle_menu(self, session, data, phone):
-        """Maneja la selección del menú principal (3 botones)."""
+    async def _handle_menu(self, session, data, phone: str) -> WhatsAppResponse:
+        """Maneja la selección del menú principal o texto libre."""
         button_id = data.button_id
+        text = data.message_text.strip()
 
+        # --- Selección por botón ---
         if button_id == "btn_asesor":
-            return await self._handle_asesor(session, data, phone)
-        elif button_id == "btn_cotizar":
+            return await self._derivar_a_comercial(
+                session, data, phone, tipo_interes="ASESORIA",
+                mensaje_contexto="Solicita hablar con un asesor",
+                msg_asignado=MSG_ASESOR_ASIGNADO,
+                msg_asignado_fuera=MSG_ASESOR_ASIGNADO_FUERA_HORARIO,
+            )
+
+        if button_id == "btn_cotizar":
             await self._update_session(session, "COTIZAR_REQUERIMIENTOS")
             return WhatsAppResponse(
                 action="send_text",
-                messages=[BotMessage(type="text", content="Cuénteme estimado, cuales son sus requerimientos😄")]
-            )
-        elif button_id == "btn_agendar":
-            await self._update_session(session, "AGENDAR_RUC")
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content=(
-                    "¡Perfecto! Para agendar una visita necesito algunos datos.\n\n"
-                    "📋 Por favor, ingresa tu *RUC* (11 dígitos):\n\n"
-                    "_Escribe *volver* para regresar al menú._"
-                ))]
-            )
-        else:
-            # Si no presionó un botón válido, reenviar el menú
-            return self._send_menu()
-
-    # ===================== ASESOR HANDLER =====================
-
-    async def _handle_asesor(self, session, data, phone, tipo_interes="ASESORIA", mensaje_contexto=None):
-        """Verifica si el cliente ya tiene un lead/comercial asignado, si no, asigna uno por Round Robin."""
-        query_inbox = select(Inbox).where(
-            and_(Inbox.telefono == phone, Inbox.estado == 'PENDIENTE')
-        ).order_by(Inbox.id.desc())
-        result = await self.db.execute(query_inbox)
-        lead_reciente = result.scalars().first()
-        
-        # Validar horario laboral
-        en_horario = self._is_working_hours()
-        msg_horario = ""
-        if not en_horario:
-            msg_horario = (
-                "\n\n*Nota:* 🕐 Nuestro horario de atención por asesores es de Lunes a Viernes de 8am a 6pm y Sábados de 8am a 11am. "
-                "Tu solicitud ha sido guardada y un asesor se comunicará contigo el próximo día hábil."
+                messages=[BotMessage(type="text", content=MSG_COTIZAR_PEDIR_REQ)],
             )
 
-        if lead_reciente and lead_reciente.asignado_a:
-            query_user = select(Usuario).options(selectinload(Usuario.empleado)).where(Usuario.id == lead_reciente.asignado_a)
-            result_user = await self.db.execute(query_user)
-            user = result_user.scalar_one_or_none()
-            nombre_comercial = self._get_user_name(user)
-
-            # Mantener sesión en ATENDIDO con cooldown corto
-            datos_atendido = {"asesor_nombre": nombre_comercial, "inbox_id": lead_reciente.id}
-            await self._update_session_corta(session, "ATENDIDO", datos_atendido)
-            
-            texto_respuesta = f"Su asesor *{nombre_comercial}* le atenderá en unos minutos. 👋{msg_horario}"
-            if not en_horario:
-                texto_respuesta = f"Su asesor *{nombre_comercial}* continuará con su atención el próximo día hábil.{msg_horario}"
-
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content=texto_respuesta)]
-            )
-        else:
-            inbox_service = InboxService(self.db)
-            from app.schemas.comercial.inbox import InboxDistribute
-            distribute_data = InboxDistribute(
-                telefono=data.from_number,
-                mensaje=mensaje_contexto or "Solicita hablar con un asesor",
-                nombre_display=data.contact_name,
-                tipo_interes=tipo_interes
-            )
-            result = await inbox_service.distribute_lead(distribute_data)
-            nombre_comercial = result["assigned_to"]["nombre"]
-            inbox_id = result.get("inbox_id")
-
-            # Mantener sesión en ATENDIDO con cooldown corto
-            datos_atendido = {"asesor_nombre": nombre_comercial, "inbox_id": inbox_id}
-            await self._update_session_corta(session, "ATENDIDO", datos_atendido)
-            
-            texto_respuesta = f"¡Perfecto! El asesor *{nombre_comercial}* se pondrá en contacto contigo en breve. 🚀{msg_horario}"
-            if not en_horario:
-                texto_respuesta = f"¡Perfecto! Hemos asignado al asesor *{nombre_comercial}* a tu consulta.{msg_horario}"
-
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content=texto_respuesta)]
+        if button_id == "btn_carga":
+            return await self._derivar_a_comercial(
+                session, data, phone, tipo_interes="CARGA_LISTA",
+                mensaje_contexto="Tiene carga lista para operación",
+                msg_asignado=MSG_CARGA_LISTA_ASIGNADO,
+                msg_asignado_fuera=MSG_CARGA_LISTA_ASIGNADO_FUERA_HORARIO,
             )
 
-    # ===================== ATENDIDO HANDLER =====================
+        # --- Texto libre: detectar intención por keywords ---
+        if text:
+            intencion = self._detectar_intencion(text)
 
-    async def _handle_atendido(self, session, data, phone):
-        """Mensajes post-asignación. Reenviar al chat del inbox y responder contextualmente."""
-        datos = self._get_session_data(session)
-        asesor = datos.get("asesor_nombre", "su asesor")
-        inbox_id = datos.get("inbox_id")
-        texto = data.message_text.strip()
+            if intencion == "COTIZACION":
+                await self._update_session(session, "COTIZAR_REQUERIMIENTOS")
+                return WhatsAppResponse(
+                    action="send_text",
+                    messages=[BotMessage(type="text", content=MSG_COTIZAR_PEDIR_REQ)],
+                )
 
-        # Si el cliente quiere volver al menú, eliminar sesión
-        text_lower = texto.lower()
-        if text_lower in ("menu", "menú", "inicio"):
-            await self._delete_session(session)
-            return self._send_menu()
+            if intencion == "CARGA":
+                return await self._derivar_a_comercial(
+                    session, data, phone, tipo_interes="CARGA_LISTA",
+                    mensaje_contexto="Tiene carga lista para operación",
+                    msg_asignado=MSG_CARGA_LISTA_ASIGNADO,
+                    msg_asignado_fuera=MSG_CARGA_LISTA_ASIGNADO_FUERA_HORARIO,
+                )
 
-        # Guardar mensaje en el chat del inbox para que el asesor lo vea
-        if inbox_id and texto:
-            try:
-                chat_svc = ChatService(self.db)
-                await chat_svc.save_message(ChatMessageCreate(
-                    inbox_id=inbox_id,
-                    telefono=data.from_number,
-                    direccion='ENTRANTE',
-                    remitente_tipo='CLIENTE',
-                    contenido=texto,
-                    estado_envio='RECIBIDO'
-                ))
-            except Exception as e:
-                logger.warning(f"No se pudo guardar mensaje post-asignación: {e}")
+            # Sin intención clara → derivar a comercial
+            return await self._derivar_a_comercial(
+                session, data, phone, tipo_interes="ASESORIA",
+                mensaje_contexto="Solicita hablar con un asesor",
+                msg_asignado=MSG_ASESOR_ASIGNADO,
+                msg_asignado_fuera=MSG_ASESOR_ASIGNADO_FUERA_HORARIO,
+            )
 
-        return WhatsAppResponse(
-            action="send_text",
-            messages=[BotMessage(
-                type="text",
-                content=f"✅ Mensaje recibido. *{asesor}* podrá ver tu mensaje. Si necesitas algo más, escribe *menu*. 😊"
-            )]
-        )
+        # Fallback: reenviar menú
+        return self._send_menu()
 
-    # ===================== COTIZAR HANDLER =====================
+    # ===================== COTIZAR =====================
 
-    async def _handle_cotizar_requerimientos(self, session, data, phone):
+    async def _handle_cotizar_requerimientos(self, session, data, phone: str) -> WhatsAppResponse:
         """Recibe el primer mensaje de requerimientos y pregunta si es todo."""
         text_lower = data.message_text.strip().lower()
+
         if text_lower == "volver" or data.button_id == "btn_volver":
             await self._delete_session(session)
-            return self._send_menu()
+            return self._send_menu(es_regreso=True)
 
-        # Guardar los requerimientos del cliente
-        datos = {"requerimientos": [data.message_text.strip()]}
+        texto = data.message_text.strip()
+        if not texto:
+            return WhatsAppResponse(
+                action="send_text",
+                messages=[BotMessage(type="text", content=MSG_COTIZAR_PEDIR_REQ)],
+            )
+
+        # Guardar requerimientos (texto o descripción de multimedia)
+        datos = {"requerimientos": [texto]}
         await self._update_session(session, "COTIZAR_CONFIRMAR", datos)
 
         return WhatsAppResponse(
             action="send_buttons",
             messages=[BotMessage(
                 type="buttons",
-                body="📝 Recibido. ¿Eso es todo o deseas agregar más detalles?",
-                buttons=COTIZAR_CONFIRM_BUTTONS
-            )]
+                body=MSG_COTIZAR_CONFIRMAR,
+                buttons=COTIZAR_CONFIRM_BUTTONS,
+            )],
         )
 
-    async def _handle_cotizar_confirmar(self, session, data, phone):
+    async def _handle_cotizar_confirmar(self, session, data, phone: str) -> WhatsAppResponse:
         """Maneja la confirmación de requerimientos o la recepción de más detalles."""
         button_id = data.button_id
         datos = self._get_session_data(session)
 
-        # Volver al menú
         if button_id == "btn_volver":
             await self._delete_session(session)
-            return self._send_menu()
+            return self._send_menu(es_regreso=True)
 
-        # Cliente confirma que terminó → derivar al asesor
+        # Cliente confirma que terminó → derivar al comercial
         if button_id == "btn_cotizar_listo":
             requerimientos = datos.get("requerimientos", [])
             resumen = "\n".join(f"• {r}" for r in requerimientos)
             mensaje_contexto = f"Solicitud de cotización:\n{resumen}"
-            return await self._handle_asesor(
-                session, data, phone,
-                tipo_interes="COTIZACION",
-                mensaje_contexto=mensaje_contexto
+            return await self._derivar_a_comercial(
+                session, data, phone, tipo_interes="COTIZACION",
+                mensaje_contexto=mensaje_contexto,
+                msg_asignado=MSG_COTIZAR_DERIVADO,
+                msg_asignado_fuera=MSG_COTIZAR_DERIVADO_FUERA_HORARIO,
             )
 
         # Cliente quiere agregar más detalles (botón)
@@ -386,7 +266,7 @@ class ChatbotService:
             await self._update_session(session, "COTIZAR_CONFIRMAR", datos)
             return WhatsAppResponse(
                 action="send_text",
-                messages=[BotMessage(type="text", content="👍 Envíame los detalles adicionales.")]
+                messages=[BotMessage(type="text", content=MSG_COTIZAR_AGREGAR_MAS)],
             )
 
         # Texto libre → el cliente envió más requerimientos
@@ -400,9 +280,9 @@ class ChatbotService:
                 action="send_buttons",
                 messages=[BotMessage(
                     type="buttons",
-                    body="📝 Recibido. ¿Eso es todo o deseas agregar más detalles?",
-                    buttons=COTIZAR_CONFIRM_BUTTONS
-                )]
+                    body=MSG_COTIZAR_CONFIRMAR,
+                    buttons=COTIZAR_CONFIRM_BUTTONS,
+                )],
             )
 
         # Fallback
@@ -410,466 +290,236 @@ class ChatbotService:
             action="send_buttons",
             messages=[BotMessage(
                 type="buttons",
-                body="¿Deseas agregar más detalles o eso es todo?",
-                buttons=COTIZAR_CONFIRM_BUTTONS
-            )]
+                body=MSG_COTIZAR_FALLBACK,
+                buttons=COTIZAR_CONFIRM_BUTTONS,
+            )],
         )
 
-    # ===================== AGENDAR: RUC =====================
+    # =====================================================================
+    # DERIVACIÓN A COMERCIAL (unificada)
+    # =====================================================================
 
-    async def _handle_agendar_ruc(self, session, data):
-        text_lower = data.message_text.strip().lower()
+    async def _derivar_a_comercial(
+        self,
+        session,
+        data: WhatsAppIncoming,
+        phone: str,
+        tipo_interes: str,
+        mensaje_contexto: str,
+        msg_asignado: str,
+        msg_asignado_fuera: str,
+    ) -> WhatsAppResponse:
+        """Asigna un comercial vía round-robin y envía mensaje de confirmación."""
 
-        # Volver al menú
-        if text_lower == "volver" or data.button_id == "btn_volver":
-            await self._delete_session(session)
-            return self._send_menu()
+        # Verificar si ya tiene lead pendiente con asesor asignado
+        query_inbox = select(Inbox).where(
+            and_(Inbox.telefono == phone, Inbox.estado == "PENDIENTE")
+        ).order_by(Inbox.id.desc())
+        result = await self.db.execute(query_inbox)
+        lead_reciente = result.scalars().first()
 
-        # Rechazar archivos multimedia en este paso
-        if data.message_type in ("image", "document", "video", "audio", "sticker"):
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content=(
-                    "📎 He recibido tu archivo, pero en este paso necesito tu *RUC* en texto.\n\n"
-                    "Por favor, escribe los 11 dígitos de tu RUC.\n\n"
-                    "_Escribe *volver* para regresar al menú._"
-                ))]
+        en_horario = es_horario_laboral()
+
+        if lead_reciente and lead_reciente.asignado_a:
+            # Ya tiene asesor asignado → reconectar
+            query_user = (
+                select(Usuario)
+                .options(selectinload(Usuario.empleado))
+                .where(Usuario.id == lead_reciente.asignado_a)
             )
+            result_user = await self.db.execute(query_user)
+            user = result_user.scalar_one_or_none()
+            nombre_comercial = self._get_user_name(user)
 
-        ruc = _sanitizar_ruc(data.message_text)
+            await self._update_session(session, "ATENDIDO", {"inbox_id": lead_reciente.id})
 
-        if not ruc.isdigit() or len(ruc) != 11:
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content=(
-                    "❌ El RUC debe tener exactamente *11 dígitos numéricos*.\n\n"
-                    "Por favor, ingrésalo de nuevo:\n\n"
-                    "_Escribe *volver* para regresar al menú._"
-                ))]
-            )
-
-        if not (ruc.startswith("10") or ruc.startswith("20")):
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content=(
-                    "❌ El RUC debe empezar con *10* (persona natural) o *20* (empresa).\n\n"
-                    "Ingrésalo de nuevo:\n\n"
-                    "_Escribe *volver* para regresar al menú._"
-                ))]
-            )
-
-        # RUC válido → pasar directamente a tipo de visita (sin pedir razón social)
-        datos = {"ruc": ruc}
-        await self._update_session(session, "AGENDAR_TIPO", datos)
-
-        return WhatsAppResponse(
-            action="send_buttons",
-            messages=[BotMessage(
-                type="buttons",
-                body=f"✅ RUC registrado: *{ruc}*\n\n¿Cómo prefieren la visita?",
-                buttons=VISIT_TYPE_BUTTONS
-            )]
-        )
-
-    # ===================== AGENDAR: TIPO VISITA =====================
-
-    async def _handle_agendar_tipo(self, session, data):
-        button_id = data.button_id
-        datos = self._get_session_data(session)
-
-        if button_id == "btn_volver":
-            # Volver a pedir el RUC
-            await self._update_session(session, "AGENDAR_RUC", datos)
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content=(
-                    "📋 Por favor, ingresa tu *RUC* (11 dígitos):\n\n"
-                    "_Escribe *volver* para regresar al menú._"
-                ))]
-            )
-
-        if button_id == "btn_nos_visita":
-            datos["tipo_visita"] = "VISITA_OFICINA"
-            await self._update_session(session, "AGENDAR_FECHA", datos)
-            return await self._show_date_list(session, datos,
-                prefix="📍 Nuestra dirección:\n*Centro Aéreo Comercial, módulo E, oficina 507*\n\n")
-        elif button_id == "btn_los_visitamos":
-            datos["tipo_visita"] = "VISITA_CLIENTE"
-            await self._update_session(session, "AGENDAR_UBICACION", datos)
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content=(
-                    "📍 Por favor, ingresa la *dirección* donde debemos visitarlos.\n\n"
-                    "También puedes *enviar tu ubicación* desde WhatsApp (📎 > Ubicación).\n\n"
-                    "_Escribe *volver* para regresar._"
-                ))]
-            )
-        else:
-            return WhatsAppResponse(
-                action="send_buttons",
-                messages=[BotMessage(type="buttons", body="Por favor, selecciona una opción:", buttons=VISIT_TYPE_BUTTONS)]
-            )
-
-    # ===================== AGENDAR: UBICACION =====================
-
-    async def _handle_agendar_ubicacion(self, session, data):
-        text_lower = data.message_text.strip().lower()
-        
-        if text_lower == "volver" or data.button_id == "btn_volver":
-            datos = self._get_session_data(session)
-            await self._update_session(session, "AGENDAR_TIPO", datos)
-            return WhatsAppResponse(
-                action="send_buttons",
-                messages=[BotMessage(
-                    type="buttons",
-                    body=f"RUC: *{datos.get('ruc', 'N/A')}*\n\n¿Cómo prefieren la visita?",
-                    buttons=VISIT_TYPE_BUTTONS
-                )]
-            )
-
-        # Handle GPS location
-        if data.message_type == "location" and data.latitude and data.longitude:
-            direccion = await self._reverse_geocode(data.latitude, data.longitude)
-            datos = self._get_session_data(session)
-            datos["direccion"] = direccion
-            datos["lat"] = data.latitude
-            datos["lng"] = data.longitude
-            await self._update_session(session, "AGENDAR_FECHA", datos)
-            return await self._show_date_list(session, datos,
-                prefix=f"✅ Ubicación registrada:\n📍 *{direccion}*\n\n")
-
-        # Rechazar archivos multimedia (excepto ubicación que ya se maneja arriba)
-        if data.message_type in ("image", "document", "video", "audio", "sticker"):
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content=(
-                    "📎 He recibido tu archivo, pero en este paso necesito una *dirección* en texto.\n\n"
-                    "También puedes *enviar tu ubicación* desde WhatsApp (📎 > Ubicación).\n\n"
-                    "_Escribe *volver* para regresar._"
-                ))]
-            )
-
-        # Handle text address
-        direccion = data.message_text.strip()
-        if len(direccion) < 5:
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content=(
-                    "❌ La dirección es muy corta. Ingresa más detalle (calle, distrito, referencia).\n\n"
-                    "También puedes *enviar tu ubicación* desde WhatsApp (📎 > Ubicación).\n\n"
-                    "_Escribe *volver* para regresar._"
-                ))]
-            )
-
-        if len(direccion) > 200:
-            direccion = direccion[:200]
-
-        datos = self._get_session_data(session)
-        datos["direccion"] = direccion
-        await self._update_session(session, "AGENDAR_FECHA", datos)
-        return await self._show_date_list(session, datos,
-            prefix="✅ Dirección registrada.\n\n")
-
-    # ===================== AGENDAR: FECHA (Lista Interactiva) =====================
-
-    async def _show_date_list(self, session, datos, prefix="", pagina=0):
-        """Generate interactive list with available business days."""
-        hoy = date.today()
-        all_dias = _proximos_dias_habiles(hoy, cantidad=14)
-        
-        # Paginate: 5 days per page
-        start = pagina * 5
-        end = start + 5
-        dias_pagina = all_dias[start:end]
-        has_more = end < len(all_dias)
-
-        rows = []
-        for d in dias_pagina:
-            dia_nombre = DIAS_SEMANA.get(d.weekday(), "")
-            rows.append({
-                "id": f"fecha_{d.strftime('%d/%m/%Y')}",
-                "title": f"{dia_nombre} {d.strftime('%d/%m')}",
-                "description": d.strftime('%d/%m/%Y')
-            })
-
-        if has_more:
-            rows.append({
-                "id": "fecha_mas",
-                "title": "Más fechas →",
-                "description": "Ver más opciones de fecha"
-            })
-
-        rows.append({
-            "id": "fecha_volver",
-            "title": "⬅️ Volver",
-            "description": "Regresar al paso anterior"
-        })
-
-        datos["fecha_pagina"] = pagina
-        await self._update_session(session, "AGENDAR_FECHA", datos)
-
-        body_text = f"{prefix}📅 Selecciona una fecha para la visita:"
-
-        return WhatsAppResponse(
-            action="send_list",
-            messages=[BotMessage(
-                type="list",
-                body=body_text,
-                header="Fechas Disponibles",
-                button_text="Ver fechas",
-                sections=[{
-                    "title": "Próximos días hábiles",
-                    "rows": rows
-                }]
-            )]
-        )
-
-    async def _handle_agendar_fecha(self, session, data):
-        button_id = data.button_id
-        text_lower = data.message_text.strip().lower()
-        datos = self._get_session_data(session)
-
-        # Volver al paso anterior (texto o botón)
-        if text_lower == "volver" or button_id == "fecha_volver":
-            tipo = datos.get("tipo_visita")
-            if tipo == "VISITA_CLIENTE":
-                await self._update_session(session, "AGENDAR_UBICACION", datos)
-                return WhatsAppResponse(
-                    action="send_text",
-                    messages=[BotMessage(type="text", content=(
-                        "📍 Ingresa la *dirección* donde debemos visitarlos.\n\n"
-                        "También puedes *enviar tu ubicación* desde WhatsApp.\n\n"
-                        "_Escribe *volver* para regresar._"
-                    ))]
-                )
+            if en_horario:
+                texto = MSG_ASESOR_EXISTENTE.format(nombre=nombre_comercial)
             else:
-                await self._update_session(session, "AGENDAR_TIPO", datos)
-                return WhatsAppResponse(
-                    action="send_buttons",
-                    messages=[BotMessage(
-                        type="buttons",
-                        body=f"RUC: *{datos.get('ruc', 'N/A')}*\n\n¿Cómo prefieren la visita?",
-                        buttons=VISIT_TYPE_BUTTONS
-                    )]
+                texto = MSG_ASESOR_EXISTENTE_FUERA_HORARIO.format(
+                    nombre=nombre_comercial, horario=MSG_HORARIO_INFO
                 )
-
-        # Detectar cambio de intención: cliente cambia tipo de visita mid-flow
-        tipo_detectado = self._detectar_tipo_visita_texto(data.message_text)
-        if tipo_detectado:
-            datos["tipo_visita"] = tipo_detectado
-            if tipo_detectado == "VISITA_CLIENTE":
-                await self._update_session(session, "AGENDAR_UBICACION", datos)
-                return WhatsAppResponse(
-                    action="send_text",
-                    messages=[BotMessage(type="text", content=(
-                        "👍 Entendido, cambiaremos a visita a tu ubicación.\n\n"
-                        "📍 Por favor, ingresa la *dirección* donde debemos visitarlos.\n\n"
-                        "También puedes *enviar tu ubicación* desde WhatsApp (📎 > Ubicación).\n\n"
-                        "_Escribe *volver* para regresar._"
-                    ))]
-                )
-            else:
-                await self._update_session(session, "AGENDAR_FECHA", datos)
-                return await self._show_date_list(session, datos,
-                    prefix="👍 Entendido, te esperamos en nuestras oficinas.\n\n📍 Nuestra dirección:\n*Centro Aéreo Comercial, módulo E, oficina 507*\n\n")
-
-        if button_id == "fecha_mas":
-            pagina_actual = datos.get("fecha_pagina", 0)
-            return await self._show_date_list(session, datos, pagina=pagina_actual + 1)
-
-        # Extract date from button_id like "fecha_20/03/2026"
-        if button_id and button_id.startswith("fecha_"):
-            fecha_str = button_id.replace("fecha_", "")
-            try:
-                fecha = datetime.strptime(fecha_str, "%d/%m/%Y")
-                datos["fecha"] = fecha_str
-                await self._update_session(session, "AGENDAR_HORA", datos)
-                return await self._show_hour_list(session, datos, fecha)
-            except ValueError:
-                pass
-
-        # Unexpected input → show list again
-        return await self._show_date_list(session, datos)
-
-    # ===================== AGENDAR: HORA (Lista Interactiva) =====================
-
-    async def _show_hour_list(self, session, datos, fecha: datetime):
-        """Generate interactive list with available hours for the selected date."""
-        available = await self._get_available_hours(fecha)
-
-        rows = []
-        for h in available:
-            rows.append({
-                "id": f"hora_{h}",
-                "title": h,
-                "description": f"Agendar a las {h}"
-            })
-
-        rows.append({
-            "id": "hora_volver",
-            "title": "⬅️ Volver",
-            "description": "Cambiar la fecha"
-        })
-
-        fecha_str = datos.get("fecha", "")
-
-        return WhatsAppResponse(
-            action="send_list",
-            messages=[BotMessage(
-                type="list",
-                body=f"📅 Fecha: *{fecha_str}*\n\n⏰ Selecciona un horario:",
-                header="Horarios Disponibles",
-                button_text="Ver horarios",
-                sections=[{
-                    "title": "Horarios del día",
-                    "rows": rows
-                }]
-            )]
-        )
-
-    async def _handle_agendar_hora(self, session, data):
-        button_id = data.button_id
-        text_lower = data.message_text.strip().lower()
-        datos = self._get_session_data(session)
-
-        # Volver al paso anterior (texto o botón)
-        if text_lower == "volver" or button_id == "hora_volver":
-            await self._update_session(session, "AGENDAR_FECHA", datos)
-            return await self._show_date_list(session, datos)
-
-        if button_id and button_id.startswith("hora_"):
-            hora = button_id.replace("hora_", "")
-            datos["hora"] = hora
-            await self._update_session(session, "AGENDAR_CONFIRMAR", datos)
-
-            tipo = "Nos visitará en nuestras oficinas" if datos["tipo_visita"] == "VISITA_OFICINA" else f"Los visitaremos en: {datos.get('direccion', 'N/A')}"
-            summary = (
-                f"📋 *Resumen de la cita:*\n\n"
-                f"🏢 RUC: {datos['ruc']}\n"
-                f"📍 Modalidad: {tipo}\n"
-                f"📅 Fecha: {datos['fecha']}\n"
-                f"⏰ Hora: {hora}\n\n"
-                f"¿Desea confirmar la cita?"
-            )
 
             return WhatsAppResponse(
-                action="send_buttons",
-                messages=[BotMessage(type="buttons", body=summary, buttons=CONFIRM_BUTTONS)]
+                action="send_text",
+                messages=[BotMessage(type="text", content=texto)],
             )
 
-        # Unexpected input
-        fecha = datetime.strptime(datos.get("fecha", "01/01/2026"), "%d/%m/%Y")
-        return await self._show_hour_list(session, datos, fecha)
-
-    # ===================== AGENDAR: CONFIRMAR =====================
-
-    async def _handle_agendar_confirmar(self, session, data, phone):
-        if data.button_id == "btn_volver":
-            datos = self._get_session_data(session)
-            fecha = datetime.strptime(datos.get("fecha", "01/01/2026"), "%d/%m/%Y")
-            await self._update_session(session, "AGENDAR_HORA", datos)
-            return await self._show_hour_list(session, datos, fecha)
-
-        if data.button_id == "btn_confirmar":
-            datos = self._get_session_data(session)
-
-            # Distribute lead (assigns commercial via round-robin)
+        # Nuevo lead → distribuir por round-robin
+        try:
             inbox_service = InboxService(self.db)
             distribute_data = InboxDistribute(
-                telefono=phone,
-                mensaje=f"Agendar visita - RUC: {datos['ruc']}",
+                telefono=data.from_number,
+                mensaje=mensaje_contexto,
                 nombre_display=data.contact_name,
-                tipo_interes="VISITA"
+                tipo_interes=tipo_interes,
             )
             result = await inbox_service.distribute_lead(distribute_data)
-            comercial_nombre = result["assigned_to"]["nombre"]
-            comercial_id = result["assigned_to"]["id"]
+            nombre_comercial = result["assigned_to"]["nombre"]
+            inbox_id = result.get("lead_id")
 
-            # Crear cita
-            try:
-                fecha = datetime.strptime(datos["fecha"], "%d/%m/%Y")
-                nueva_cita = Cita(
-                    tipo_agenda="INDIVIDUAL",
-                    comercial_id=comercial_id,
-                    fecha=fecha,
-                    hora=datos["hora"],
-                    tipo_cita=datos["tipo_visita"],
-                    direccion=datos.get("direccion", "Centro Aéreo Comercial, módulo E, oficina 507"),
-                    motivo=f"Cita agendada via WhatsApp - RUC: {datos['ruc']}",
-                    estado="PENDIENTE",
-                    created_by=comercial_id,
-                )
-                self.db.add(nueva_cita)
-                await self.db.commit()
-            except Exception as e:
-                logger.error(f"Error creando cita vía WhatsApp: {e}", exc_info=True)
-                await self._delete_session(session)
-                return WhatsAppResponse(
-                    action="send_text",
-                    messages=[BotMessage(type="text", content=(
-                        f"⚠️ Tu solicitud fue registrada pero la cita no pudo ser creada automáticamente.\n\n"
-                        f"El asesor *{comercial_nombre}* te contactará para confirmar los detalles.\n\n"
-                        f"¡Gracias por elegir Grupo Corban! 🚀"
-                    ))]
+            await self._update_session(session, "ATENDIDO", {"inbox_id": inbox_id})
+
+            if en_horario:
+                texto = msg_asignado.format(nombre=nombre_comercial)
+            else:
+                texto = msg_asignado_fuera.format(
+                    nombre=nombre_comercial, horario=MSG_HORARIO_INFO
                 )
 
+            return WhatsAppResponse(
+                action="send_text",
+                messages=[BotMessage(type="text", content=texto)],
+            )
+        except Exception as e:
+            logger.error(f"Error al derivar a comercial: {e}", exc_info=True)
             await self._delete_session(session)
             return WhatsAppResponse(
                 action="send_text",
-                messages=[BotMessage(type="text", content=(
-                    f"✅ ¡Cita agendada exitosamente!\n\n"
-                    f"El asesor *{comercial_nombre}* confirmará la cita y se pondrá en contacto contigo.\n\n"
-                    f"¡Gracias por elegir Grupo Corban! 🚀"
-                ))]
+                messages=[BotMessage(type="text", content=MSG_ERROR_OCUPADOS)],
             )
-        elif data.button_id == "btn_cancelar":
+
+    # =====================================================================
+    # DESPEDIDA (llamado por inbox_service y chat endpoint al cerrar lead)
+    # =====================================================================
+
+    async def send_despedida(self, phone: str, inbox_id: int):
+        """Envía mensaje simple de despedida y limpia la sesión del bot."""
+        from app.services.comercial.whatsapp_service import WhatsAppService
+
+        # Eliminar sesión activa si existe
+        session = await self._get_active_session(phone)
+        if session:
             await self._delete_session(session)
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content="Cita cancelada. Escribe *menu* cuando quieras volver a empezar. 👋")]
-            )
-        else:
-            return WhatsAppResponse(
-                action="send_buttons",
-                messages=[BotMessage(type="buttons", body="Por favor, confirma o cancela:", buttons=CONFIRM_BUTTONS)]
-            )
 
-    # ===================== HELPERS =====================
+        try:
+            await WhatsAppService.send_text(phone, MSG_DESPEDIDA)
 
-    def _send_menu(self, es_regreso=False) -> WhatsAppResponse:
-        """Envía el menú principal. Si es_regreso=True, usa mensaje corto en vez de bienvenida completa."""
-        mensaje = MENSAJE_MENU_REGRESO if es_regreso else MENSAJE_BIENVENIDA
+            # Guardar en historial de chat
+            chat_svc = ChatService(self.db)
+            await chat_svc.save_message(ChatMessageCreate(
+                inbox_id=inbox_id,
+                telefono=phone,
+                direccion="SALIENTE",
+                remitente_tipo="BOT",
+                contenido=MSG_DESPEDIDA,
+                estado_envio="ENVIADO",
+                tipo_contenido="text",
+            ))
+        except Exception as e:
+            logger.error(f"Error enviando despedida: {e}", exc_info=True)
+
+    # =====================================================================
+    # AUTO-DERIVAR COTIZACIONES ABANDONADAS (llamado por scheduler)
+    # =====================================================================
+
+    async def auto_derivar_cotizaciones_abandonadas(self):
+        """Busca sesiones COTIZAR_CONFIRMAR con más de 5 min sin actividad y las deriva."""
+        try:
+            limite = datetime.now() - timedelta(minutes=5)
+            query = select(ConversationSession).where(
+                and_(
+                    ConversationSession.estado == "COTIZAR_CONFIRMAR",
+                    ConversationSession.updated_at <= limite,
+                )
+            )
+            result = await self.db.execute(query)
+            sesiones_abandonadas = result.scalars().all()
+
+            for session in sesiones_abandonadas:
+                try:
+                    phone = session.telefono
+                    datos = self._get_session_data(session)
+                    requerimientos = datos.get("requerimientos", [])
+                    resumen = "\n".join(f"• {r}" for r in requerimientos) if requerimientos else "Cotización sin detalles"
+
+                    # Distribuir lead
+                    inbox_service = InboxService(self.db)
+                    distribute_data = InboxDistribute(
+                        telefono=phone,
+                        mensaje=f"Solicitud de cotización (auto-derivada):\n{resumen}",
+                        nombre_display="Cliente WhatsApp",
+                        tipo_interes="COTIZACION",
+                    )
+                    result_dist = await inbox_service.distribute_lead(distribute_data)
+                    nombre_comercial = result_dist["assigned_to"]["nombre"]
+
+                    # Enviar mensaje al cliente
+                    from app.services.comercial.whatsapp_service import WhatsAppService
+
+                    en_horario = es_horario_laboral()
+                    if en_horario:
+                        texto = MSG_COTIZAR_DERIVADO.format(nombre=nombre_comercial)
+                    else:
+                        texto = MSG_COTIZAR_DERIVADO_FUERA_HORARIO.format(
+                            nombre=nombre_comercial, horario=MSG_HORARIO_INFO
+                        )
+
+                    await WhatsAppService.send_text(phone, texto)
+
+                    # Guardar respuesta del bot en historial
+                    inbox_id = result_dist.get("lead_id")
+                    if inbox_id:
+                        chat_svc = ChatService(self.db)
+                        await chat_svc.save_message(ChatMessageCreate(
+                            inbox_id=inbox_id,
+                            telefono=phone,
+                            direccion="SALIENTE",
+                            remitente_tipo="BOT",
+                            contenido=texto,
+                            estado_envio="ENVIADO",
+                            tipo_contenido="text",
+                        ))
+
+                    # Eliminar sesión
+                    await self.db.delete(session)
+                    await self.db.commit()
+
+                    logger.info(
+                        f"[CHATBOT] Cotización auto-derivada: tel={phone}, "
+                        f"asesor={nombre_comercial}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"[CHATBOT] Error auto-derivando cotización {session.telefono}: {e}",
+                        exc_info=True,
+                    )
+        except Exception as e:
+            logger.error(f"[CHATBOT] Error en auto_derivar_cotizaciones: {e}", exc_info=True)
+
+    # =====================================================================
+    # HELPERS
+    # =====================================================================
+
+    def _send_menu(self, es_regreso: bool = False) -> WhatsAppResponse:
+        """Envía el menú principal con 3 botones."""
+        mensaje = MSG_MENU_REGRESO if es_regreso else MSG_BIENVENIDA
         return WhatsAppResponse(
             action="send_buttons",
-            messages=[BotMessage(
-                type="buttons",
-                body=mensaje,
-                buttons=MENU_BUTTONS
-            )]
+            messages=[BotMessage(type="buttons", body=mensaje, buttons=MENU_BUTTONS)],
         )
 
     def _get_user_name(self, user) -> str:
+        """Extrae el nombre legible de un Usuario."""
         if user and user.empleado:
             return f"{user.empleado.nombres} {user.empleado.apellido_paterno}"
         elif user:
             return user.correo_corp
         return "Un asesor"
 
-    def _detectar_tipo_visita_texto(self, texto: str):
-        """Detecta intención de tipo de visita desde texto libre del cliente."""
-        texto_lower = texto.strip().lower()
-        patrones_nos_visita = ["los visito", "los visitaré", "los visitare", "iré a", "ire a", "voy a ir", "yo voy"]
-        patrones_visitenme = ["visítenme", "visitenme", "que me visiten", "vengan", "nos visiten", "visitenos", "visítenos"]
-
-        for patron in patrones_visitenme:
-            if patron in texto_lower:
-                return "VISITA_CLIENTE"
-        for patron in patrones_nos_visita:
-            if patron in texto_lower:
-                return "VISITA_OFICINA"
+    def _detectar_intencion(self, texto: str) -> str | None:
+        """Detecta intención del cliente por palabras clave. Retorna 'COTIZACION', 'CARGA' o None."""
+        texto_lower = texto.lower()
+        for kw in KEYWORDS_COTIZACION:
+            if kw in texto_lower:
+                return "COTIZACION"
+        for kw in KEYWORDS_CARGA:
+            if kw in texto_lower:
+                return "CARGA"
         return None
 
     def _get_session_data(self, session) -> dict:
+        """Deserializa el campo JSON 'datos' de la sesión."""
         if session.datos:
             try:
                 return json.loads(session.datos)
@@ -877,105 +527,94 @@ class ChatbotService:
                 return {}
         return {}
 
-    async def _reverse_geocode(self, lat: float, lon: float) -> str:
-        """Convert lat/lng to a human-readable address using Nominatim (OpenStreetMap)."""
+    async def _guardar_mensaje_en_chat(self, inbox_id: int, telefono: str, texto: str):
+        """Guarda un mensaje del cliente en el historial del inbox."""
+        if not texto:
+            return
         try:
-            async with httpx.AsyncClient() as client:
-                response = await client.get(
-                    "https://nominatim.openstreetmap.org/reverse",
-                    params={"lat": lat, "lon": lon, "format": "json", "addressdetails": 1},
-                    headers={"User-Agent": "SGI-Corban/1.0"},
-                    timeout=5.0
-                )
-                data = response.json()
-                return data.get("display_name", f"Lat: {lat}, Lon: {lon}")
-        except Exception as e:
-            logger.error(f"Error en geocodificación inversa: {e}")
-            return f"Lat: {lat}, Lon: {lon}"
-
-    async def _handle_post_atencion_confirmar(self, session, data, phone):
-        """Maneja la confirmación después de que un asesor desecha o devuelve un lead."""
-        button_id = data.button_id
-        text_lower = data.message_text.strip().lower()
-        cortesia = ["gracias", "ok", "vale", "entendido", "listo", "muy bien", "muchas gracias", "hasta luego", "adios", "chau", "perfecto"]
-
-        # Si escoge nueva consulta o escribe algo que no es cortesía
-        if button_id == "btn_otra_consulta":
-            await self._delete_session(session)
-            return self._send_menu(es_regreso=True)
-            
-        if button_id == "btn_finalizar" or (any(p in text_lower for p in cortesia) and len(text_lower) < 25):
-            await self._delete_session(session)
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content="¡Gracias por comunicarte con Grupo Corban! Que tengas un excelente día. 🤗")]
-            )
-            
-        # Si escribe cualquier otra cosa, asumimos que quiere una nueva consulta
-        await self._delete_session(session)
-        return self._send_menu(es_regreso=True)
-
-    async def initiate_post_atencion(self, phone: str, inbox_id: int):
-        """Inicia el flujo interactivo para despedirse del cliente o reabrir el menú tras la atención."""
-        from app.services.comercial.whatsapp_service import WhatsAppService
-        from app.services.comercial.chat_service import ChatService
-        from app.schemas.comercial.chat import ChatMessageCreate
-
-        # Eliminar cualquier sesión que tenga
-        session = await self._get_active_session(phone)
-        if session:
-            await self._delete_session(session)
-            
-        # Creamos sesión de espera para confirmación
-        await self._create_session(phone, "POST_ATENCION_CONFIRMAR")
-
-        mensaje_cierre = "✅ El asesor ha finalizado la atención.\n\n¿Tienes alguna otra consulta o deseas finalizar el chat?"
-        try:
-            await WhatsAppService.send_interactive_buttons(
-                to=phone,
-                body_text=mensaje_cierre,
-                buttons=POST_ATENCION_CONFIRM_BUTTONS
-            )
-            
             chat_svc = ChatService(self.db)
             await chat_svc.save_message(ChatMessageCreate(
                 inbox_id=inbox_id,
-                telefono=phone,
-                direccion='SALIENTE',
-                remitente_tipo='BOT',
-                contenido=mensaje_cierre,
-                estado_envio='ENVIADO',
-                tipo_contenido='text'
+                telefono=telefono,
+                direccion="ENTRANTE",
+                remitente_tipo="CLIENTE",
+                contenido=texto,
+                estado_envio="RECIBIDO",
             ))
         except Exception as e:
-            logger.error(f"Error enviando mensaje de cierre post-atención: {e}")
+            logger.warning(f"No se pudo guardar mensaje en chat: {e}")
+
+    async def _guardar_mensaje_en_chat_desde_session(
+        self, session, telefono: str, texto: str
+    ):
+        """Guarda mensaje usando inbox_id de los datos de sesión."""
+        datos = self._get_session_data(session)
+        inbox_id = datos.get("inbox_id")
+        if inbox_id:
+            await self._guardar_mensaje_en_chat(inbox_id, telefono, texto)
+
+    # =====================================================================
+    # SESSION MANAGEMENT
+    # =====================================================================
 
     async def _get_active_session(self, phone: str):
+        """Obtiene la sesión activa (no expirada) para un teléfono."""
         query = select(ConversationSession).where(
             and_(
                 ConversationSession.telefono == phone,
                 or_(
                     ConversationSession.expires_at.is_(None),
-                    ConversationSession.expires_at > datetime.now()
-                )
+                    ConversationSession.expires_at > datetime.now(),
+                ),
             )
         )
         result = await self.db.execute(query)
         return result.scalars().first()
 
-    async def _get_expired_session(self, phone: str):
-        """Find an expired session for this phone (for timeout notification)."""
-        query = select(ConversationSession).where(
-            and_(
-                ConversationSession.telefono == phone,
-                ConversationSession.expires_at <= datetime.now()
-            )
+    async def _create_session(self, phone: str, estado: str, datos: dict = None):
+        """Crea una nueva sesión eliminando cualquier previa para el teléfono."""
+        existing = await self.db.execute(
+            select(ConversationSession).where(ConversationSession.telefono == phone)
         )
-        result = await self.db.execute(query)
-        return result.scalars().first()
+        for old_session in existing.scalars().all():
+            await self.db.delete(old_session)
+
+        expires = None
+        if estado != "ATENDIDO":
+            expires = datetime.now() + timedelta(minutes=SESSION_TIMEOUT_MINUTES)
+
+        session = ConversationSession(
+            telefono=phone,
+            estado=estado,
+            datos=json.dumps(datos) if datos else None,
+            expires_at=expires,
+        )
+        self.db.add(session)
+        await self.db.commit()
+        await self.db.refresh(session)
+        return session
+
+    async def _update_session(self, session, estado: str, datos: dict = None):
+        """Actualiza estado y datos de la sesión."""
+        session.estado = estado
+        if datos is not None:
+            session.datos = json.dumps(datos)
+        session.updated_at = datetime.now()
+
+        if estado == "ATENDIDO":
+            session.expires_at = None  # Sin timeout
+        else:
+            session.expires_at = datetime.now() + timedelta(minutes=SESSION_TIMEOUT_MINUTES)
+
+        await self.db.commit()
+
+    async def _delete_session(self, session):
+        """Elimina una sesión del bot."""
+        await self.db.delete(session)
+        await self.db.commit()
 
     async def _cleanup_expired_sessions(self):
-        """Delete all sessions expired more than 1 hour ago (opportunistic cleanup)."""
+        """Elimina sesiones expiradas hace más de 1 hora (limpieza oportunista)."""
         try:
             stmt = delete(ConversationSession).where(
                 ConversationSession.expires_at < datetime.now() - timedelta(hours=1)
@@ -985,59 +624,17 @@ class ChatbotService:
         except Exception as e:
             logger.warning(f"Error limpiando sesiones expiradas: {e}")
 
-    async def _create_session(self, phone: str, estado: str, datos: dict = None):
-        # FIX 5: Eliminar sesiones previas para este teléfono (evita duplicados)
-        existing = await self.db.execute(
-            select(ConversationSession).where(ConversationSession.telefono == phone)
-        )
-        for old_session in existing.scalars().all():
-            await self.db.delete(old_session)
-
-        session = ConversationSession(
-            telefono=phone,
-            estado=estado,
-            datos=json.dumps(datos) if datos else None,
-            expires_at=datetime.now() + timedelta(minutes=SESSION_TIMEOUT_MINUTES),
-        )
-        self.db.add(session)
-        await self.db.commit()
-        await self.db.refresh(session)
-        return session
-
-    async def _update_session(self, session, estado: str, datos: dict = None):
-        session.estado = estado
-        if datos is not None:
-            session.datos = json.dumps(datos)
-        session.updated_at = datetime.now()
-        session.expires_at = datetime.now() + timedelta(minutes=SESSION_TIMEOUT_MINUTES)
-        await self.db.commit()
-
-    async def _update_session_corta(self, session, estado: str, datos: dict = None):
-        """Actualiza sesión con timeout corto (para estado ATENDIDO)."""
-        session.estado = estado
-        if datos is not None:
-            session.datos = json.dumps(datos)
-        session.updated_at = datetime.now()
-        session.expires_at = datetime.now() + timedelta(minutes=ATENDIDO_TIMEOUT_MINUTES)
-        await self.db.commit()
-
-    async def _delete_session(self, session):
-        await self.db.delete(session)
-        await self.db.commit()
-
-    async def _get_available_hours(self, fecha: datetime) -> list:
-        """Get available hours for a given date checking against existing appointments."""
-        all_hours = ["9:00", "10:00", "11:00", "14:00", "15:00", "16:00"]
-        try:
-            query = select(Cita.hora).where(
+    async def _get_lead_activo(self, phone: str):
+        """Busca un lead activo (PENDIENTE o EN_GESTION) para el teléfono."""
+        query = (
+            select(Inbox)
+            .where(
                 and_(
-                    Cita.fecha == fecha,
-                    Cita.estado.in_(["PENDIENTE", "APROBADO"])
+                    Inbox.telefono == phone,
+                    Inbox.estado.in_(["PENDIENTE", "EN_GESTION"]),
                 )
             )
-            result = await self.db.execute(query)
-            taken = [r[0] for r in result.all()]
-            available = [h for h in all_hours if h not in taken]
-            return available if available else all_hours
-        except Exception:
-            return all_hours
+            .order_by(Inbox.id.desc())
+        )
+        result = await self.db.execute(query)
+        return result.scalars().first()

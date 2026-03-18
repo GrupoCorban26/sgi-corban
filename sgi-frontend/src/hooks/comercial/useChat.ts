@@ -125,7 +125,7 @@ export const useChatActions = () => {
     });
 
     const descartarLead = useMutation({
-        mutationFn: async ({ inboxId, request }: { inboxId: number; request: { motivo_descarte: string; comentario_descarte: string } }) => {
+        mutationFn: async ({ inboxId, request }: { inboxId: number; request: { motivo_descarte: string; comentario_descarte: string; enviar_mensaje: boolean } }) => {
             const { data } = await api.post(`/comercial/inbox/${inboxId}/descartar`, request);
             return data;
         },

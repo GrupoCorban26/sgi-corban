@@ -1,10 +1,15 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+from datetime import datetime, timedelta
 from typing import List
 
 from app.database.db_connection import get_db
 from app.core.dependencies import get_current_user_obj, resolver_comercial_ids
 from app.models.seguridad import Usuario
+from app.models.comercial_inbox import Inbox
+from app.models.chat_message import ChatMessage
 from app.schemas.comercial.chat import (
     ChatMessageResponse, 
     SendMessageRequest,
@@ -15,7 +20,41 @@ from app.schemas.comercial.chat import (
 from app.services.comercial.chat_service import ChatService
 from app.services.comercial.whatsapp_service import WhatsAppService
 
+logger = logging.getLogger(__name__)
+
+# Nombre de la plantilla aprobada en Meta Business Manager
+TEMPLATE_SALUDO = "saludo_8am"
+
 router = APIRouter(prefix="/comercial/chat", tags=["chat"])
+
+
+async def _ultimo_mensaje_entrante_at(db: AsyncSession, inbox_id: int) -> datetime | None:
+    """Obtiene la fecha del último mensaje ENTRANTE del cliente para este inbox."""
+    query = (
+        select(ChatMessage.created_at)
+        .where(
+            ChatMessage.inbox_id == inbox_id,
+            ChatMessage.direccion == 'ENTRANTE'
+        )
+        .order_by(ChatMessage.created_at.desc())
+        .limit(1)
+    )
+    result = await db.execute(query)
+    return result.scalar_one_or_none()
+
+
+def _ventana_24h_abierta(ultimo_entrante_at: datetime | None) -> bool:
+    """Verifica si la ventana de 24h de WhatsApp sigue abierta."""
+    if not ultimo_entrante_at:
+        return False  # Sin mensaje entrante, ventana cerrada
+    
+    # Normalizar a naive para comparar
+    if ultimo_entrante_at.tzinfo:
+        ultimo_entrante_at = ultimo_entrante_at.replace(tzinfo=None)
+    
+    diferencia = datetime.now() - ultimo_entrante_at
+    return diferencia.total_seconds() < 86400  # 24 horas
+
 
 @router.get("/conversations", response_model=List[ChatConversationPreview])
 async def get_conversations(
@@ -53,19 +92,29 @@ async def send_message(
 ):
     """Enviar un mensaje de WhatsApp al lead desde el comercial."""
     chat_svc = ChatService(db)
-    from app.models.comercial_inbox import Inbox
     
     inbox = await db.get(Inbox, inbox_id)
     if not inbox:
         raise HTTPException(status_code=404, detail="Lead no encontrado")
-        
-    # Send via WhatsApp API
+    
+    # ==========================================
+    # Verificar ventana de 24h antes de enviar
+    # ==========================================
+    ultimo_entrante = await _ultimo_mensaje_entrante_at(db, inbox_id)
+    ventana_abierta = _ventana_24h_abierta(ultimo_entrante)
+    
     try:
-        await WhatsAppService.send_text(inbox.telefono, request.contenido)
+        if ventana_abierta:
+            # Ventana abierta: enviar texto libre normal
+            await WhatsAppService.send_text(inbox.telefono, request.contenido)
+        else:
+            # Ventana cerrada: enviar template primero para reabrir la ventana
+            logger.info(f"Ventana 24h cerrada para inbox {inbox_id}. Enviando template '{TEMPLATE_SALUDO}' en lugar de texto libre.")
+            await WhatsAppService.send_template(inbox.telefono, TEMPLATE_SALUDO)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al enviar mensaje por WhatsApp: {e}")
         
-    # Save to db
+    # Save to db (siempre guardamos el contenido original del asesor)
     msg_create = ChatMessageCreate(
         inbox_id=inbox_id,
         telefono=inbox.telefono,
@@ -96,21 +145,20 @@ async def release_chat(
 ):
     """Devolver el control del chat al bot (cambia modo a BOT) y envía despedida."""
     chat_svc = ChatService(db)
-    # 1. Recuperar info antes de liberar
-    from app.models.comercial_inbox import Inbox
+    
     inbox = await db.get(Inbox, inbox_id)
     if not inbox:
         raise HTTPException(status_code=404, detail="Lead no encontrado")
     
     telefono = inbox.telefono
 
-    # 2. Hacer release en base de datos
+    # Hacer release en base de datos
     inbox = await chat_svc.release_chat(inbox_id)
     
-    # 3. Enviar mensaje de WhatsApp automático y flujo de post-atención interactivo
+    # Enviar mensaje de despedida al cliente
     from app.services.comercial.chatbot_service import ChatbotService
     bot_svc = ChatbotService(db)
-    await bot_svc.initiate_post_atencion(telefono, inbox.id)
+    await bot_svc.send_despedida(telefono, inbox.id)
 
     return {"status": "success", "modo": inbox.modo}
 

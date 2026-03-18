@@ -20,6 +20,7 @@ export interface Cliente {
     is_active: boolean;
     created_at: string | null;
     telefono?: string | null;
+    correo?: string | null;
 }
 
 export interface ClienteCreate {

@@ -63,7 +63,6 @@ class Settings(BaseSettings):
         "extra": "ignore",
     }
 
-
 @lru_cache()
 def get_settings() -> Settings:
     """Retorna la instancia cacheada de Settings. Falla al importar si faltan variables."""

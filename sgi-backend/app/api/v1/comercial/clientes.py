@@ -86,6 +86,7 @@ async def listar_clientes(
     tipo_estado: Optional[str] = Query(None, description="Filtrar por estado"),
     comercial_id: Optional[int] = Query(None, description="Filtrar por comercial"),
     area_id: Optional[int] = Query(None, description="Filtrar por área"),
+    filtro_fecha: Optional[str] = Query(None, description="Filtrar por fecha de próximo contacto (hoy, vencidos, proximos_7_dias)"),
     page: int = Query(1, ge=1),
     page_size: int = Query(15, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -104,6 +105,7 @@ async def listar_clientes(
         tipo_estado=tipo_estado,
         comercial_ids=comercial_ids,
         area_id=area_id,
+        filtro_fecha=filtro_fecha,
         page=page,
         page_size=page_size
     )

@@ -20,6 +20,7 @@ export const useClientes = (
     busqueda = '',
     tipoEstado: string | null = null,
     comercialId: number | null = null,
+    filtroFecha: string | null = null,
     page = 1,
     pageSize = 15
 ) => {
@@ -27,12 +28,13 @@ export const useClientes = (
 
     // 1. Obtener Clientes (Paginado y con filtros)
     const listQuery = useQuery({
-        queryKey: ['clientes', busqueda, tipoEstado, comercialId, page, pageSize],
+        queryKey: ['clientes', busqueda, tipoEstado, comercialId, filtroFecha, page, pageSize],
         queryFn: async () => {
             const params: Record<string, unknown> = { page, page_size: pageSize };
             if (busqueda) params.busqueda = busqueda;
             if (tipoEstado) params.tipo_estado = tipoEstado;
             if (comercialId) params.comercial_id = comercialId;
+            if (filtroFecha) params.filtro_fecha = filtroFecha;
 
             const { data } = await api.get<ClientePaginationResponse>(`${CLIENTES_URL}`, { params });
             return data;

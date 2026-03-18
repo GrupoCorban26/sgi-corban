@@ -35,15 +35,16 @@ class ClientesService:
         tipo_estado: str = None,
         comercial_ids: list[int] = None,
         area_id: int = None,
+        filtro_fecha: str = None,
         page: int = 1,
         page_size: int = 15
     ) -> dict:
         """Lista clientes con paginación y filtros. Filtra por lista de IDs (usuario o empleado)."""
         offset = (page - 1) * page_size
         
-        # Subquery para obtener el teléfono del contacto principal asociado al cliente
-        subq_telefono = (
-            select(ClienteContacto.telefono)
+        # Subquery para obtener el teléfono y correo del contacto principal asociado al cliente
+        subq_contacto = (
+            select(ClienteContacto.telefono, ClienteContacto.correo)
             .where(ClienteContacto.ruc == Cliente.ruc)
             .order_by(
                 ClienteContacto.is_principal.desc(), 
@@ -51,15 +52,15 @@ class ClientesService:
                 ClienteContacto.created_at.desc()
             )
             .limit(1)
-            .scalar_subquery()
-            .label("telefono_contacto")
+            .subquery()
         )
 
         stmt = select(
             Cliente,
             Area.nombre.label("area_nombre"),
             func.concat(Empleado.nombres, ' ', Empleado.apellido_paterno).label("comercial_nombre"),
-            subq_telefono
+            subq_contacto.c.telefono.label("telefono_contacto"),
+            subq_contacto.c.correo.label("correo_contacto")
         ).outerjoin(Area, Cliente.area_encargada_id == Area.id) \
          .outerjoin(Usuario, Cliente.comercial_encargado_id == Usuario.id) \
          .outerjoin(Empleado, Usuario.empleado_id == Empleado.id) \
@@ -79,6 +80,19 @@ class ClientesService:
             
         if area_id:
             stmt = stmt.where(Cliente.area_encargada_id == area_id)
+            
+        if filtro_fecha:
+            today = datetime.now().date()
+            if filtro_fecha == 'vencidos':
+                stmt = stmt.where(Cliente.proxima_fecha_contacto < today)
+            elif filtro_fecha == 'hoy':
+                stmt = stmt.where(Cliente.proxima_fecha_contacto == today)
+            elif filtro_fecha == 'proximos_7_dias':
+                limit_date = today + timedelta(days=7)
+                stmt = stmt.where(and_(
+                    Cliente.proxima_fecha_contacto >= today,
+                    Cliente.proxima_fecha_contacto <= limit_date
+                ))
             
         # Count
         count_stmt = select(func.count()).select_from(stmt.subquery())
@@ -104,6 +118,7 @@ class ClientesService:
                 "comercial_encargado_id": c.comercial_encargado_id,
                 "comercial_nombre": row[2],
                 "telefono": row[3], # Inyectando el teléfono
+                "correo": row[4], # Inyectando el correo
                 "ultimo_contacto": c.ultimo_contacto,
                 "comentario_ultima_llamada": c.comentario_ultima_llamada,
                 "proxima_fecha_contacto": c.proxima_fecha_contacto,

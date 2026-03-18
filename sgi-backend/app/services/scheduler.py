@@ -29,6 +29,9 @@ HORA_RESET = time(8, 0)  # 8:00 AM
 TIMEOUT_LEADS_SIN_RESPUESTA_MINUTOS = 60  # 1 hora
 INTERVALO_VERIFICACION_MINUTOS = 10  # Cada cuántos minutos revisar
 
+# Configuración de auto-derivación de cotizaciones abandonadas
+INTERVALO_COTIZACIONES_MINUTOS = 1  # Cada cuántos minutos revisar
+
 
 async def _reset_disponibilidad_buzon():
     """Resetea disponible_buzon=True para todos los comerciales activos."""
@@ -274,10 +277,38 @@ async def _scheduler_leads_sin_respuesta():
             await asyncio.sleep(300)  # Reintentar en 5 minutos
 
 
+async def _scheduler_cotizaciones_abandonadas():
+    """Loop que cada minuto revisa cotizaciones abandonadas y las auto-deriva."""
+    logger.info(
+        f"[SCHEDULER] Tarea de cotizaciones abandonadas iniciada. "
+        f"Intervalo: {INTERVALO_COTIZACIONES_MINUTOS} min."
+    )
+    # Espera inicial para que el servidor termine de arrancar
+    await asyncio.sleep(30)
+
+    while True:
+        try:
+            async with AsyncSessionLocal() as db:
+                from app.services.comercial.chatbot_service import ChatbotService
+                bot_svc = ChatbotService(db)
+                await bot_svc.auto_derivar_cotizaciones_abandonadas()
+            await asyncio.sleep(INTERVALO_COTIZACIONES_MINUTOS * 60)
+        except asyncio.CancelledError:
+            logger.info("[SCHEDULER] Tarea de cotizaciones abandonadas detenida.")
+            break
+        except Exception as e:
+            logger.error(
+                f"[SCHEDULER] Error en tarea de cotizaciones abandonadas: {e}",
+                exc_info=True,
+            )
+            await asyncio.sleep(60)  # Reintentar en 1 minuto
+
+
 async def iniciar_scheduler():
     """Inicia todas las tareas programadas del sistema."""
     logger.info("[SCHEDULER] Iniciando todas las tareas programadas...")
     await asyncio.gather(
         _scheduler_reset_disponibilidad(),
-        _scheduler_leads_sin_respuesta()
+        _scheduler_leads_sin_respuesta(),
+        _scheduler_cotizaciones_abandonadas(),
     )

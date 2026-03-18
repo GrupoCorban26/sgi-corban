@@ -18,11 +18,30 @@ interface Props {
 }
 
 const ESTADOS_MAP = [
-    { value: 'NUEVO', label: 'Nuevo Lead', color: 'text-blue-600' },
-    { value: 'PENDIENTE', label: 'Pendiente de Atención', color: 'text-amber-600' },
     { value: 'EN_GESTION', label: 'En Gestión Activa', color: 'text-emerald-600' },
     { value: 'COTIZADO', label: 'Cotización Enviada', color: 'text-cyan-600' },
+    { value: 'DESCARTADO', label: 'Descartar Lead', color: 'text-red-600' },
 ];
+
+// Mapa de labels para mostrar el estado actual (incluye los automáticos)
+const ESTADO_LABELS: Record<string, string> = {
+    'NUEVO': 'Nuevo Lead',
+    'PENDIENTE': 'Pendiente de Atención',
+    'EN_GESTION': 'En Gestión Activa',
+    'COTIZADO': 'Cotización Enviada',
+    'SEGUIMIENTO': 'Seguimiento',
+    'DESCARTADO': 'Descartado',
+    'CONVERTIDO': 'Convertido',
+    'CIERRE': 'Cerrado',
+};
+
+// Opciones disponibles según el estado actual (solo progresión hacia adelante)
+const ESTADOS_PERMITIDOS: Record<string, string[]> = {
+    'NUEVO': ['EN_GESTION'],
+    'PENDIENTE': ['EN_GESTION'],
+    'EN_GESTION': ['COTIZADO', 'DESCARTADO'],
+    'COTIZADO': ['DESCARTADO'],
+};
 
 const MOTIVOS_DESCARTE = [
     'Solo consulta',
@@ -37,7 +56,7 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
     const { asignarManualMutation } = useInbox();
     const { data: comerciales = [] } = useComerciales();
     const [showDiscardModal, setShowDiscardModal] = useState(false);
-    const [discardData, setDiscardData] = useState({ motivo_descarte: '', comentario_descarte: '' });
+    const [discardData, setDiscardData] = useState({ motivo_descarte: '', comentario_descarte: '', enviar_mensaje: true });
     const [isDiscarding, setIsDiscarding] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
     const [selectedComercialId, setSelectedComercialId] = useState<number | ''>('');
@@ -126,7 +145,7 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
             await descartarLead.mutateAsync({ inboxId: selectedConv.inbox_id, request: discardData });
             toast.success('Lead descartado');
             setShowDiscardModal(false);
-            setDiscardData({ motivo_descarte: '', comentario_descarte: '' });
+            setDiscardData({ motivo_descarte: '', comentario_descarte: '', enviar_mensaje: true });
             onChangeConv(null);
         } catch {
             toast.error('Error al descartar');
@@ -204,14 +223,20 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
                 <select
                     value={selectedConv.estado}
                     onChange={handleEstadoChange}
-                    disabled={selectedConv.estado === 'CIERRE' || selectedConv.estado === 'DESCARTADO'}
+                    disabled={selectedConv.estado === 'CIERRE' || selectedConv.estado === 'DESCARTADO' || selectedConv.estado === 'CONVERTIDO'}
                     className="w-full bg-slate-50 border border-slate-200 text-slate-700 rounded-xl px-3 py-2.5 text-sm font-medium
                         focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400
                         disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
                 >
-                    {ESTADOS_MAP.map(est => (
-                        <option key={est.value} value={est.value}>{est.label}</option>
-                    ))}
+                    <option value={selectedConv.estado}>
+                        {ESTADO_LABELS[selectedConv.estado] || selectedConv.estado}
+                    </option>
+                    {(ESTADOS_PERMITIDOS[selectedConv.estado] || []).map(val => {
+                        const est = ESTADOS_MAP.find(e => e.value === val);
+                        return est ? (
+                            <option key={est.value} value={est.value}>{est.label}</option>
+                        ) : null;
+                    })}
                 </select>
             </div>
 
@@ -277,14 +302,6 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
                         flex items-center justify-center gap-2 shadow-sm shadow-emerald-200 hover:shadow-md transition-all"
                 >
                     <CheckCircle2 size={15} /> Cerrar como Cliente
-                </button>
-
-                <button
-                    onClick={() => setShowDiscardModal(true)}
-                    className="w-full py-2.5 px-4 bg-white hover:bg-red-50 text-slate-500 hover:text-red-600 rounded-xl text-sm font-medium
-                        flex items-center justify-center gap-2 transition-all border border-slate-200 hover:border-red-200"
-                >
-                    Descartar Lead
                 </button>
             </div>
 
@@ -381,13 +398,27 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
                                     onChange={(e) => setDiscardData({ ...discardData, comentario_descarte: e.target.value })}
                                 />
                             </div>
+
+                            {/* Toggle enviar mensaje */}
+                            <label className="flex items-center gap-3 p-3 bg-slate-50 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors">
+                                <input
+                                    type="checkbox"
+                                    checked={discardData.enviar_mensaje}
+                                    onChange={(e) => setDiscardData({ ...discardData, enviar_mensaje: e.target.checked })}
+                                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-200 cursor-pointer"
+                                />
+                                <div>
+                                    <span className="text-sm font-medium text-slate-700">Enviar mensaje al cliente</span>
+                                    <p className="text-xs text-slate-400 mt-0.5">Se enviará un mensaje de despedida por WhatsApp</p>
+                                </div>
+                            </label>
                         </div>
 
                         <div className="flex gap-3 px-6 pb-6">
                             <button
                                 onClick={() => {
                                     setShowDiscardModal(false);
-                                    setDiscardData({ motivo_descarte: '', comentario_descarte: '' });
+                                    setDiscardData({ motivo_descarte: '', comentario_descarte: '', enviar_mensaje: true });
                                 }}
                                 disabled={isDiscarding}
                                 className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 disabled:opacity-50 transition-colors"

@@ -233,7 +233,7 @@ class ChatService:
         if not inbox:
             raise HTTPException(status_code=404, detail="Inbox not found")
             
-        valid_states = ['NUEVO', 'PENDIENTE', 'EN_GESTION', 'SEGUIMIENTO', 'COTIZADO', 'CIERRE', 'DESCARTADO']
+        valid_states = ['EN_GESTION', 'COTIZADO', 'CIERRE', 'DESCARTADO', 'CONVERTIDO']
         if nuevo_estado not in valid_states:
             raise HTTPException(status_code=400, detail="Estado no válido")
             

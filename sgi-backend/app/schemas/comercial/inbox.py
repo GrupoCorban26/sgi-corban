@@ -38,6 +38,7 @@ class InboxDistributionResponse(BaseModel):
 class InboxDescartarRequest(BaseModel):
     motivo_descarte: str
     comentario_descarte: str
+    enviar_mensaje: bool = True  # Por defecto envía mensaje al cliente
 
 class InboxAsignarManualRequest(BaseModel):
     comercial_id: int
