@@ -79,7 +79,7 @@ export default function CarteraGlobalPage() {
         isError,
         isFetching,
         refetch
-    } = useClientes(busqueda, tipoEstado, comercialId, page, pageSize);
+    } = useClientes(busqueda, tipoEstado, comercialId, null, page, pageSize);
 
     // Stats globales (sin filtro de comercial para ver totales de todos)
     const { data: stats } = useClientesStats(null);

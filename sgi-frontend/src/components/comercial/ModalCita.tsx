@@ -17,7 +17,7 @@ interface ModalCitaProps {
 export default function ModalCita({ isOpen, onClose, citaToEdit }: ModalCitaProps) {
     const { createMutation, updateMutation } = useCitas();
     const { user } = useCurrentUser();
-    const { clientes, isLoading: loadingClientes } = useClientes('', null, user?.id ?? null, 1, 100);
+    const { clientes, isLoading: loadingClientes } = useClientes('', null, user?.id ?? null, null, 1, 100);
 
     const [clienteId, setClienteId] = useState<number>(0);
     const [fecha, setFecha] = useState('');
