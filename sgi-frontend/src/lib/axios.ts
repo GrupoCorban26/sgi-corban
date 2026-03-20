@@ -1,64 +1,55 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000/api/v1';
+/**
+ * Instancia centralizada de axios para el SGI.
+ * 
+ * Todas las peticiones pasan por el proxy de Next.js (/api/proxy/...)
+ * que inyecta el token JWT desde una cookie httpOnly.
+ * 
+ * Esto protege el token contra ataques XSS — el JavaScript del navegador
+ * nunca tiene acceso al token.
+ */
 
-// Función para obtener cookie de document.cookie
-function getCookie(name: string): string | undefined {
-    if (typeof document === 'undefined') return undefined;
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) return parts.pop()?.split(';').shift();
-    return undefined;
-}
-
-// Crear instancia de axios con configuración base
+// El proxy corre en el mismo origen que Next.js, así que usamos ruta relativa
 const api = axios.create({
-    baseURL: API_BASE_URL,
+    baseURL: '/api/proxy',
     headers: {
         'Content-Type': 'application/json',
     },
 });
 
-// Interceptor para agregar token automáticamente
-api.interceptors.request.use(
-    (config) => {
-        let token = getCookie('token');
-        if (!token && typeof window !== 'undefined') {
-            token = localStorage.getItem('token') || undefined;
-        }
-
-        if (token) {
-            config.headers.Authorization = `Bearer ${token}`;
-        }
-        return config;
-    },
-    (error) => {
-        return Promise.reject(error);
-    }
-);
-
-// Interceptor para manejar errores de autenticación
+// Interceptor de respuesta: manejar errores de autenticación y autorización
 api.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response?.status === 401) {
-            console.error('Unauthorized - Token may be expired or missing');
+        const status = error.response?.status;
 
-            // Only execute in the browser
-            if (typeof window !== 'undefined') {
-                // Clear cookies and local storage
-                document.cookie = 'token=; Max-Age=0; path=/;';
-                document.cookie = 'user_data=; Max-Age=0; path=/;';
-                localStorage.removeItem('token');
-                localStorage.removeItem('user_data');
+        if (typeof window !== 'undefined') {
+            if (status === 401) {
+                // Sesión expirada o token inválido → limpiar cookies (incluyendo httpOnly) y redirigir
+                fetch('/api/auth/clear-session', { method: 'POST' }).finally(() => {
+                    if (window.location.pathname !== '/login') {
+                        window.location.href = '/login';
+                    }
+                });
+            }
 
-                // Avoid redirect loop if already on login page
-                if (window.location.pathname !== '/login') {
-                    window.location.href = '/login';
+            if (status === 403) {
+                // Sin permiso → redirigir a página de acceso denegado
+                if (window.location.pathname !== '/acceso-denegado') {
+                    window.location.href = '/acceso-denegado';
                 }
             }
         }
-        return Promise.reject(error);
+
+        // Normalizar error para que los componentes reciban estructura consistente
+        const normalizedError = {
+            status: status || 0,
+            message: error.response?.data?.detail || 'Error de conexión con el servidor',
+            code: error.response?.data?.code || 'UNKNOWN_ERROR',
+        };
+
+        return Promise.reject(normalizedError);
     }
 );
 

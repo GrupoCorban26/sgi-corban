@@ -1,39 +1,29 @@
-'use client';
-
 import React, { useState } from 'react';
+import { Phone, CheckCircle2, XCircle, ClipboardList, ChevronLeft, ChevronRight, Bot, Tag, AlertTriangle, Clock as ClockIcon } from 'lucide-react';
+import { format, startOfMonth, endOfMonth } from 'date-fns';
+import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
+
 import { useReportesLlamadas } from '@/hooks/comercial/useReportesLlamadas';
 import { reportesLlamadasService } from '@/services/comercial/reportesLlamadas';
-import {
-    Calendar as CalendarIcon,
-    Download,
-    Phone,
-    CheckCircle2,
-    XCircle,
-    ClipboardList,
-    ChevronLeft,
-    ChevronRight,
-    Bot,
-    MessageSquare,
-    Clock,
-    Tag,
-    AlertTriangle
-} from 'lucide-react';
-import { format, startOfMonth, endOfMonth } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { toast } from 'sonner';
+import { FiltrosSeccion } from './FiltrosSeccion';
 
-export default function HistorialLlamadasPage() {
+export function SectionLlamadas() {
     const [fechaInicio, setFechaInicio] = useState(format(startOfMonth(new Date()), 'yyyy-MM-dd'));
     const [fechaFin, setFechaFin] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
+    const [comercialId, setComercialId] = useState<string | undefined>();
+    const [empresa, setEmpresa] = useState<string | undefined>();
     const [page, setPage] = useState(1);
     const pageSize = 50;
 
+    // We pass comercialId to useReportesLlamadas (currently relies on comercial_id as number, so we parse it)
     const { data, isLoading, isError, isFetching } = useReportesLlamadas({
         fecha_inicio: fechaInicio,
         fecha_fin: fechaFin,
+        comercial_id: comercialId ? parseInt(comercialId) : undefined,
         page,
         page_size: pageSize
+        // empresa is not currently sent to backend for this specific hook, but UI handles the state
     });
 
     const [isExporting, setIsExporting] = useState(false);
@@ -42,7 +32,8 @@ export default function HistorialLlamadasPage() {
             setIsExporting(true);
             await reportesLlamadasService.exportarExcel({
                 fecha_inicio: fechaInicio,
-                fecha_fin: fechaFin
+                fecha_fin: fechaFin,
+                comercial_id: comercialId ? parseInt(comercialId) : undefined
             });
             toast.success('Reporte exportado exitosamente');
         } catch (error) {
@@ -53,7 +44,7 @@ export default function HistorialLlamadasPage() {
         }
     };
 
-    const totalPages = data ? Math.ceil(data.total / pageSize) : 0;
+    const totalPages = data && data.total ? Math.ceil(data.total / pageSize) : 0;
 
     // Bot Analytics
     const { data: botData } = useQuery({
@@ -73,61 +64,28 @@ export default function HistorialLlamadasPage() {
     };
 
     return (
-        <div className="space-y-6">
-            {/* Cabecera y Filtros */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-900 tracking-tight flex items-center gap-2">
-                        <Phone className="text-blue-600" size={24} />
-                        Historial de Llamadas
-                    </h1>
-                    <p className="text-sm text-gray-500 mt-1 flex items-center gap-1.5">
-                        <CalendarIcon size={14} />
-                        Período: {format(new Date(fechaInicio), 'dd MMM, yyyy', { locale: es })} - {format(new Date(fechaFin), 'dd MMM, yyyy', { locale: es })}
-                    </p>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
-                    <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-lg border border-gray-200">
-                        <input
-                            type="date"
-                            value={fechaInicio}
-                            onChange={(e) => {
-                                setFechaInicio(e.target.value);
-                                setPage(1);
-                            }}
-                            className="bg-transparent text-sm text-gray-700 font-medium focus:outline-none p-1 cursor-pointer"
-                        />
-                        <span className="text-gray-400 font-bold">-</span>
-                        <input
-                            type="date"
-                            value={fechaFin}
-                            onChange={(e) => {
-                                setFechaFin(e.target.value);
-                                setPage(1);
-                            }}
-                            className="bg-transparent text-sm text-gray-700 font-medium focus:outline-none p-1 cursor-pointer"
-                        />
-                    </div>
-
-                    <button
-                        onClick={handleExportar}
-                        disabled={isExporting}
-                        className={`flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors ${isExporting ? 'opacity-50 cursor-not-allowed' : ''
-                            }`}
-                    >
-                        {isExporting ? (
-                            <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-                        ) : (
-                            <Download size={18} />
-                        )}
-                        Exportar a Excel
-                    </button>
-                </div>
-            </div>
+        <div className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm mb-6 mt-8">
+            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                <Phone className="text-blue-600" size={24} />
+                Historial de Llamadas
+            </h2>
+            
+            <FiltrosSeccion
+                fechaInicio={fechaInicio}
+                fechaFin={fechaFin}
+                setFechaInicio={(d) => { setFechaInicio(d); setPage(1); }}
+                setFechaFin={(d) => { setFechaFin(d); setPage(1); }}
+                comercialId={comercialId}
+                setComercialId={(c) => { setComercialId(c); setPage(1); }}
+                empresa={empresa}
+                setEmpresa={(e) => { setEmpresa(e); setPage(1); }}
+                onExport={handleExportar}
+                isExporting={isExporting}
+                hasData={!!data && (data.total > 0 || (data.data && data.data.length > 0))}
+            />
 
             {/* Tabla de Resultados */}
-            <div className={`bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden transition-opacity duration-300 ${isFetching ? 'opacity-60' : 'opacity-100'}`}>
+            <div className={`mt-6 bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden transition-opacity duration-300 ${isFetching ? 'opacity-60' : 'opacity-100'}`}>
                 <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
                     <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                         <ClipboardList className="text-gray-500" size={20} />
@@ -245,7 +203,7 @@ export default function HistorialLlamadasPage() {
             {/* SECCIÓN: ANALYTICS DEL BOT                              */}
             {/* ======================================================= */}
             {botData && (
-                <div className="space-y-6">
+                <div className="space-y-6 mt-8">
                     <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2 border-b pb-2">
                         <Bot className="text-blue-500" size={24} />
                         Análisis del Bot WhatsApp
@@ -322,7 +280,7 @@ export default function HistorialLlamadasPage() {
                     {/* Leads por Hora del Día */}
                     <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
                         <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center gap-2">
-                            <Clock className="text-teal-500" size={18} />
+                            <ClockIcon className="text-teal-500" size={18} />
                             <h3 className="font-semibold text-gray-800">Leads por hora del día</h3>
                             <span className="text-xs text-gray-400 ml-auto">¿A qué hora llegan más leads?</span>
                         </div>

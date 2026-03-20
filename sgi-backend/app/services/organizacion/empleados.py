@@ -80,7 +80,9 @@ class EmpleadoService:
                 e.email_personal,
                 e.distrito_id,
                 dist.nombre AS distrito,
+                p.id AS provincia_id,
                 p.nombre AS provincia,
+                dept_ub.id AS departamento_ubigeo_id,
                 dept_ub.nombre AS departamento_ubigeo,
                 e.direccion,
                 e.fecha_ingreso,
@@ -93,7 +95,9 @@ class EmpleadoService:
                 a.departamento_id AS departamento_id,
                 d.nombre AS departamento_nombre,
                 e.jefe_id,
-                ISNULL(emp_jefe.nombres + ' ' + emp_jefe.apellido_paterno, 'Sin jefe') AS jefe_nombre
+                ISNULL(emp_jefe.nombres + ' ' + emp_jefe.apellido_paterno, 'Sin jefe') AS jefe_nombre,
+                e.iniciales_sispac,
+                e.empresa
             FROM adm.empleados e
             LEFT JOIN core.distritos dist ON dist.id = e.distrito_id
             LEFT JOIN core.provincias p ON p.id = dist.provincia_id
@@ -131,7 +135,9 @@ class EmpleadoService:
                 e.cargo_id, c.nombre AS cargo_nombre,
                 c.area_id AS area_id, a.nombre AS area_nombre,
                 a.departamento_id AS departamento_id, d.nombre AS departamento_nombre,
-                e.jefe_id, ISNULL(emp_jefe.nombres + ' ' + emp_jefe.apellido_paterno, 'Sin jefe') AS jefe_nombre
+                e.jefe_id, ISNULL(emp_jefe.nombres + ' ' + emp_jefe.apellido_paterno, 'Sin jefe') AS jefe_nombre,
+                e.iniciales_sispac,
+                e.empresa
             FROM adm.empleados e
             LEFT JOIN core.distritos dist ON dist.id = e.distrito_id
             LEFT JOIN core.provincias p ON p.id = dist.provincia_id
@@ -170,14 +176,14 @@ class EmpleadoService:
                 nombres, apellido_paterno, apellido_materno, fecha_nacimiento, 
                 tipo_documento, nro_documento, celular, email_personal, 
                 distrito_id, direccion, fecha_ingreso, fecha_cese, is_active, 
-                cargo_id, jefe_id, empresa
+                cargo_id, jefe_id, empresa, iniciales_sispac
             )
             OUTPUT INSERTED.id
             VALUES (
                 :nombres, :apellido_paterno, :apellido_materno, :fecha_nacimiento, 
                 :tipo_documento, :nro_documento, :celular, :email_personal, 
                 :distrito_id, :direccion, :fecha_ingreso, NULL, 1, 
-                :cargo_id, :jefe_id, :empresa
+                :cargo_id, :jefe_id, :empresa, :iniciales_sispac
             )
         """)
         
@@ -195,7 +201,8 @@ class EmpleadoService:
             "fecha_ingreso": empleado.fecha_ingreso,
             "cargo_id": empleado.cargo_id,
             "jefe_id": empleado.jefe_id,
-            "empresa": empleado.empresa
+            "empresa": empleado.empresa,
+            "iniciales_sispac": empleado.iniciales_sispac
         })
         await self.db.commit()
         
@@ -241,6 +248,7 @@ class EmpleadoService:
                 cargo_id = :cargo_id,
                 jefe_id = :jefe_id,
                 empresa = :empresa,
+                iniciales_sispac = :iniciales_sispac,
                 updated_at = GETDATE()
             WHERE id = :id
         """)
@@ -260,7 +268,8 @@ class EmpleadoService:
             "fecha_ingreso": empleado.fecha_ingreso,
             "cargo_id": empleado.cargo_id,
             "jefe_id": empleado.jefe_id,
-            "empresa": empleado.empresa
+            "empresa": empleado.empresa,
+            "iniciales_sispac": empleado.iniciales_sispac
         })
         await self.db.commit()
         

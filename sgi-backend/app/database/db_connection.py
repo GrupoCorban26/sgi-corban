@@ -48,7 +48,7 @@ async def test_connection():
         # En motores asíncronos se usa "async with engine.begin()"
         async with engine.begin() as conn:
             logger.info("Conexión asíncrona exitosa")
-            logger.info(f"Conectado a: {DB_NAME} en {DB_SERVER}")
+            logger.info(f"Conectado a: {settings.DB_NAME} en {settings.DB_SERVER}")
     except Exception as e:
         logger.error(f"Error en la conexión asíncrona: {e}")
 

@@ -43,6 +43,13 @@ const ESTADOS_PIPELINE: Record<string, { label: string; color: string; tipo: 'po
     INACTIVO:         { label: 'Inactivo',        color: 'bg-gray-100 text-gray-500 border-gray-300', tipo: 'negativo' },
 };
 
+const MOTIVOS_CAIDA = [
+    'Precio alto',
+    'No responde',
+    'Ya no quiere trabajar con nosotros',
+    'Otro',
+];
+
 // Transiciones válidas (debe coincidir con el backend)
 const TRANSICIONES: Record<string, string[]> = {
     PROSPECTO:        ['EN_NEGOCIACION', 'CAIDO', 'INACTIVO'],
@@ -68,6 +75,7 @@ export default function ModalRegistrarGestion({
 
     // Campos para Caído
     const [motivoCaida, setMotivoCaida] = useState('');
+    const [motivoCaidaOtro, setMotivoCaidaOtro] = useState('');
     const [fechaSeguimientoCaida, setFechaSeguimientoCaida] = useState('');
 
     // Modal de contactos
@@ -88,6 +96,7 @@ export default function ModalRegistrarGestion({
         setProximaFecha('');
         setNuevoEstado('');
         setMotivoCaida('');
+        setMotivoCaidaOtro('');
         setFechaSeguimientoCaida('');
     };
 
@@ -96,16 +105,21 @@ export default function ModalRegistrarGestion({
         if (!resultado) return;
 
         // Si marcó Caído, validar motivo
-        if (nuevoEstado === 'CAIDO' && !motivoCaida.trim()) {
+        if (nuevoEstado === 'CAIDO' && !motivoCaida) {
             toast.error('El motivo de caída es obligatorio');
+            return;
+        }
+        if (nuevoEstado === 'CAIDO' && motivoCaida === 'Otro' && !motivoCaidaOtro.trim()) {
+            toast.error('Especifique el motivo de caída');
             return;
         }
 
         try {
             // Caso especial: Marcar como CAIDO (usa endpoint dedicado)
             if (nuevoEstado === 'CAIDO') {
+                const motivoFinal = motivoCaida === 'Otro' ? motivoCaidaOtro.trim() : motivoCaida;
                 const caido: ClienteMarcarCaido = {
-                    motivo_caida: motivoCaida,
+                    motivo_caida: motivoFinal,
                     fecha_seguimiento_caida: fechaSeguimientoCaida || undefined,
                 };
                 await marcarCaidoMutation.mutateAsync({ id: clienteId, data: caido });
@@ -302,14 +316,27 @@ export default function ModalRegistrarGestion({
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-red-700 mb-1">Motivo de caída *</label>
-                                <input
-                                    type="text"
+                                <select
                                     value={motivoCaida}
                                     onChange={e => setMotivoCaida(e.target.value)}
-                                    placeholder="Ej: No le interesa, precio alto, ya tiene proveedor..."
-                                    className="w-full border border-red-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-400 focus:border-red-400"
+                                    className="w-full border border-red-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-400 focus:border-red-400 bg-white"
                                     required
-                                />
+                                >
+                                    <option value="">Seleccione un motivo...</option>
+                                    {MOTIVOS_CAIDA.map(m => (
+                                        <option key={m} value={m}>{m}</option>
+                                    ))}
+                                </select>
+                                {motivoCaida === 'Otro' && (
+                                    <input
+                                        type="text"
+                                        value={motivoCaidaOtro}
+                                        onChange={e => setMotivoCaidaOtro(e.target.value)}
+                                        placeholder="Especifique el motivo..."
+                                        className="w-full border border-red-200 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-400 focus:border-red-400 mt-2"
+                                        required
+                                    />
+                                )}
                             </div>
                             <div>
                                 <label className="block text-xs font-medium text-red-700 mb-1">

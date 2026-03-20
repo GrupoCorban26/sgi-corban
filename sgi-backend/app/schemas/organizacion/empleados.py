@@ -19,6 +19,7 @@ class EmpleadoBase(BaseModel):
     cargo_id: int  # Area y Departamento se derivan del cargo
     jefe_id: Optional[int] = None
     empresa: str = Field("Corban Trans Logistic", max_length=50)
+    iniciales_sispac: Optional[str] = Field(None, max_length=10)
 
 
 class EmpleadoCreate(EmpleadoBase):
@@ -44,7 +45,9 @@ class EmpleadoResponse(BaseModel):
     email_personal: Optional[str] = None
     distrito_id: Optional[int] = None
     distrito: Optional[str] = None
+    provincia_id: Optional[int] = None
     provincia: Optional[str] = None
+    departamento_ubigeo_id: Optional[int] = None
     departamento_ubigeo: Optional[str] = None  # Departamento geográfico
     direccion: Optional[str] = None
     fecha_ingreso: Optional[date] = None
@@ -59,6 +62,7 @@ class EmpleadoResponse(BaseModel):
     jefe_id: Optional[int] = None
     jefe_nombre: Optional[str] = None
     empresa: Optional[str] = None
+    iniciales_sispac: Optional[str] = None
     
     model_config = ConfigDict(from_attributes=True)
 

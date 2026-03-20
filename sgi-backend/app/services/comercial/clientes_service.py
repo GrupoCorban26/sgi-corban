@@ -2,7 +2,7 @@ from fastapi import HTTPException
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, case, or_, desc, update, and_
+from sqlalchemy import func, case, or_, desc, update, and_, literal_column
 from sqlalchemy.orm import selectinload
 from app.schemas.comercial.cliente import ClienteCreate, ClienteUpdate
 from app.models.comercial import Cliente, ClienteContacto
@@ -43,11 +43,24 @@ class ClientesService:
         offset = (page - 1) * page_size
         
         # Subqueries for telefono and correo using correlate to evaluate per-row
-        subq_telefono = (
+        subq_telefono_principal = (
+            select(func.string_agg(ClienteContacto.telefono, literal_column("' - '")))
+            .where(
+                ClienteContacto.ruc == Cliente.ruc,
+                ClienteContacto.is_principal == True,
+                ClienteContacto.is_active == True
+            )
+            .correlate(Cliente)
+            .scalar_subquery()
+        )
+
+        subq_telefono_fallback = (
             select(ClienteContacto.telefono)
-            .where(ClienteContacto.ruc == Cliente.ruc)
+            .where(
+                ClienteContacto.ruc == Cliente.ruc,
+                ClienteContacto.is_active == True
+            )
             .order_by(
-                ClienteContacto.is_principal.desc(), 
                 ClienteContacto.fecha_llamada.desc(), 
                 ClienteContacto.created_at.desc()
             )
@@ -86,7 +99,7 @@ class ClientesService:
             Cliente,
             Area.nombre.label("area_nombre"),
             func.concat(Empleado.nombres, ' ', Empleado.apellido_paterno).label("comercial_nombre"),
-            subq_telefono.label("telefono_contacto"),
+            func.coalesce(subq_telefono_principal, subq_telefono_fallback).label("telefono_contacto"),
             subq_correo.label("correo_contacto"),
             subq_nombre_contacto.label("nombre_contacto")
         ).outerjoin(Area, Cliente.area_encargada_id == Area.id) \

@@ -6,7 +6,7 @@ interface Props {
     msg: ChatMessage;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:8000';
+const API_BASE = process.env.NEXT_PUBLIC_API_HOST || 'http://localhost:8000';
 
 export default function MessageBubble({ msg }: Props) {
     const isOut = msg.direccion === 'SALIENTE';

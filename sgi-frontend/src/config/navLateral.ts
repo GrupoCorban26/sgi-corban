@@ -1,4 +1,4 @@
-import { LucideIcon, Home, BarChart3, ArrowRightLeft, Users, Database, UserCog, Building2, Package, Cable, Clock, Phone, ShoppingBag, Globe } from 'lucide-react';
+import { LucideIcon, Home, BarChart3, BarChart2, ArrowRightLeft, Users, Database, UserCog, Building2, Package, Cable, Clock, Phone, ShoppingBag, Globe } from 'lucide-react';
 
 export interface MenuItem {
   label: string;
@@ -13,7 +13,7 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
     { label: 'Cartera', href: '/comercial/cartera', icon: Users },
     { label: 'Buzón', href: '/comercial/buzon', icon: Package },
     { label: 'Leads Web', href: '/comercial/leads-web', icon: Globe },
-    { label: 'Analytics Buzón', href: '/comercial/analytics', icon: BarChart3 },
+    { label: 'Analytics Comercial', href: '/comercial/analytics', icon: BarChart3 },
   ],
   administrador: [
     { label: 'Inicio', href: '/administracion/', icon: Home },
@@ -25,8 +25,7 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
     { label: 'Asistencias', href: '/administracion/asistencias', icon: Clock },
     { label: 'Rendimiento', href: '/administracion/rendimiento', icon: BarChart3 },
     { label: 'Reportes', href: '/sistemas/reportes', icon: BarChart3 },
-    { label: 'Hist. Llamadas', href: '/sistemas/reportes-llamadas', icon: Phone },
-    { label: 'Analytics Buzón', href: '/comercial/analytics', icon: BarChart3 },
+    { label: 'Analytics Comercial', href: '/comercial/analytics', icon: BarChart3 },
   ],
   jefa_comercial: [
     { label: 'Inicio', href: '/comercial', icon: Home },
@@ -34,34 +33,30 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
     { label: 'Cartera Global', href: '/comercial/cartera-global', icon: Database },
     { label: 'Buzón', href: '/comercial/buzon', icon: Package },
     { label: 'Leads Web', href: '/comercial/leads-web', icon: Globe },
-    { label: 'Analytics Buzón', href: '/comercial/analytics', icon: BarChart3 },
+    { label: 'Analytics Comercial', href: '/comercial/analytics', icon: BarChart3 },
     { label: 'Reportes', href: '/sistemas/reportes', icon: BarChart3 },
-    { label: 'Hist. Llamadas', href: '/sistemas/reportes-llamadas', icon: Phone },
   ],
   pricing: [
     { label: 'Cartera', href: '/comercial/cartera', icon: Users },
     { label: 'Reportes', href: '/sistemas/reportes', icon: BarChart3 },
-    { label: 'Hist. Llamadas', href: '/sistemas/reportes-llamadas', icon: Phone },
-    { label: 'Analytics Buzón', href: '/comercial/analytics', icon: BarChart3 },
+    { label: 'Analytics Comercial', href: '/comercial/analytics', icon: BarChart3 },
   ],
   gerencia: [
     { label: 'Inicio', href: '/administracion/', icon: Home },
     { label: 'Organización', href: '/administracion/organizacion', icon: Building2 },
     { label: 'Reportes', href: '/sistemas/reportes', icon: BarChart3 },
-    { label: 'Hist. Llamadas', href: '/sistemas/reportes-llamadas', icon: Phone },
-    { label: 'Analytics Buzón', href: '/comercial/analytics', icon: BarChart3 },
+    { label: 'Analytics Comercial', href: '/comercial/analytics', icon: BarChart3 },
   ],
   auditor: [
     { label: 'Reportes', href: '/sistemas/reportes', icon: BarChart3 },
-    { label: 'Hist. Llamadas', href: '/sistemas/reportes-llamadas', icon: Phone },
     { label: 'Leads Web', href: '/comercial/leads-web', icon: Globe },
-    { label: 'Analytics Buzón', href: '/comercial/analytics', icon: BarChart3 },
+    { label: 'Analytics Comercial', href: '/comercial/analytics', icon: BarChart3 },
   ],
   sistemas: [
     { label: 'Inicio', href: '/sistemas', icon: Home },
     { label: 'Reportes', href: '/sistemas/reportes', icon: BarChart3 },
-    { label: 'Analytics Buzón', href: '/comercial/analytics', icon: BarChart3 },
-    { label: 'Hist. Llamadas', href: '/sistemas/reportes-llamadas', icon: Phone },
+    { label: 'Centro de Órdenes', href: '/comercial/ordenes', icon: Database },
+    { label: 'Analytics Comercial', href: '/comercial/analytics', icon: BarChart3 },
     { label: 'Transacciones', href: '/sistemas/transacciones', icon: ArrowRightLeft },
     { label: 'Contactos', href: '/sistemas/contactos', icon: Users },
     { label: 'Base', href: '/sistemas/base', icon: Database },

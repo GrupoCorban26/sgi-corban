@@ -5,7 +5,7 @@ import sys
 from contextlib import asynccontextmanager
 
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
@@ -59,9 +59,11 @@ from app.api.v1.comercial.chat import router as chat_router
 from app.api.v1.comercial.gestiones import router as gestiones_router
 from app.api.v1.comercial.reportes import router as reportes_router
 from app.api.v1.comercial.notificaciones import router as notificaciones_router
+from app.api.v1.comercial.analytics_buzon import router as analytics_buzon_router
+from app.api.v1.comercial.analytics_comercial import router as analytics_comercial_router
 from app.api.v1.comercial.leads_web import router as leads_web_router
 from app.api.v1.comercial.leads_web import router_publico as leads_web_publico_router
-from app.api.v1.comercial.analytics_buzon import router as analytics_buzon_router
+from app.api.v1.comercial.ordenes import router as ordenes_router
 from app.api.v1.administracion.asistencia import router as asistencia_router
 
 # Lifespan: tareas de inicio y cierre del servidor
@@ -101,16 +103,34 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-SGI-API-Key"],
 )
 
-# Rate Limiting — handler global para errores 429
+# =========================================================================
+# EXCEPTION HANDLERS GLOBALES
+# =========================================================================
+
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request, exc):
     return JSONResponse(
         status_code=429,
-        content={"detail": "Demasiadas solicitudes. Intente nuevamente en un momento."}
+        content={"detail": "Demasiadas solicitudes. Intente nuevamente en un momento.", "code": "RATE_LIMIT"}
+    )
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail, "code": f"HTTP_{exc.status_code}"}
+    )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    logger.error(f"Error no manejado en {request.method} {request.url.path}: {exc}", exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Error interno del servidor", "code": "INTERNAL_ERROR"}
     )
 
 # Registrar routers
@@ -138,10 +158,12 @@ app.include_router(gestiones_router, prefix="/api/v1")
 app.include_router(productos_oficina_router, prefix="/api/v1")
 app.include_router(reportes_router, prefix="/api/v1")
 app.include_router(notificaciones_router, prefix="/api/v1")
+app.include_router(analytics_buzon_router, prefix="/api/v1")
+app.include_router(analytics_comercial_router, prefix="/api/v1")
 app.include_router(asistencia_router, prefix="/api/v1")
 app.include_router(leads_web_router, prefix="/api/v1")
 app.include_router(leads_web_publico_router, prefix="/api/v1")
-app.include_router(analytics_buzon_router, prefix="/api/v1")
+app.include_router(ordenes_router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():

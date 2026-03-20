@@ -22,9 +22,6 @@ async def login(
     auth_svc = AuthService(db)
     user_data = await auth_svc.obtener_usuario_por_correo(payload.correo)
     
-    # DEBUG: Ver qué roles devuelve el SP
-    logging.info(f"[LOGIN DEBUG] Roles del usuario: {user_data.get('roles', []) if user_data else 'No user data'}")
-    
     if not user_data:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, 

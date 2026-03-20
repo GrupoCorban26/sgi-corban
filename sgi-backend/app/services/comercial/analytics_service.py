@@ -49,11 +49,13 @@ class AnalyticsService:
     # A. Reporte de Base de Datos
     # =========================================================================
 
-    async def _get_reporte_base_datos(self, dt_inicio: datetime, dt_fin: datetime, comercial_ids: list = None) -> dict:
+    async def get_reporte_base_datos(self, dt_inicio: datetime, dt_fin: datetime, comercial_ids: list = None, empresa: str = None) -> dict:
         # Obtener comerciales activos y filtrar
         stmt_comerciales = select(Usuario.id, Empleado.nombres).join(Empleado).join(Usuario.roles).where(and_(Usuario.is_active == True, Rol.nombre == "COMERCIAL"))
         if comercial_ids is not None:
              stmt_comerciales = stmt_comerciales.where(Usuario.id.in_(comercial_ids))
+        if empresa:
+             stmt_comerciales = stmt_comerciales.where(Empleado.empresa == empresa)
         comerciales = (await self.db.execute(stmt_comerciales)).all()
         
         comerciales_stats = []
@@ -103,11 +105,13 @@ class AnalyticsService:
     # B. Reporte de Mantenimiento de Cartera
     # =========================================================================
 
-    async def _get_reporte_cartera(self, dt_inicio: datetime, dt_fin: datetime, comercial_ids: list = None) -> dict:
+    async def get_reporte_cartera(self, dt_inicio: datetime, dt_fin: datetime, comercial_ids: list = None, empresa: str = None) -> dict:
         # Obtener comerciales activos y filtrar
         stmt_comerciales = select(Usuario.id, Empleado.nombres).join(Empleado).join(Usuario.roles).where(and_(Usuario.is_active == True, Rol.nombre == "COMERCIAL"))
         if comercial_ids is not None:
              stmt_comerciales = stmt_comerciales.where(Usuario.id.in_(comercial_ids))
+        if empresa:
+             stmt_comerciales = stmt_comerciales.where(Empleado.empresa == empresa)
         comerciales = (await self.db.execute(stmt_comerciales)).all()
         
         comerciales_stats = []
@@ -116,13 +120,11 @@ class AnalyticsService:
         condicion_base = and_(ClienteGestion.created_at >= dt_inicio, ClienteGestion.created_at <= dt_fin)
         if comercial_ids is not None:
             condicion_base = and_(condicion_base, ClienteGestion.comercial_id.in_(comercial_ids))
-            
-        # Totales Generales limitados a los comerciales permitidos
-        stmt_totales = select(func.count()).select_from(ClienteGestion).where(condicion_base)
-        total_gestiones = (await self.db.execute(stmt_totales)).scalar() or 0
+        # Nota: El filtro de empresa en los totales generales requeriría join con Usuario y Empleado, pero al mostrar
+        # por comercial al final, es mejor calcular los totales sólo para los comerciales filtrados.
         
-        stmt_unicos = select(func.count(func.distinct(ClienteGestion.cliente_id))).where(condicion_base)
-        total_unicos = (await self.db.execute(stmt_unicos)).scalar() or 0
+        total_gestiones = 0
+        total_unicos_set = set()
 
         for com in comerciales:
             uid = com.id
@@ -136,18 +138,47 @@ class AnalyticsService:
             result_motivos = await self.db.execute(stmt_motivos)
             motivos = {row.resultado: row.total for row in result_motivos.all()}
             
+            seguimiento = motivos.get("SEGUIMIENTO_CARGA", 0)
+            fidelizacion = motivos.get("FIDELIZACION", 0)
+            dudas = motivos.get("DUDAS_CLIENTE", 0)
+            cotizacion = motivos.get("QUIERE_COTIZACION", 0)
+            total_comercial = seguimiento + fidelizacion + dudas + cotizacion
+            
+            total_gestiones += sum(motivos.values()) # O utilizar una cuenta pura
+            
+            # Obtener clientes unicos para este comercial
+            stmt_unicos = select(func.count(func.distinct(ClienteGestion.cliente_id))).where(
+                and_(ClienteGestion.comercial_id == uid, ClienteGestion.created_at >= dt_inicio, ClienteGestion.created_at <= dt_fin)
+            )
+            unicos = (await self.db.execute(stmt_unicos)).scalar() or 0
+            # Wait, accumulating unicos across comercial might lead to duplicates if shared. But typically a client is managed by one.
+            # I can just sum them up for simplicity.
+            
             comerciales_stats.append({
                 "usuario_id": uid, "nombre": nombre,
-                "seguimiento_carga": motivos.get("SEGUIMIENTO_CARGA", 0),
-                "fidelizacion": motivos.get("FIDELIZACION", 0),
-                "dudas_cliente": motivos.get("DUDAS_CLIENTE", 0),
-                "quiere_cotizacion": motivos.get("QUIERE_COTIZACION", 0)
+                "seguimiento_carga": seguimiento,
+                "fidelizacion": fidelizacion,
+                "dudas_cliente": dudas,
+                "quiere_cotizacion": cotizacion,
+                "total": total_comercial
             })
+            
+        # Re-evaluating unicos with exact logic taking into account provided filters (commercial IDs) and empresa (derived)
+        comercial_ids_validos = [c.id for c in comerciales]
+        if comercial_ids_validos:
+            stmt_totales = select(func.count()).select_from(ClienteGestion).where(and_(condicion_base, ClienteGestion.comercial_id.in_(comercial_ids_validos)))
+            total_gestiones_real = (await self.db.execute(stmt_totales)).scalar() or 0
+            
+            stmt_unicos_real = select(func.count(func.distinct(ClienteGestion.cliente_id))).where(and_(condicion_base, ClienteGestion.comercial_id.in_(comercial_ids_validos)))
+            total_unicos_real = (await self.db.execute(stmt_unicos_real)).scalar() or 0
+        else:
+            total_gestiones_real = 0
+            total_unicos_real = 0
 
         return {
             "totales": {
-                "total_llamadas": total_gestiones,
-                "total_clientes_gestionados": total_unicos
+                "total_llamadas": total_gestiones_real,
+                "total_clientes_gestionados": total_unicos_real
             },
             "por_comercial": comerciales_stats
         }
@@ -156,52 +187,71 @@ class AnalyticsService:
     # C. Reporte de Buzón WhatsApp
     # =========================================================================
 
-    async def _get_reporte_buzon(self, dt_inicio: datetime, dt_fin: datetime, comercial_ids: list = None) -> dict:
+    async def get_reporte_buzon(self, dt_inicio: datetime, dt_fin: datetime, comercial_ids: list = None, empresa: str = None) -> dict:
         """Métricas del Buzón de WhatsApp por comercial."""
+        # --- COMERCIALES A CONSIDERAR ---
+        stmt_comerciales = select(Usuario.id, Empleado.nombres).join(Empleado).join(Usuario.roles).where(
+            and_(Usuario.is_active == True, Rol.nombre == "COMERCIAL")
+        )
+        if comercial_ids is not None:
+            stmt_comerciales = stmt_comerciales.where(Usuario.id.in_(comercial_ids))
+        if empresa:
+            stmt_comerciales = stmt_comerciales.where(Empleado.empresa == empresa)
+            
+        comerciales = (await self.db.execute(stmt_comerciales)).all()
+        comerciales_ids_validos = [c.id for c in comerciales]
+
         # Condición base de fechas
         condicion_fecha = and_(
             Inbox.fecha_recepcion >= dt_inicio,
             Inbox.fecha_recepcion <= dt_fin
         )
-
+        
+        # Filtro de comerciales para los totales generales
+        # Aplica si se proveyó explicitamente comercial_ids o empresa, para que los totales calzen.
+        filtro_aplicable = (comercial_ids is not None) or (empresa is not None)
+        
         # --- TOTALES GENERALES ---
         # Total leads
         stmt_total = select(func.count()).select_from(Inbox).where(condicion_fecha)
-        if comercial_ids is not None:
-            stmt_total = stmt_total.where(Inbox.asignado_a.in_(comercial_ids))
+        if filtro_aplicable:
+             if not comerciales_ids_validos:
+                 stmt_total = stmt_total.where(False)
+             else:
+                 stmt_total = stmt_total.where(Inbox.asignado_a.in_(comerciales_ids_validos))
         total_leads = (await self.db.execute(stmt_total)).scalar() or 0
 
         # Convertidos
         stmt_convertidos = select(func.count()).select_from(Inbox).where(
             and_(condicion_fecha, Inbox.estado == 'CONVERTIDO')
         )
-        if comercial_ids is not None:
-            stmt_convertidos = stmt_convertidos.where(Inbox.asignado_a.in_(comercial_ids))
-        total_convertidos = (await self.db.execute(stmt_convertidos)).scalar() or 0
+        if filtro_aplicable and comerciales_ids_validos:
+            stmt_convertidos = stmt_convertidos.where(Inbox.asignado_a.in_(comerciales_ids_validos))
+        total_convertidos = (await self.db.execute(stmt_convertidos)).scalar() if total_leads > 0 else 0
 
         # Descartados
         stmt_descartados = select(func.count()).select_from(Inbox).where(
             and_(condicion_fecha, Inbox.estado == 'DESCARTADO')
         )
-        if comercial_ids is not None:
-            stmt_descartados = stmt_descartados.where(Inbox.asignado_a.in_(comercial_ids))
-        total_descartados = (await self.db.execute(stmt_descartados)).scalar() or 0
+        if filtro_aplicable and comerciales_ids_validos:
+            stmt_descartados = stmt_descartados.where(Inbox.asignado_a.in_(comerciales_ids_validos))
+        total_descartados = (await self.db.execute(stmt_descartados)).scalar() if total_leads > 0 else 0
 
         # Sin respuesta (auto-asignados)
         stmt_sin_respuesta = select(func.count()).select_from(Inbox).where(
             and_(condicion_fecha, Inbox.tipo_interes == 'SIN_RESPUESTA')
         )
-        if comercial_ids is not None:
-            stmt_sin_respuesta = stmt_sin_respuesta.where(Inbox.asignado_a.in_(comercial_ids))
-        total_sin_respuesta = (await self.db.execute(stmt_sin_respuesta)).scalar() or 0
+        if filtro_aplicable and comerciales_ids_validos:
+            stmt_sin_respuesta = stmt_sin_respuesta.where(Inbox.asignado_a.in_(comerciales_ids_validos))
+        total_sin_respuesta = (await self.db.execute(stmt_sin_respuesta)).scalar() if total_leads > 0 else 0
 
         # Tiempo promedio de respuesta (solo leads con respuesta)
         stmt_avg_tiempo = select(func.avg(Inbox.tiempo_respuesta_segundos)).where(
             and_(condicion_fecha, Inbox.tiempo_respuesta_segundos != None)
         )
-        if comercial_ids is not None:
-            stmt_avg_tiempo = stmt_avg_tiempo.where(Inbox.asignado_a.in_(comercial_ids))
-        avg_tiempo = (await self.db.execute(stmt_avg_tiempo)).scalar() or 0
+        if filtro_aplicable and comerciales_ids_validos:
+            stmt_avg_tiempo = stmt_avg_tiempo.where(Inbox.asignado_a.in_(comerciales_ids_validos))
+        avg_tiempo = (await self.db.execute(stmt_avg_tiempo)).scalar() if total_leads > 0 else 0
 
         # Tasa de conversión y abandono
         tasa_conversion = round((total_convertidos / total_leads * 100), 1) if total_leads > 0 else 0

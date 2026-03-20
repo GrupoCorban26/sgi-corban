@@ -4,11 +4,14 @@ Helpers reutilizables para queries SQLAlchemy.
 Centraliza lógica de filtrado por equipo comercial que antes estaba
 duplicada en inbox_service, chat_service, etc.
 """
+import logging
 from sqlalchemy import Column, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
 from app.core.settings import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 async def aplicar_filtro_comercial(
@@ -54,8 +57,8 @@ async def aplicar_filtro_comercial(
                     bot_jefe_uid = (await db.execute(query_bot_jefe)).scalar()
                     if bot_jefe_uid and bot_jefe_uid in comercial_ids:
                         condiciones.append(columna_asignado == None)
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.warning(f"No se pudo resolver BOT_JEFE_COMERCIAL_ID: {e}")
         
         return stmt.where(or_(*condiciones))
     

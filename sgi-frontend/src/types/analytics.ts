@@ -24,6 +24,7 @@ export interface CarteraComercial {
     fidelizacion: number;
     dudas_cliente: number;
     quiere_cotizacion: number;
+    total: number;
 }
 
 export interface CarteraStats {

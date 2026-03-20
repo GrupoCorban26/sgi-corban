@@ -13,7 +13,9 @@ export interface Empleado {
     distrito_id?: number | null;
     distrito?: string | null;
     provincia?: string | null;
+    provincia_id?: number | null;
     departamento?: string | null; // Departamento geográfico (ubigeo)
+    departamento_ubigeo_id?: number | null;
     direccion?: string | null;
     fecha_ingreso?: string | null;
     fecha_cese?: string | null;
@@ -27,6 +29,7 @@ export interface Empleado {
     jefe_id?: number | null;
     jefe_nombre?: string | null;
     empresa?: string | null;
+    iniciales_sispac?: string | null;
 }
 
 export interface EmpleadoPaginationResponse {
@@ -65,6 +68,7 @@ export interface EmpleadoCreate {
     departamento_id: number;
     jefe_id?: number | null;
     empresa?: string;
+    iniciales_sispac?: string | null;
 }
 
 export interface EmpleadoUpdate {
@@ -84,4 +88,5 @@ export interface EmpleadoUpdate {
     departamento_id?: number;
     jefe_id?: number | null;
     empresa?: string;
+    iniciales_sispac?: string | null;
 }

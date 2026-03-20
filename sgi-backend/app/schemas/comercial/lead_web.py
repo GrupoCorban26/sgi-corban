@@ -1,4 +1,5 @@
-from pydantic import BaseModel, ConfigDict, Field, EmailStr
+from pydantic import BaseModel, ConfigDict, Field, EmailStr, field_validator
+import re
 from typing import Optional
 from datetime import datetime
 
@@ -12,6 +13,13 @@ class LeadWebCreate(BaseModel):
     mensaje: str
     pagina_origen: str = Field(..., max_length=100)
     servicio_interes: Optional[str] = Field(None, max_length=100)
+
+    @field_validator('telefono', mode='before')
+    @classmethod
+    def clean_telefono(cls, v: str | None) -> str | None:
+        if v:
+            return re.sub(r'[^\d+]', '', str(v))
+        return v
 
 
 class LeadWebResponse(BaseModel):

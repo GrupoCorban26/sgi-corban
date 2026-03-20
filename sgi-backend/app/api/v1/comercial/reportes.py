@@ -6,14 +6,18 @@ from app.database.db_connection import get_db
 from app.core.security import get_current_active_auth
 from app.core.dependencies import require_permission, resolver_comercial_ids
 from app.services.comercial.reportes_service import ReportesLlamadasService
-from app.schemas.comercial.reportes import ReporteLlamadaPaginated
+from app.services.comercial.reportes_operativos_service import ReportesOperativosService
+from app.schemas.comercial.reportes import (
+    ReporteLlamadaPaginated,
+    ReporteBaseDatos, ReporteMantenimientoCartera, ReporteGestionLeads
+)
 
 router = APIRouter(
     prefix="/comercial/reportes",
     tags=["Reportes"]
 )
 
-@router.get("/llamadas", response_model=ReporteLlamadaPaginated, dependencies=[Depends(require_permission("reportes.ver_comercial"))])
+@router.get("/llamadas", response_model=ReporteLlamadaPaginated, dependencies=[Depends(get_current_active_auth)])
 async def get_reporte_llamadas_historico(
     fecha_inicio: date = Query(..., description="Fecha inicio YYYY-MM-DD"),
     fecha_fin: date = Query(..., description="Fecha fin YYYY-MM-DD"),
@@ -41,7 +45,7 @@ async def get_reporte_llamadas_historico(
     )
 
 
-@router.get("/llamadas/exportar", dependencies=[Depends(require_permission("reportes.ver_comercial"))])
+@router.get("/llamadas/exportar", dependencies=[Depends(get_current_active_auth)])
 async def exportar_reporte_llamadas_historico(
     fecha_inicio: date = Query(..., description="Fecha inicio YYYY-MM-DD"),
     fecha_fin: date = Query(..., description="Fecha fin YYYY-MM-DD"),
@@ -64,7 +68,71 @@ async def exportar_reporte_llamadas_historico(
         fecha_inicio, fecha_fin, filtro_comercial_id, comercial_ids=comercial_ids
     )
 
-@router.get("/bot-analytics", dependencies=[Depends(require_permission("reportes.ver_comercial"))])
+
+# ==========================================
+# REPORTES OPERATIVOS (Fase 3)
+# ==========================================
+
+@router.get(
+    "/base-datos",
+    response_model=ReporteBaseDatos,
+    dependencies=[Depends(get_current_active_auth)]
+)
+async def get_reporte_base_datos(
+    periodo: str = Query(..., description="Mes a consultar en formato YYYY-MM"),
+    comercial_id: Optional[int] = Query(None, description="Filtro opcional por ID de comercial"),
+    db: AsyncSession = Depends(get_db),
+    comercial_ids: Optional[List[int]] = Depends(resolver_comercial_ids)
+):
+    service = ReportesOperativosService(db)
+    filtro_comercial_id = None
+    if comercial_id:
+        if comercial_ids is None or comercial_id in comercial_ids:
+            filtro_comercial_id = comercial_id
+    
+    return await service.get_reporte_base_datos(periodo, filtro_comercial_id)
+
+
+@router.get(
+    "/mantenimiento-cartera",
+    response_model=ReporteMantenimientoCartera,
+    dependencies=[Depends(get_current_active_auth)]
+)
+async def get_reporte_mantenimiento_cartera(
+    periodo: str = Query(..., description="Mes a consultar en formato YYYY-MM"),
+    comercial_id: Optional[int] = Query(None, description="Filtro opcional por ID de comercial"),
+    db: AsyncSession = Depends(get_db),
+    comercial_ids: Optional[List[int]] = Depends(resolver_comercial_ids)
+):
+    service = ReportesOperativosService(db)
+    filtro_comercial_id = None
+    if comercial_id:
+        if comercial_ids is None or comercial_id in comercial_ids:
+            filtro_comercial_id = comercial_id
+            
+    return await service.get_reporte_mantenimiento_cartera(periodo, filtro_comercial_id)
+
+
+@router.get(
+    "/gestion-leads",
+    response_model=ReporteGestionLeads,
+    dependencies=[Depends(get_current_active_auth)]
+)
+async def get_reporte_gestion_leads(
+    periodo: str = Query(..., description="Mes a consultar en formato YYYY-MM"),
+    comercial_id: Optional[int] = Query(None, description="Filtro opcional por ID de comercial"),
+    db: AsyncSession = Depends(get_db),
+    comercial_ids: Optional[List[int]] = Depends(resolver_comercial_ids)
+):
+    service = ReportesOperativosService(db)
+    filtro_comercial_id = None
+    if comercial_id:
+        if comercial_ids is None or comercial_id in comercial_ids:
+            filtro_comercial_id = comercial_id
+            
+    return await service.get_reporte_gestion_leads(periodo, filtro_comercial_id)
+
+@router.get("/bot-analytics", dependencies=[Depends(get_current_active_auth)])
 async def get_bot_analytics(
     fecha_inicio: date = Query(..., description="Fecha inicio YYYY-MM-DD"),
     fecha_fin: date = Query(..., description="Fecha fin YYYY-MM-DD"),

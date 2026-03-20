@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
-from datetime import date
+from datetime import date, datetime
 
 # Importaciones de base de datos y esquemas
 from app.database.db_connection import get_db
@@ -22,8 +22,6 @@ from app.core.security import (
     get_current_active_auth
 )
 from app.core.dependencies import require_permission, resolver_comercial_ids
-
-from sqlalchemy import and_
 
 router = APIRouter(prefix="/clientes", tags=["Clientes"])
 
@@ -78,6 +76,99 @@ async def get_dashboard(
     
     service = AnalyticsService(db)
     return await service.get_dashboard(fecha_inicio, fecha_fin, comercial_ids=comercial_ids)
+
+
+@router.get("/metricas/dashboard/base-datos", dependencies=[Depends(get_current_active_auth)])
+async def get_dashboard_base_datos(
+    fecha_inicio: date = Query(..., description="Fecha de inicio del reporte (YYYY-MM-DD)"),
+    fecha_fin: date = Query(..., description="Fecha de fin del reporte (YYYY-MM-DD)"),
+    comercial_id: Optional[int] = Query(None, description="Filtrar por comercial"),
+    empresa: Optional[str] = Query(None, description="Filtrar por empresa"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_token_payload),
+    comercial_ids_permitidos: list = Depends(resolver_comercial_ids)
+):
+    """Reporte de Base de Datos individual."""
+    roles = current_user.get("roles", [])
+    if not any(role in roles for role in ALLOWED_ALL):
+        raise HTTPException(status_code=403, detail="No tienes permisos para acceder al dashboard")
+    if fecha_inicio > fecha_fin:
+        raise HTTPException(status_code=400, detail="La fecha de inicio no puede ser posterior a la fecha de fin")
+        
+    filtro_comercial_ids = comercial_ids_permitidos
+    if comercial_id:
+        if comercial_ids_permitidos is None or comercial_id in comercial_ids_permitidos:
+            filtro_comercial_ids = [comercial_id]
+
+    service = AnalyticsService(db)
+    return await service.get_reporte_base_datos(
+        datetime.combine(fecha_inicio, datetime.min.time()),
+        datetime.combine(fecha_fin, datetime.max.time()),
+        comercial_ids=filtro_comercial_ids,
+        empresa=empresa
+    )
+
+
+@router.get("/metricas/dashboard/cartera", dependencies=[Depends(get_current_active_auth)])
+async def get_dashboard_cartera(
+    fecha_inicio: date = Query(..., description="Fecha de inicio del reporte (YYYY-MM-DD)"),
+    fecha_fin: date = Query(..., description="Fecha de fin del reporte (YYYY-MM-DD)"),
+    comercial_id: Optional[int] = Query(None, description="Filtrar por comercial"),
+    empresa: Optional[str] = Query(None, description="Filtrar por empresa"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_token_payload),
+    comercial_ids_permitidos: list = Depends(resolver_comercial_ids)
+):
+    """Reporte de Mantenimiento de Cartera individual."""
+    roles = current_user.get("roles", [])
+    if not any(role in roles for role in ALLOWED_ALL):
+        raise HTTPException(status_code=403, detail="No tienes permisos para acceder al dashboard")
+    if fecha_inicio > fecha_fin:
+        raise HTTPException(status_code=400, detail="La fecha de inicio no puede ser posterior a la fecha de fin")
+        
+    filtro_comercial_ids = comercial_ids_permitidos
+    if comercial_id:
+        if comercial_ids_permitidos is None or comercial_id in comercial_ids_permitidos:
+            filtro_comercial_ids = [comercial_id]
+
+    service = AnalyticsService(db)
+    return await service.get_reporte_cartera(
+        datetime.combine(fecha_inicio, datetime.min.time()),
+        datetime.combine(fecha_fin, datetime.max.time()),
+        comercial_ids=filtro_comercial_ids,
+        empresa=empresa
+    )
+
+
+@router.get("/metricas/dashboard/buzon", dependencies=[Depends(get_current_active_auth)])
+async def get_dashboard_buzon(
+    fecha_inicio: date = Query(..., description="Fecha de inicio del reporte (YYYY-MM-DD)"),
+    fecha_fin: date = Query(..., description="Fecha de fin del reporte (YYYY-MM-DD)"),
+    comercial_id: Optional[int] = Query(None, description="Filtrar por comercial"),
+    empresa: Optional[str] = Query(None, description="Filtrar por empresa"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_token_payload),
+    comercial_ids_permitidos: list = Depends(resolver_comercial_ids)
+):
+    """Reporte de Buzón WhatsApp individual."""
+    roles = current_user.get("roles", [])
+    if not any(role in roles for role in ALLOWED_ALL):
+        raise HTTPException(status_code=403, detail="No tienes permisos para acceder al dashboard")
+    if fecha_inicio > fecha_fin:
+        raise HTTPException(status_code=400, detail="La fecha de inicio no puede ser posterior a la fecha de fin")
+        
+    filtro_comercial_ids = comercial_ids_permitidos
+    if comercial_id:
+        if comercial_ids_permitidos is None or comercial_id in comercial_ids_permitidos:
+            filtro_comercial_ids = [comercial_id]
+
+    service = AnalyticsService(db)
+    return await service.get_reporte_buzon(
+        datetime.combine(fecha_inicio, datetime.min.time()),
+        datetime.combine(fecha_fin, datetime.max.time()),
+        comercial_ids=filtro_comercial_ids,
+        empresa=empresa
+    )
 
 
 @router.get("", dependencies=[Depends(require_permission("clientes.listar"))])

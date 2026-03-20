@@ -1,33 +1,10 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import type { UserData } from '@/types/usuario';
+import { getAllowedPathsForRoles, getDefaultPathForRoles } from '@/config/roles';
 
 // Rutas públicas que no requieren autenticación
 const PUBLIC_PATHS = ['/login', '/api'];
-
-// Mapeo de ROLES a las rutas que pueden acceder
-const ROLE_ALLOWED_PATHS: Record<string, string[]> = {
-    'ADMIN': ['/administracion', '/sistemas/reportes', '/sistemas/reportes-llamadas', '/comercial/analytics'],
-    'SISTEMAS': ['/sistemas', '/administracion', '/comercial'],
-    'GERENCIA': ['/administracion', '/comercial', '/sistemas/reportes', '/sistemas/reportes-llamadas'],
-    'JEFE_COMERCIAL': ['/comercial', '/sistemas/reportes', '/sistemas/reportes-llamadas'],
-    'PRICING': ['/comercial', '/sistemas/reportes', '/sistemas/reportes-llamadas'],
-    'COMERCIAL': ['/comercial'],
-    'OPERACIONES': ['/operaciones'],
-    'AUDITOR': ['/sistemas/reportes', '/sistemas/reportes-llamadas', '/comercial/analytics', '/comercial/leads-web'],
-};
-
-// Ruta por defecto para cada rol (a donde redirigir si accede a ruta no permitida)
-const ROLE_DEFAULT_PATH: Record<string, string> = {
-    'ADMIN': '/administracion',
-    'SISTEMAS': '/sistemas',
-    'GERENCIA': '/administracion',
-    'JEFE_COMERCIAL': '/comercial',
-    'PRICING': '/comercial',
-    'COMERCIAL': '/comercial',
-    'OPERACIONES': '/operaciones',
-    'AUDITOR': '/sistemas/reportes',
-};
 
 
 function getUserDataFromCookie(request: NextRequest): UserData | null {
@@ -38,25 +15,6 @@ function getUserDataFromCookie(request: NextRequest): UserData | null {
     } catch {
         return null;
     }
-}
-
-function getAllowedPaths(roles: string[]): string[] {
-    const allowed = new Set<string>();
-    for (const role of roles) {
-        const paths = ROLE_ALLOWED_PATHS[role] || [];
-        paths.forEach(path => allowed.add(path));
-    }
-    return Array.from(allowed);
-}
-
-function getDefaultPath(roles: string[]): string {
-    // Retorna la ruta por defecto del primer rol que tenga una
-    for (const role of roles) {
-        if (ROLE_DEFAULT_PATH[role]) {
-            return ROLE_DEFAULT_PATH[role];
-        }
-    }
-    return '/login';
 }
 
 export function middleware(request: NextRequest) {
@@ -77,7 +35,7 @@ export function middleware(request: NextRequest) {
     // 3. Si está en /login y YA está autenticado -> redirigir a su dashboard
     if (pathname === '/login' || pathname === '/login/') {
         if (token && userData && userData.roles && userData.roles.length > 0) {
-            const defaultPath = getDefaultPath(userData.roles);
+            const defaultPath = getDefaultPathForRoles(userData.roles);
             return NextResponse.redirect(new URL(defaultPath, request.url));
         }
         // No está logueado, permitir ver login
@@ -97,12 +55,12 @@ export function middleware(request: NextRequest) {
     }
 
     // 6. Verificar si tiene permiso para la ruta actual
-    const allowedPaths = getAllowedPaths(userData.roles);
+    const allowedPaths = getAllowedPathsForRoles(userData.roles);
     const isAllowed = allowedPaths.some(path => pathname.startsWith(path));
 
     if (!isAllowed) {
         // No tiene permiso -> redirigir a su ruta por defecto
-        const defaultPath = getDefaultPath(userData.roles);
+        const defaultPath = getDefaultPathForRoles(userData.roles);
         return NextResponse.redirect(new URL(defaultPath, request.url));
     }
 

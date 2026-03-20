@@ -2,6 +2,7 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { isRedirectError } from 'next/dist/client/components/redirect-error';
+import { getDefaultPathForRoles } from '@/config/roles';
 
 export interface ActionState {
   error: string | null;
@@ -36,12 +37,12 @@ export async function handleLoginAction(prevState: any, formData: FormData) {
       return { error: data.detail || "Credenciales incorrectas" };
     }
 
-    // 1. Guardar el token en las cookies (httpOnly para seguridad)
+    // 1. Guardar el token en cookie httpOnly (NO accesible desde JavaScript → protección XSS)
     const cookieStore = await cookies();
     cookieStore.set('token', data.access_token, {
-      httpOnly: false, // Permitir acceso desde JavaScript para enviar con axios
+      httpOnly: true, // ← SEGURO: solo el servidor puede leer esta cookie
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24,
+      maxAge: 60 * 60 * 8, // 8 horas, alineado con ACCESS_TOKEN_EXPIRE_MINUTES
       path: '/',
       sameSite: 'lax',
     });
@@ -55,36 +56,16 @@ export async function handleLoginAction(prevState: any, formData: FormData) {
     }), {
       httpOnly: false,  // JS puede leer esta cookie
       secure: process.env.NODE_ENV === 'production',
-      maxAge: 60 * 60 * 24,
+      maxAge: 60 * 60 * 8, // 8 horas, alineado con ACCESS_TOKEN_EXPIRE_MINUTES
       path: '/',
       sameSite: 'lax',
     });
 
-    // 2. Lógica de Redirección por ROL (prioridad definida)
-    // El primer rol que coincida define la ruta
-    const ROLE_ROUTES: Record<string, string> = {
-      'ADMIN': '/administracion',
-      'SISTEMAS': '/sistemas',
-      'GERENCIA': '/administracion',
-      'JEFE_COMERCIAL': '/comercial',
-      'PRICING': '/pricing',
-      'COMERCIAL': '/comercial',
-      'OPERACIONES': '/operaciones',
-      'RRHH': '/administracion',
-    };
-
     const roles: string[] = data.user.roles || [];
-
-    // Buscar el primer rol que tenga ruta definida
-    for (const role of Object.keys(ROLE_ROUTES)) {
-      if (roles.includes(role)) {
-        targetPath = ROLE_ROUTES[role];
-        break;
-      }
-    }
+    targetPath = getDefaultPathForRoles(roles);
 
     // Si no coincide ningún rol, usar área como fallback
-    if (!targetPath) {
+    if (targetPath === '/login') {
       const area = data.user.area?.toLowerCase().trim() || '';
       if (area.includes('comercial')) targetPath = '/comercial';
       else if (area.includes('administración')) targetPath = '/administracion';
@@ -108,6 +89,21 @@ export async function handleLoginAction(prevState: any, formData: FormData) {
 
 export async function handleLogoutAction() {
   const cookieStore = await cookies();
+  const token = cookieStore.get('token')?.value;
+
+  // Revocar sesión en el backend antes de limpiar cookies
+  if (token) {
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/login/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+    } catch (e) {
+      // Log pero no bloquear el logout del frontend
+      console.error('Error revocando sesión en backend:', e);
+    }
+  }
+
   cookieStore.delete('token');
   cookieStore.delete('user_data');
   redirect('/login');

@@ -71,6 +71,7 @@ export interface ClienteMarcarCaido {
 
 export interface ClienteCambiarEstado {
     nuevo_estado: string;
+    motivo?: string;
 }
 
 export interface ClientePaginationResponse {

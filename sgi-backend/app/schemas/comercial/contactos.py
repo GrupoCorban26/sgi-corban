@@ -1,4 +1,5 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+import re
 from typing import Optional
 from datetime import datetime
 
@@ -12,6 +13,13 @@ class ContactoBase(BaseModel):
     is_client: bool = Field(False)
     is_principal: bool = Field(False)
 
+    @field_validator('telefono', mode='before')
+    @classmethod
+    def clean_telefono(cls, v: str | None) -> str | None:
+        if v:
+            return re.sub(r'[^\d+]', '', str(v))
+        return v
+
 class ContactoCreate(ContactoBase):
     pass
 
@@ -23,6 +31,13 @@ class ContactoManualCreate(BaseModel):
     email: Optional[str] = Field(None, max_length=100)
     crear_como_prospecto: bool = Field(False, description="Si True, crea Cliente y va directo a cartera")
 
+    @field_validator('telefono', mode='before')
+    @classmethod
+    def clean_telefono(cls, v: str | None) -> str | None:
+        if v:
+            return re.sub(r'[^\d+]', '', str(v))
+        return v
+
 class AsignarLeadManual(BaseModel):
     comercial_id: int = Field(..., description="ID del comercial responsable")
 
@@ -33,6 +48,13 @@ class ContactoUpdate(BaseModel):
     email: Optional[str] = None
     origen: Optional[str] = None
     is_client: Optional[bool] = None
+
+    @field_validator('telefono', mode='before')
+    @classmethod
+    def clean_telefono(cls, v: str | None) -> str | None:
+        if v:
+            return re.sub(r'[^\d+]', '', str(v))
+        return v
 
 class ContactoResponse(ContactoBase):
     id: int

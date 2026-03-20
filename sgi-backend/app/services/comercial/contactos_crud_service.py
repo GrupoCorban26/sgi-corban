@@ -38,6 +38,8 @@ class ContactosCrudService:
         if (await self.db.execute(stmt_dup)).scalars().first():
              return True  # Already exists
 
+        is_client_val = data.get('is_client', False)
+        
         nuevo_contacto = ClienteContacto(
             ruc=data['ruc'],
             nombre=data.get('nombre'),
@@ -45,9 +47,9 @@ class ContactosCrudService:
             telefono=data['telefono'],
             correo=data.get('email'),
             origen=data.get('origen', 'MANUAL'),
-            is_client=data.get('is_client', False),
+            is_client=is_client_val,
             is_active=True,
-            estado='DISPONIBLE'
+            estado='GESTIONADO' if is_client_val else 'DISPONIBLE'
         )
         self.db.add(nuevo_contacto)
         await self.db.commit()
@@ -88,14 +90,7 @@ class ContactosCrudService:
             return False
             
         if is_principal:
-            # 2. Desmarcar todos los del RUC
-            await self.db.execute(
-                update(ClienteContacto)
-                .where(ClienteContacto.ruc == ruc)
-                .values(is_principal=False)
-            )
-            
-            # 3. Marcar el seleccionado como principal
+            # 2. Marcar el seleccionado como principal (permitiendo múltiples)
             contacto.is_principal = True
         else:
             # Solo desmarcar el seleccionado

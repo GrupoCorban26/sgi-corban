@@ -84,8 +84,8 @@ class AuthService:
             }
 
         except Exception as e:
-            logger.error(f"Error en obtener_usuario_por_correo: {e}")
-            return None
+            logger.error(f"Error en obtener_usuario_por_correo: {e}", exc_info=True)
+            raise  # Propagar al exception handler global de FastAPI (retorna 500)
 
     # =========================================================================
     # GESTIÓN DE SESIONES

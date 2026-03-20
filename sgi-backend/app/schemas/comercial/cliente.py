@@ -9,6 +9,12 @@ OrigenCliente = Literal[
     "WHATSAPP", "REFERIDO", "OTRO"
 ]
 
+MOTIVOS_CAIDA_VALIDOS = [
+    "Precio alto",
+    "No responde",
+    "Ya no quiere trabajar con nosotros",
+]
+
 EstadoCliente = Literal[
     "PROSPECTO", "EN_NEGOCIACION", "CERRADA", "EN_OPERACION", "CARGA_ENTREGADA", "CAIDO", "INACTIVO"
 ]

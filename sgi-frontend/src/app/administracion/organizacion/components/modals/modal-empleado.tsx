@@ -36,6 +36,7 @@ interface FormState {
   cargo_id: number | null;
   jefe_id: number | null;
   empresa: string;
+  iniciales_sispac: string;
 }
 
 interface FormErrors {
@@ -72,6 +73,7 @@ const initialFormState: FormState = {
   cargo_id: null,
   jefe_id: null,
   empresa: 'Corban Trans Logistic',
+  iniciales_sispac: '',
 };
 
 // ============================================
@@ -274,8 +276,8 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
         nro_documento: empleadoData.nro_documento || '',
         celular: empleadoData.celular || '',
         email_personal: empleadoData.email_personal || '',
-        departamento_geo_id: null,
-        provincia_id: null,
+        departamento_geo_id: empleadoData.departamento_ubigeo_id || null,
+        provincia_id: empleadoData.provincia_id || null,
         distrito_id: empleadoData.distrito_id || null,
         direccion: empleadoData.direccion || '',
         fecha_ingreso: empleadoData.fecha_ingreso || '',
@@ -284,40 +286,14 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
         cargo_id: empleadoData.cargo_id || null,
         jefe_id: empleadoData.jefe_id || null,
         empresa: empleadoData.empresa || 'Corban Trans Logistic',
+        iniciales_sispac: empleadoData.iniciales_sispac || '',
       });
-      setErrors({});
-      setTouched(new Set());
     } else {
       setFormData(initialFormState);
       setErrors({});
       setTouched(new Set());
     }
   }, [isEdit, empleadoData, isOpen]);
-
-  // Resetear selects dependientes cuando cambia el padre
-  useEffect(() => {
-    if (!isEdit) {
-      setFormData(prev => ({ ...prev, provincia_id: null, distrito_id: null }));
-    }
-  }, [formData.departamento_geo_id]);
-
-  useEffect(() => {
-    if (!isEdit) {
-      setFormData(prev => ({ ...prev, distrito_id: null }));
-    }
-  }, [formData.provincia_id]);
-
-  useEffect(() => {
-    if (!isEdit) {
-      setFormData(prev => ({ ...prev, area_id: null, cargo_id: null }));
-    }
-  }, [formData.departamento_id]);
-
-  useEffect(() => {
-    if (!isEdit) {
-      setFormData(prev => ({ ...prev, cargo_id: null }));
-    }
-  }, [formData.area_id]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -327,7 +303,25 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
         : value
     );
 
-    setFormData(prev => ({ ...prev, [name]: newValue }));
+    setFormData(prev => {
+      const updated = { ...prev, [name]: newValue };
+      
+      // Lógica de reset en cascada solo cuando el usuario cambia el valor manualmente
+      if (name === 'departamento_geo_id') {
+        updated.provincia_id = null;
+        updated.distrito_id = null;
+      } else if (name === 'provincia_id') {
+        updated.distrito_id = null;
+      } else if (name === 'departamento_id') {
+        updated.area_id = null;
+        updated.cargo_id = null;
+        updated.jefe_id = null; 
+      } else if (name === 'area_id') {
+        updated.cargo_id = null;
+      }
+      
+      return updated;
+    });
     setTouched(prev => new Set(prev).add(name));
 
     // Validar el campo al cambiar si ya fue tocado
@@ -397,6 +391,7 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
           cargo_id: formData.cargo_id!,
           jefe_id: formData.jefe_id,
           empresa: formData.empresa,
+          iniciales_sispac: formData.iniciales_sispac || undefined,
         };
         await updateMutation.mutateAsync({ id: empleadoData.id, data: updateData });
         toast.success('Empleado actualizado correctamente');
@@ -418,6 +413,7 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
           cargo_id: formData.cargo_id!,
           jefe_id: formData.jefe_id,
           empresa: formData.empresa,
+          iniciales_sispac: formData.iniciales_sispac || undefined,
         };
         await createMutation.mutateAsync(createData);
         toast.success('Empleado registrado correctamente');
@@ -630,6 +626,15 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
               disabled={isLoading}
               icon={<Calendar size={12} />}
             />
+            <InputField
+              label="Iniciales Sispac"
+              name="iniciales_sispac"
+              value={formData.iniciales_sispac}
+              onChange={handleChange}
+              disabled={isLoading}
+              placeholder="Ej. EGO"
+              maxLength={15}
+            />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -665,29 +670,14 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <InputField
-              label="Fecha Ingreso"
-              name="fecha_ingreso"
-              type="date"
-              value={formData.fecha_ingreso}
-              onChange={handleChange}
-              error={touched.has('fecha_ingreso') ? errors.fecha_ingreso : undefined}
-              required
-              disabled={isLoading}
-              icon={<Calendar size={12} />}
-            />
             <SelectField
               label="Jefe Directo"
               name="jefe_id"
               value={formData.jefe_id}
               onChange={handleChange}
-              options={(empleadosDropdown || []).filter(emp => {
-                // Filtrar empleados de la misma área o del mismo departamento
-                // Solo mostrar jefes potenciales después de seleccionar área
-                return formData.area_id ? true : false;
-              })}
-              disabled={!formData.area_id || isLoading}
-              placeholder={formData.area_id ? 'Sin jefe asignado' : 'Seleccione área primero'}
+              options={(empleadosDropdown || [])}
+              disabled={!formData.departamento_id || isLoading}
+              placeholder={formData.departamento_id ? 'Sin jefe asignado' : 'Seleccione depto. primero'}
             />
           </div>
         </section>

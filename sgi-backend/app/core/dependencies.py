@@ -32,6 +32,28 @@ def require_permission(permiso_requerido: str):
     return permission_checker
 
 
+def require_any_role(*roles_requeridos: str):
+    """
+    Factory de dependencias para verificar roles.
+    Uso: @router.get("/", dependencies=[Depends(require_any_role("ADMIN", "GERENCIA"))])
+    SISTEMAS tiene bypass implícito (Super-Admin).
+    """
+    def role_checker(current_user: dict = Depends(security.get_current_active_auth)):
+        roles = current_user.get("roles", [])
+
+        # SISTEMAS tiene acceso total implícito
+        if "SISTEMAS" in roles:
+            return True
+
+        if not any(r in roles for r in roles_requeridos):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Se requiere uno de los siguientes roles: {', '.join(roles_requeridos)}"
+            )
+        return True
+
+    return role_checker
+
 async def get_current_user_obj(
     db: AsyncSession = Depends(get_db),
     payload: dict = Depends(security.get_current_active_auth)

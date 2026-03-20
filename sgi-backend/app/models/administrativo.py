@@ -86,6 +86,9 @@ class Empleado(Base):
     # Nuevo campo Empresa
     empresa = Column(String(50), default="Corban Trans Logistic", nullable=False)
     
+    # Iniciales del comercial en SISPAC (ej: 'DC', 'CR') para homologación de órdenes
+    iniciales_sispac = Column(String(10), nullable=True)
+    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
