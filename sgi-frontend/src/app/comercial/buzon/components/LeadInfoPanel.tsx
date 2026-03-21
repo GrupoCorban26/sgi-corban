@@ -9,6 +9,7 @@ import {
     CheckCircle2, X, ChevronRight, Headset, Clock, Tag, UserPlus
 } from 'lucide-react';
 import { toast } from 'sonner';
+import Cookies from 'js-cookie';
 
 interface Props {
     selectedConv: ChatConversationPreview;
@@ -61,6 +62,7 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
     const [isMounted, setIsMounted] = useState(false);
     const [selectedComercialId, setSelectedComercialId] = useState<number | ''>('');
     const [isAssigning, setIsAssigning] = useState(false);
+    const [isSupervisor, setIsSupervisor] = useState(false);
 
     // Resetear selección al cambiar de lead
     useEffect(() => {
@@ -69,7 +71,24 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
 
     useEffect(() => {
         setIsMounted(true);
+        try {
+            const userDataStr = Cookies.get('user_data');
+            if (userDataStr) {
+                const userData = JSON.parse(userDataStr);
+                const roles: string[] = userData.roles ?? [];
+                if (roles.includes('JEFE_COMERCIAL') || roles.includes('SISTEMAS')) {
+                    setIsSupervisor(true);
+                }
+            }
+        } catch (e) {
+            console.error('Error parsing user data cookies', e);
+        }
     }, []);
+
+    // Determinar si debemos mostrar el selector de asignación
+    const isSilentlyAssigned = !!selectedConv.asignado_a && selectedConv.estado === 'PENDIENTE' && selectedConv.modo === 'ASESOR';
+    const isUnassigned = selectedConv.estado === 'NUEVO' || !selectedConv.asignado_a;
+    const canAssign = isUnassigned || (isSupervisor && isSilentlyAssigned);
 
     const handleAsignarManual = async () => {
         if (!selectedComercialId) {
@@ -240,17 +259,20 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
                 </select>
             </div>
 
-            {/* Asignación manual (solo para leads NUEVO sin asesor) */}
-            {(selectedConv.estado === 'NUEVO' || !selectedConv.asignado_a) && (
+            {/* Asignación y Reasignación Manual */}
+            {canAssign && (
                 <div className="px-5 py-4 border-b border-slate-100 space-y-2.5">
                     <div className="flex items-center gap-2 mb-1">
                         <UserPlus size={14} className="text-blue-500" />
                         <label className="text-xs font-semibold text-blue-600 uppercase tracking-wider">
-                            Asignar Asesor
+                            {isUnassigned ? 'Asignar Asesor' : 'Reasignar Asesor'}
                         </label>
                     </div>
                     <p className="text-xs text-slate-400 -mt-1">
-                        Este lead no tiene asesor asignado. Selecciona uno manualmente.
+                        {isUnassigned 
+                            ? 'Este lead no tiene asesor asignado. Selecciona uno manualmente.'
+                            : 'Este lead fue asignado silenciosamente. Puedes reasignarlo.'
+                        }
                     </p>
                     <select
                         value={selectedComercialId}
@@ -272,7 +294,9 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
                             disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         <UserPlus size={15} />
-                        {isAssigning ? 'Asignando...' : 'Asignar Asesor'}
+                        {isAssigning 
+                            ? 'Procesando...' 
+                            : (isUnassigned ? 'Asignar Asesor' : 'Reasignar Asesor')}
                     </button>
                 </div>
             )}
