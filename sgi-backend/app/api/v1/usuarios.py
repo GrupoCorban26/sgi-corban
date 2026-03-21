@@ -5,7 +5,7 @@ from typing import Optional
 
 from app.database.db_connection import get_db
 from app.core.security import get_current_user_id, get_current_active_auth
-from app.core.dependencies import require_permission, get_current_user_obj, resolver_comercial_ids
+from app.core.dependencies import require_permission, require_any_role, get_current_user_obj, resolver_comercial_ids
 from app.services.usuarios import UsuarioService
 from app.models.seguridad import Usuario
 from app.schemas.usuario import (
@@ -205,3 +205,47 @@ async def toggle_disponibilidad_buzon(
         "message": "Ahora estás disponible para recibir leads" if current_user.disponible_buzon
                    else "No recibirás leads hasta que te pongas disponible"
     }
+
+
+# ===========================================
+# DISPONIBILIDAD BUZÓN — GESTIÓN DE EQUIPO
+# ===========================================
+
+@router.get(
+    "/disponibilidad-buzon/equipo",
+    dependencies=[Depends(require_any_role("SISTEMAS", "JEFE_COMERCIAL"))],
+)
+async def obtener_disponibilidad_equipo(
+    db: AsyncSession = Depends(get_db),
+    comercial_ids: list = Depends(resolver_comercial_ids),
+    _: dict = Depends(get_current_active_auth),
+):
+    """
+    Lista comerciales con su estado de disponibilidad.
+    SISTEMAS ve todos. JEFE_COMERCIAL ve solo su equipo.
+    """
+    service = UsuarioService(db)
+    return await service.get_disponibilidad_equipo(comercial_ids=comercial_ids)
+
+
+@router.patch(
+    "/disponibilidad-buzon/{user_id}/toggle",
+    dependencies=[Depends(require_any_role("SISTEMAS", "JEFE_COMERCIAL"))],
+)
+async def toggle_disponibilidad_usuario(
+    user_id: int,
+    db: AsyncSession = Depends(get_db),
+    comercial_ids: list = Depends(resolver_comercial_ids),
+    _: dict = Depends(get_current_active_auth),
+):
+    """
+    Cambia el estado de disponibilidad de un comercial específico.
+    SISTEMAS puede cambiar cualquiera. JEFE_COMERCIAL solo su equipo.
+    """
+    service = UsuarioService(db)
+    result = await service.toggle_disponibilidad_usuario(
+        user_id=user_id, comercial_ids=comercial_ids
+    )
+    if result.get("success") == 0:
+        raise HTTPException(status_code=403, detail=result.get("message"))
+    return result

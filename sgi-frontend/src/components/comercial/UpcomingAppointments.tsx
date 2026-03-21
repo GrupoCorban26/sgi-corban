@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import { useCitas, Cita } from '@/hooks/comercial/useCitas';
 import { Calendar, Clock, MapPin, Loader2, Info, User, Filter, CheckCircle } from 'lucide-react';
-import { format, parseISO, isSameDay } from 'date-fns';
+import { format, parseISO, isSameDay, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import ModalAprobarCita from '@/components/comercial/ModalAprobarCita';
@@ -29,8 +29,12 @@ export default function UpcomingAppointments() {
 
     const { citas, isLoading, terminateMutation } = useCitas(shouldFetch ? comercialIdFilter : undefined, filterStatus, undefined, 1);
 
-    // Sort by date asc (closest first)
-    const sortedCitas = [...citas].sort((a, b) => new Date(a.fecha).getTime() - new Date(b.fecha).getTime());
+    // Sort by date asc (closest first) - Evitamos new Date() plano para mayor compatibilidad con Safari iOS
+    const sortedCitas = [...citas].sort((a, b) => {
+        const dateA = a.fecha ? parseISO(a.fecha).getTime() : 0;
+        const dateB = b.fecha ? parseISO(b.fecha).getTime() : 0;
+        return (isNaN(dateA) ? 0 : dateA) - (isNaN(dateB) ? 0 : dateB);
+    });
 
     const handleCitaClick = (cita: Cita) => {
         if (isBoss && cita.estado === 'PENDIENTE') {
@@ -110,8 +114,17 @@ export default function UpcomingAppointments() {
                     {sortedCitas.map((cita) => {
                         const isPendiente = cita.estado === 'PENDIENTE';
                         const isClickable = isBoss && isPendiente;
-                        const isToday = isSameDay(parseISO(cita.fecha), new Date());
+                        
+                        // Parseo de fecha seguro para Safari Móvil
+                        const parsedDate = cita.fecha ? parseISO(cita.fecha) : null;
+                        const esFechaValida = parsedDate && isValid(parsedDate);
+                        
+                        const isToday = esFechaValida ? isSameDay(parsedDate, new Date()) : false;
                         const canTerminate = !isBoss && cita.estado === 'APROBADO' && isToday;
+                        
+                        const dateText = esFechaValida 
+                            ? format(parsedDate, "EEEE d 'de' MMMM", { locale: es }) 
+                            : 'Fecha Inválida';
 
                         return (
                             <div
@@ -143,16 +156,16 @@ export default function UpcomingAppointments() {
                                     )}
                                     <div className="flex items-center gap-2">
                                         <Calendar size={12} />
-                                        <span>{format(parseISO(cita.fecha), "EEEE d 'de' MMMM", { locale: es })}</span>
+                                        <span className="capitalize-first">{dateText}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <Clock size={12} />
-                                        <span>{cita.hora}</span>
+                                        <span>{cita.hora || 'Sin hora'}</span>
                                     </div>
                                     <div className="flex items-center gap-2">
                                         <MapPin size={12} />
                                         <span className="truncate max-w-[200px]" title={cita.direccion}>
-                                            {cita.direccion}
+                                            {cita.direccion || 'Sin dirección'}
                                         </span>
                                     </div>
                                 </div>

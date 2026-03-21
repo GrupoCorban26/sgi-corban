@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import { useChatConversations } from '@/hooks/comercial/useChat';
 import { useDisponibilidadBuzon } from '@/hooks/comercial/useDisponibilidad';
+import { useEquipoDisponibilidad } from '@/hooks/comercial/useEquipoDisponibilidad';
 import { ChatConversationPreview } from '@/types/chat';
 import ConversationItem from './ConversationItem';
-import { Loader2, MessageSquareDashed, Search, X, Inbox } from 'lucide-react';
+import { Loader2, MessageSquareDashed, Search, X, Inbox, ChevronDown, Users } from 'lucide-react';
 import { useComerciales } from '@/hooks/organizacion/useComerciales';
 import Cookies from 'js-cookie';
 
@@ -23,16 +24,23 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
     const [activeTab, setActiveTab] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [filtroComercial, setFiltroComercial] = useState<number | ''>('');
+    const [equipoOpen, setEquipoOpen] = useState(false);
 
-    // Verificar si es jefa comercial
+    // Verificar roles del usuario
     const [isJefa, setIsJefa] = useState(false);
+    const [isSupervisor, setIsSupervisor] = useState(false);
     React.useEffect(() => {
         try {
             const userDataStr = Cookies.get('user_data');
             if (userDataStr) {
                 const userData = JSON.parse(userDataStr);
-                if (userData.roles?.includes('JEFE_COMERCIAL')) {
+                const roles: string[] = userData.roles ?? [];
+                if (roles.includes('JEFE_COMERCIAL')) {
                     setIsJefa(true);
+                    setIsSupervisor(true);
+                }
+                if (roles.includes('SISTEMAS')) {
+                    setIsSupervisor(true);
                 }
             }
         } catch (e) { console.error(e); }
@@ -41,6 +49,9 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
     const { data: comerciales = [] } = useComerciales();
     const { data: conversations = [], isLoading } = useChatConversations(filtroComercial);
     const { disponible, toggle, isToggling } = useDisponibilidadBuzon();
+    const { equipo, toggleUsuario, isToggling: isTogglingEquipo } = useEquipoDisponibilidad(isSupervisor);
+
+    const enLineaCount = equipo.filter(u => u.disponible_buzon).length;
 
     const filtered = conversations.filter(c => {
         if (activeTab !== 'all' && c.estado !== activeTab) return false;
@@ -106,6 +117,69 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
                         {disponible ? 'En línea' : 'Ausente'}
                     </button>
                 </div>
+
+                {/* Panel Equipo — Solo SISTEMAS / JEFE_COMERCIAL */}
+                {isSupervisor && equipo.length > 0 && (
+                    <div className="mb-2 border border-slate-200 rounded-xl overflow-hidden">
+                        <button
+                            onClick={() => setEquipoOpen(!equipoOpen)}
+                            className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
+                        >
+                            <div className="flex items-center gap-2">
+                                <Users size={14} className="text-slate-500" />
+                                <span className="text-xs font-semibold text-slate-700">
+                                    Equipo
+                                </span>
+                                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+                                    {enLineaCount}/{equipo.length} en línea
+                                </span>
+                            </div>
+                            <ChevronDown
+                                size={14}
+                                className={`text-slate-400 transition-transform duration-200 ${equipoOpen ? 'rotate-180' : ''}`}
+                            />
+                        </button>
+
+                        {equipoOpen && (
+                            <div className="divide-y divide-slate-100 max-h-44 overflow-y-auto">
+                                {equipo.map(u => (
+                                    <div
+                                        key={u.usuario_id}
+                                        className="flex items-center justify-between px-3 py-2 hover:bg-slate-50/50 transition-colors"
+                                    >
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className={`
+                                                w-2 h-2 rounded-full flex-shrink-0
+                                                ${u.disponible_buzon ? 'bg-emerald-500' : 'bg-slate-300'}
+                                            `} />
+                                            <span className="text-xs text-slate-700 truncate font-medium">
+                                                {u.nombre}
+                                            </span>
+                                        </div>
+
+                                        {/* Toggle switch */}
+                                        <button
+                                            onClick={() => toggleUsuario(u.usuario_id)}
+                                            disabled={isTogglingEquipo}
+                                            className={`
+                                                relative w-8 h-[18px] rounded-full flex-shrink-0 transition-colors duration-200
+                                                ${u.disponible_buzon ? 'bg-emerald-500' : 'bg-slate-300'}
+                                                ${isTogglingEquipo ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}
+                                            `}
+                                            title={u.disponible_buzon ? 'Marcar como ausente' : 'Marcar como en línea'}
+                                        >
+                                            <span className={`
+                                                absolute top-0.5 w-3.5 h-3.5 rounded-full bg-white shadow-sm
+                                                transition-all duration-200
+                                                ${u.disponible_buzon ? 'left-[15px]' : 'left-0.5'}
+                                            `} />
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* Barra de búsqueda */}
                 <div className="relative">

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import api from '@/lib/axios';
 import { Loader2, Phone, Calendar, AlertTriangle, User } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 
@@ -87,6 +87,12 @@ export default function RecordatorioLlamadas() {
                         const colorClass = getUrgencyColor(client.days_remaining);
                         const urgencyText = getUrgencyText(client.days_remaining);
                         const isOverdue = client.days_remaining < 0;
+                        
+                        // Parseo de fecha seguro para evitar crashes en date-fns (ErrorBoundary) en Safari Móvil
+                        const parsedDate = client.proxima_fecha_contacto ? parseISO(client.proxima_fecha_contacto) : null;
+                        const dateText = parsedDate && isValid(parsedDate) 
+                            ? format(parsedDate, "d 'de' MMM", { locale: es }) 
+                            : 'Fecha Inválida';
 
                         return (
                             <div
@@ -118,7 +124,7 @@ export default function RecordatorioLlamadas() {
                                         {urgencyText}
                                     </span>
                                     <span className="text-xs opacity-75 mt-0.5">
-                                        {format(parseISO(client.proxima_fecha_contacto), "d 'de' MMM", { locale: es })}
+                                        {dateText}
                                     </span>
                                 </div>
                             </div>

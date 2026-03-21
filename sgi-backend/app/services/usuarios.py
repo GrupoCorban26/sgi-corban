@@ -269,6 +269,83 @@ class UsuarioService:
         
         return {"success": 1, "message": "Roles asignados correctamente"}
 
+    async def get_disponibilidad_equipo(self, comercial_ids: list = None) -> list:
+        """
+        Obtiene la lista de comerciales con su estado de disponibilidad.
+        Si comercial_ids es None → devuelve todos (SISTEMAS).
+        Si comercial_ids es lista → filtra solo esos (JEFE_COMERCIAL).
+        """
+        stmt = (
+            select(Usuario)
+            .options(
+                selectinload(Usuario.roles),
+                selectinload(Usuario.empleado)
+            )
+            .join(Usuario.roles)
+            .where(
+                Usuario.is_active == True,
+                Rol.nombre == 'COMERCIAL'
+            )
+        )
+
+        if comercial_ids is not None:
+            stmt = stmt.where(Usuario.id.in_(comercial_ids))
+
+        stmt = stmt.distinct()
+
+        result = await self.db.execute(stmt)
+        usuarios = result.scalars().all()
+
+        return [
+            {
+                "usuario_id": u.id,
+                "nombre": (
+                    f"{u.empleado.nombres} {u.empleado.apellido_paterno}"
+                    if u.empleado else u.correo_corp
+                ),
+                "disponible_buzon": u.disponible_buzon,
+            }
+            for u in usuarios
+        ]
+
+    async def toggle_disponibilidad_usuario(
+        self, user_id: int, comercial_ids: list = None
+    ) -> dict:
+        """
+        Cambia el estado de disponibilidad de un comercial específico.
+        Valida que el user_id pertenezca al equipo si comercial_ids no es None.
+        """
+        # Validar pertenencia al equipo (JEFE_COMERCIAL)
+        if comercial_ids is not None and user_id not in comercial_ids:
+            return {
+                "success": 0,
+                "message": "No tienes permiso para modificar este usuario",
+            }
+
+        stmt = select(Usuario).where(
+            Usuario.id == user_id, Usuario.is_active == True
+        )
+        result = await self.db.execute(stmt)
+        usuario = result.scalars().first()
+
+        if not usuario:
+            return {"success": 0, "message": "Usuario no encontrado"}
+
+        usuario.disponible_buzon = not usuario.disponible_buzon
+        await self.db.commit()
+        await self.db.refresh(usuario)
+
+        return {
+            "success": 1,
+            "usuario_id": usuario.id,
+            "disponible_buzon": usuario.disponible_buzon,
+            "message": (
+                "Usuario marcado como disponible"
+                if usuario.disponible_buzon
+                else "Usuario marcado como ausente"
+            ),
+        }
+
     async def change_password(self, id: int, password: str, updated_by: int = None) -> dict:
         """Cambia la contraseña de un usuario"""
         stmt = select(Usuario).where(Usuario.id == id)
