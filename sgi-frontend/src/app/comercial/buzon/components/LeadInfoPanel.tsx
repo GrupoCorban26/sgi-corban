@@ -86,7 +86,7 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
     }, []);
 
     // Determinar si debemos mostrar el selector de asignación
-    const isSilentlyAssigned = !!selectedConv.asignado_a && selectedConv.estado === 'PENDIENTE' && selectedConv.modo === 'ASESOR';
+    const isSilentlyAssigned = !!selectedConv.asignado_a && selectedConv.estado === 'PENDIENTE';
     const isUnassigned = selectedConv.estado === 'NUEVO' || !selectedConv.asignado_a;
     const canAssign = isUnassigned || (isSupervisor && isSilentlyAssigned);
 
