@@ -3,7 +3,7 @@ import { ChatConversationPreview } from '@/types/chat';
 import { useChatMessages, useChatActions } from '@/hooks/comercial/useChat';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
-import { ArrowLeft, Bot, UserPlus, Loader2, Info, MessageSquare, Headset } from 'lucide-react';
+import { ArrowLeft, Bot, UserPlus, Loader2, Info, MessageSquare, Headset, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -170,7 +170,18 @@ export default function ChatWindow({ selectedConv, onBack, onToggleInfo, showInf
 
             {/* Área de input */}
             {selectedConv.modo === 'ASESOR' ? (
-                <ChatInput inboxId={selectedConv.inbox_id} disabled={false} />
+                selectedConv.ventana_abierta ? (
+                    <ChatInput inboxId={selectedConv.inbox_id} disabled={false} />
+                ) : (
+                    <div className="bg-amber-50/95 backdrop-blur-sm px-4 py-3 text-center border-t border-amber-200 z-10 flex-shrink-0">
+                        <div className="flex items-center justify-center gap-2">
+                            <AlertCircle size={16} className="text-amber-600 flex-shrink-0" />
+                            <p className="text-sm text-amber-700 font-medium">
+                                ⚠️ La ventana de 24h ha expirado. Contacta al cliente desde tu celular corporativo.
+                            </p>
+                        </div>
+                    </div>
+                )
             ) : (
                 <div className="bg-white/95 backdrop-blur-sm px-4 py-3 text-center border-t border-slate-200 z-10 flex-shrink-0">
                     <div className="flex items-center justify-center gap-2">

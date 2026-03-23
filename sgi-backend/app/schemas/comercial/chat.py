@@ -54,3 +54,5 @@ class ChatConversationPreview(BaseModel):
     ultimo_mensaje_preview: Optional[str] = None
     asignado_a: Optional[int] = None
     nombre_asignado: Optional[str] = None
+    ventana_abierta: bool = True
+    escalado_a_directo: bool = False

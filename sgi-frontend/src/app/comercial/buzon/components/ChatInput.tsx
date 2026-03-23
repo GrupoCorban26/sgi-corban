@@ -46,8 +46,14 @@ export default function ChatInput({ inboxId, disabled = false }: Props) {
         sendMessage.mutate(
             { inboxId, contenido },
             {
-                onError: () => {
-                    toast.error('Error al enviar mensaje');
+                onError: (err) => {
+                    // Verificar si es error 409 (ventana cerrada)
+                    const axiosErr = err as { response?: { status?: number; data?: { detail?: string } } };
+                    if (axiosErr?.response?.status === 409 && axiosErr?.response?.data?.detail === 'ventana_cerrada') {
+                        toast.warning('La ventana de 24h ha expirado. Contacta al cliente desde tu celular corporativo.');
+                    } else {
+                        toast.error('Error al enviar mensaje');
+                    }
                     setMessage(contenido); // Restaurar contenido si falló
                 }
             }

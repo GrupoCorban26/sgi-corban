@@ -6,6 +6,7 @@ import {
     SendMessageRequest,
     ChangeEstadoRequest
 } from '@/types/chat';
+import { AxiosError } from 'axios';
 
 const CHAT_URL = '/comercial/chat';
 
@@ -75,6 +76,12 @@ export const useChatActions = () => {
             if (context?.previousMessages) {
                 queryClient.setQueryData(['chat-messages', newMsg.inboxId], context.previousMessages);
             }
+            // Manejar error 409 (ventana cerrada) sin mostrar error genérico
+            const axiosErr = err as AxiosError<{ detail: string }>;
+            if (axiosErr?.response?.status === 409 && axiosErr?.response?.data?.detail === 'ventana_cerrada') {
+                // Refrescar conversaciones para que el frontend detecte ventana cerrada
+                queryClient.invalidateQueries({ queryKey: ['chat-conversations'] });
+            }
         },
         onSettled: (_, __, variables) => {
             queryClient.invalidateQueries({ queryKey: ['chat-messages', variables.inboxId] });
@@ -134,12 +141,23 @@ export const useChatActions = () => {
         }
     });
 
+    const escalarADirecto = useMutation({
+        mutationFn: async (inboxId: number) => {
+            const { data } = await api.post(`/comercial/inbox/${inboxId}/escalar`);
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['chat-conversations'] });
+        }
+    });
+
     return {
         sendMessage,
         takeChat,
         releaseChat,
         changeEstado,
         markAsRead,
-        descartarLead
+        descartarLead,
+        escalarADirecto
     };
 };

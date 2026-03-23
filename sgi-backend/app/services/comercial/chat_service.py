@@ -3,7 +3,7 @@ from sqlalchemy.future import select
 from sqlalchemy import and_, update, func, case
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Optional
 from app.utils.horario_laboral import calcular_segundos_horario_laboral
 
@@ -25,7 +25,7 @@ class ChatService:
             .where(
                 and_(
                     Inbox.asignado_a == comercial_id,
-                    Inbox.estado.not_in(['CIERRE', 'DESCARTADO', 'CONVERTIDO'])
+                    Inbox.estado.not_in(['DESCARTADO', 'CONVERTIDO'])
                 )
             )
             .options(
@@ -59,6 +59,9 @@ class ChatService:
             else:
                 latest_msg = ibx.mensaje_inicial
             
+            # Calcular ventana 24h
+            ventana = self._calcular_ventana_abierta(ibx)
+            
             previews.append({
                 "inbox_id": ibx.id,
                 "telefono": ibx.telefono,
@@ -69,7 +72,9 @@ class ChatService:
                 "mensajes_no_leidos": unread,
                 "ultimo_mensaje_preview": latest_msg[:50] + "..." if latest_msg and len(latest_msg) > 50 else latest_msg,
                 "asignado_a": ibx.asignado_a,
-                "nombre_asignado": ibx.nombre_asignado
+                "nombre_asignado": ibx.nombre_asignado,
+                "ventana_abierta": ventana,
+                "escalado_a_directo": ibx.escalado_a_directo or False
             })
         return previews
 
@@ -80,7 +85,7 @@ class ChatService:
         query = (
             select(Inbox)
             .where(
-                Inbox.estado.not_in(['CIERRE', 'DESCARTADO', 'CONVERTIDO'])
+                Inbox.estado.not_in(['DESCARTADO', 'CONVERTIDO'])
             )
             .options(
                 selectinload(Inbox.mensajes),
@@ -113,6 +118,9 @@ class ChatService:
             sorted_msgs = sorted(ibx.mensajes, key=lambda x: x.created_at, reverse=True)
             latest_msg = sorted_msgs[0].contenido if sorted_msgs else ibx.mensaje_inicial
             
+            # Calcular ventana 24h
+            ventana = self._calcular_ventana_abierta(ibx)
+            
             previews.append({
                 "inbox_id": ibx.id,
                 "telefono": ibx.telefono,
@@ -123,9 +131,21 @@ class ChatService:
                 "mensajes_no_leidos": unread,
                 "ultimo_mensaje_preview": latest_msg[:50] + "..." if latest_msg and len(latest_msg) > 50 else latest_msg,
                 "asignado_a": ibx.asignado_a,
-                "nombre_asignado": ibx.nombre_asignado
+                "nombre_asignado": ibx.nombre_asignado,
+                "ventana_abierta": ventana,
+                "escalado_a_directo": ibx.escalado_a_directo or False
             })
         return previews
+
+    def _calcular_ventana_abierta(self, inbox) -> bool:
+        """Calcula si la ventana de 24h de WhatsApp sigue abierta.
+        Usa ultimo_mensaje_cliente_at si existe, si no hace fallback a ultimo_mensaje_at."""
+        ref = inbox.ultimo_mensaje_cliente_at or inbox.ultimo_mensaje_at
+        if not ref:
+            return False
+        if ref.tzinfo:
+            ref = ref.replace(tzinfo=None)
+        return (datetime.now() - ref).total_seconds() < 86400
 
     async def get_messages(self, inbox_id: int):
         """Get history of messages for a specific conversation."""

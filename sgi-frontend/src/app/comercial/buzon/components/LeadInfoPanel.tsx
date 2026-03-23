@@ -6,7 +6,7 @@ import { useInbox } from '@/hooks/comercial/useInbox';
 import { useComerciales } from '@/hooks/organizacion/useComerciales';
 import {
     Building2, Phone, Calendar, Bot, AlertCircle,
-    CheckCircle2, X, ChevronRight, Headset, Clock, Tag, UserPlus
+    CheckCircle2, X, ChevronRight, Headset, Clock, Tag, UserPlus, Smartphone
 } from 'lucide-react';
 import { toast } from 'sonner';
 import Cookies from 'js-cookie';
@@ -53,7 +53,7 @@ const MOTIVOS_DESCARTE = [
 ];
 
 export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClick, onClose }: Props) {
-    const { changeEstado, releaseChat, descartarLead } = useChatActions();
+    const { changeEstado, releaseChat, descartarLead, escalarADirecto } = useChatActions();
     const { asignarManualMutation } = useInbox();
     const { data: comerciales = [] } = useComerciales();
     const [showDiscardModal, setShowDiscardModal] = useState(false);
@@ -309,6 +309,37 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
                         Acciones
                     </label>
                 </div>
+
+                {/* Toggle Gestionando por celular */}
+                {['PENDIENTE', 'EN_GESTION', 'COTIZADO'].includes(selectedConv.estado) && (
+                    selectedConv.escalado_a_directo ? (
+                        <div className="w-full py-2.5 px-4 bg-orange-50 rounded-xl text-sm border border-orange-200">
+                            <div className="flex items-center gap-2">
+                                <Smartphone size={15} className="text-orange-600" />
+                                <span className="font-semibold text-orange-700">Gestionado por celular</span>
+                            </div>
+                        </div>
+                    ) : (
+                        <button
+                            onClick={async () => {
+                                try {
+                                    await escalarADirecto.mutateAsync(selectedConv.inbox_id);
+                                    toast.success('Marcado como gestionado por celular');
+                                    onChangeConv({ ...selectedConv, escalado_a_directo: true });
+                                } catch {
+                                    toast.error('Error al escalar');
+                                }
+                            }}
+                            disabled={escalarADirecto.isPending}
+                            className="w-full py-2.5 px-4 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-xl text-sm font-medium
+                                flex items-center justify-center gap-2 transition-all border border-orange-200 hover:border-orange-300
+                                disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <Smartphone size={15} />
+                            {escalarADirecto.isPending ? 'Procesando...' : '📱 Gestionando por celular'}
+                        </button>
+                    )
+                )}
 
                 {selectedConv.modo === 'ASESOR' && (
                     <button

@@ -36,7 +36,7 @@ export default function ChatLayout() {
             await convertMutation.mutateAsync({ id: selectedId, clienteId: newClienteId });
             toast.success('Lead convertido y enlazado exitosamente');
             setIsModalClienteOpen(false);
-            setSelectedId(null);
+            // No deseleccionar: el lead sigue visible con estado CIERRE
         } catch (error) {
             toast.error('Cliente creado pero hubo un error al enlazar el lead.');
         }
@@ -101,7 +101,8 @@ export default function ChatLayout() {
                 onClienteCreado={handleClienteCreado}
                 initialData={{
                     razon_social: selectedConv?.nombre_whatsapp || '',
-                    nombre_comercial: selectedConv?.nombre_whatsapp || ''
+                    nombre_comercial: selectedConv?.nombre_whatsapp || '',
+                    tipo_estado: 'CERRADA'
                 }}
             />
         </div>

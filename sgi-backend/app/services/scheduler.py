@@ -26,8 +26,8 @@ PET = timezone(timedelta(hours=-5))
 HORA_RESET = time(8, 0)  # 8:00 AM
 
 # Configuración de auto-asignación de leads sin respuesta
-TIMEOUT_LEADS_SIN_RESPUESTA_MINUTOS = 60  # 1 hora
-INTERVALO_VERIFICACION_MINUTOS = 10  # Cada cuántos minutos revisar
+TIMEOUT_LEADS_SIN_RESPUESTA_MINUTOS = 15  # 15 minutos
+INTERVALO_VERIFICACION_MINUTOS = 1  # Cada minuto
 
 # Configuración de auto-derivación de cotizaciones abandonadas
 INTERVALO_COTIZACIONES_MINUTOS = 1  # Cada cuántos minutos revisar
@@ -77,7 +77,10 @@ async def _asignar_leads_sin_respuesta():
     Busca registros en Inbox con:
     - estado = 'NUEVO' (el bot envió bienvenida pero el cliente no respondió)
     - sin asignado_a (no tiene asesor)
-    - creado hace más de TIMEOUT_LEADS_SIN_RESPUESTA_MINUTOS
+    - creado hace más de TIMEOUT_LEADS_SIN_RESPUESTA_MINUTOS (15 min)
+    
+    También busca sesiones de bot activas (MENU, COTIZAR_REQUERIMIENTOS, 
+    COTIZAR_CONFIRMAR) con más de 15 min de inactividad.
     
     Los asigna a un asesor por Round Robin SIN enviar mensaje al cliente,
     para que el asesor pueda contactarlos manualmente desde el inbox.
@@ -86,7 +89,7 @@ async def _asignar_leads_sin_respuesta():
         async with AsyncSessionLocal() as db:
             limite = datetime.now() - timedelta(minutes=TIMEOUT_LEADS_SIN_RESPUESTA_MINUTOS)
             
-            # Buscar leads NUEVO sin asesor y con más de 1 hora de antigüedad
+            # 1. Buscar leads NUEVO sin asesor y con más de 15 min de antigüedad
             query = select(Inbox).where(
                 and_(
                     Inbox.estado == 'NUEVO',
@@ -96,7 +99,38 @@ async def _asignar_leads_sin_respuesta():
             ).order_by(Inbox.fecha_recepcion.asc())
             
             result = await db.execute(query)
-            leads_sin_respuesta = result.scalars().all()
+            leads_sin_respuesta = list(result.scalars().all())
+            
+            # 2. Buscar sesiones de bot activas con >15 min de inactividad
+            #    (cliente quedó en un flujo del bot pero dejó de interactuar)
+            estados_bot_activos = ['MENU', 'COTIZAR_REQUERIMIENTOS', 'COTIZAR_CONFIRMAR']
+            query_sessions = select(ConversationSession).where(
+                and_(
+                    ConversationSession.estado.in_(estados_bot_activos),
+                    ConversationSession.updated_at <= limite
+                )
+            )
+            result_sessions = await db.execute(query_sessions)
+            sesiones_inactivas = result_sessions.scalars().all()
+            
+            for session in sesiones_inactivas:
+                # Buscar inbox NUEVO asociado a esta sesión
+                tel_session = session.telefono.replace(" ", "").replace("+", "")
+                if tel_session.startswith("51"):
+                    tel_session = tel_session[2:]
+                    
+                query_inbox_session = select(Inbox).where(
+                    and_(
+                        Inbox.telefono == tel_session,
+                        Inbox.estado == 'NUEVO',
+                        Inbox.asignado_a.is_(None)
+                    )
+                )
+                result_inbox_s = await db.execute(query_inbox_session)
+                inbox_session = result_inbox_s.scalars().first()
+                
+                if inbox_session and inbox_session not in leads_sin_respuesta:
+                    leads_sin_respuesta.append(inbox_session)
             
             if not leads_sin_respuesta:
                 return
@@ -201,7 +235,7 @@ async def _asignar_leads_sin_respuesta():
                 
                 # Actualizar mensaje_inicial si es genérico
                 if not lead.mensaje_inicial or lead.mensaje_inicial == "Interacción inicial":
-                    lead.mensaje_inicial = "[Auto-asignado] Cliente no respondió al bot después de 1 hora"
+                    lead.mensaje_inicial = "[Auto-asignado] Cliente no respondió al bot después de 15 min"
                 
                 nombre_asesor = (
                     f"{asesor.empleado.nombres} {asesor.empleado.apellido_paterno}"

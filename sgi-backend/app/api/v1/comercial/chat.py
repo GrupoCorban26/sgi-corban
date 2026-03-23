@@ -22,9 +22,6 @@ from app.services.comercial.whatsapp_service import WhatsAppService
 
 logger = logging.getLogger(__name__)
 
-# Nombre de la plantilla aprobada en Meta Business Manager
-TEMPLATE_SALUDO = "saludo_8am"
-
 router = APIRouter(prefix="/comercial/chat", tags=["chat"])
 
 
@@ -103,18 +100,18 @@ async def send_message(
     ultimo_entrante = await _ultimo_mensaje_entrante_at(db, inbox_id)
     ventana_abierta = _ventana_24h_abierta(ultimo_entrante)
     
+    if not ventana_abierta:
+        raise HTTPException(
+            status_code=409,
+            detail="ventana_cerrada"
+        )
+    
     try:
-        if ventana_abierta:
-            # Ventana abierta: enviar texto libre normal
-            await WhatsAppService.send_text(inbox.telefono, request.contenido)
-        else:
-            # Ventana cerrada: enviar template primero para reabrir la ventana
-            logger.info(f"Ventana 24h cerrada para inbox {inbox_id}. Enviando template '{TEMPLATE_SALUDO}' en lugar de texto libre.")
-            await WhatsAppService.send_template(inbox.telefono, TEMPLATE_SALUDO)
+        await WhatsAppService.send_text(inbox.telefono, request.contenido)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al enviar mensaje por WhatsApp: {e}")
         
-    # Save to db (siempre guardamos el contenido original del asesor)
+    # Save to db
     msg_create = ChatMessageCreate(
         inbox_id=inbox_id,
         telefono=inbox.telefono,

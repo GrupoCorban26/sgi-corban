@@ -25,6 +25,8 @@ export interface ChatConversationPreview {
     ultimo_mensaje_preview: string | null;
     asignado_a: number | null;
     nombre_asignado: string | null;
+    ventana_abierta: boolean;
+    escalado_a_directo: boolean;
 }
 
 export interface SendMessageRequest {

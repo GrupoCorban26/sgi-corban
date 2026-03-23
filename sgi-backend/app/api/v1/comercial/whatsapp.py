@@ -1,6 +1,7 @@
 import logging
 from fastapi import APIRouter, HTTPException, Query, BackgroundTasks
 from typing import Optional, List
+from datetime import datetime
 import os
 from sqlalchemy import select, and_
 
@@ -198,6 +199,10 @@ async def _process_webhook(payload: WhatsAppWebhookPayload):
                                 media_url=media_url,
                                 whatsapp_msg_id=msg_id
                             ))
+                            
+                            # Actualizar timestamp del último mensaje del cliente (ventana 24h)
+                            inbox.ultimo_mensaje_cliente_at = datetime.now()
+                            await db.commit()
 
                         # If mode is ASESOR, skip bot
                         if inbox and inbox.modo == 'ASESOR':
