@@ -325,3 +325,51 @@ class AnalyticsService:
             })
 
         return {"totales": totales, "por_comercial": comerciales_stats}
+
+    # =========================================================================
+    # D. Detalle de Buzón WhatsApp (para exportación Excel)
+    # =========================================================================
+
+    async def get_detalle_buzon(self, dt_inicio: datetime, dt_fin: datetime, comercial_ids: list = None, empresa: str = None) -> list[dict]:
+        """Retorna filas individuales del Inbox para exportar a Excel."""
+
+        # Condición base de fechas
+        condicion = and_(
+            Inbox.fecha_recepcion >= dt_inicio,
+            Inbox.fecha_recepcion <= dt_fin,
+        )
+
+        stmt = (
+            select(
+                Inbox.telefono,
+                Inbox.estado,
+                Inbox.comentario_descarte,
+                Inbox.fecha_recepcion,
+                Empleado.nombres.label("comercial"),
+            )
+            .outerjoin(Usuario, Inbox.asignado_a == Usuario.id)
+            .outerjoin(Empleado, Usuario.empleado_id == Empleado.id)
+            .where(condicion)
+            .order_by(Inbox.fecha_recepcion.desc())
+        )
+
+        # Filtrar por comerciales permitidos
+        if comercial_ids is not None:
+            stmt = stmt.where(Inbox.asignado_a.in_(comercial_ids))
+
+        # Filtrar por empresa del empleado
+        if empresa:
+            stmt = stmt.where(Empleado.empresa == empresa)
+
+        rows = (await self.db.execute(stmt)).all()
+
+        return [
+            {
+                "telefono": row.telefono,
+                "estado": row.estado,
+                "comentario": row.comentario_descarte or "",
+                "fecha": row.fecha_recepcion.strftime("%Y-%m-%d %H:%M") if row.fecha_recepcion else "",
+                "comercial": (row.comercial.split()[0] if row.comercial else "Sin asignar"),
+            }
+            for row in rows
+        ]

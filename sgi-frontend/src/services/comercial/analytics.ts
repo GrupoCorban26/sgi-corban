@@ -43,5 +43,16 @@ export const analyticsService = {
             }
         });
         return response.data;
+    },
+    getDetalleBuzon: async (fechaInicio: string, fechaFin: string, comercialId?: string, empresa?: string): Promise<{ telefono: string; estado: string; comentario: string; fecha: string; comercial: string }[]> => {
+        const response = await api.get('/clientes/metricas/dashboard/buzon/detalle', {
+            params: {
+                fecha_inicio: fechaInicio,
+                fecha_fin: fechaFin,
+                comercial_id: comercialId || undefined,
+                empresa: empresa || undefined
+            }
+        });
+        return response.data;
     }
 };

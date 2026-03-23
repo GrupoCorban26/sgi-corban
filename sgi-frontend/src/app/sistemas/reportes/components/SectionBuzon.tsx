@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 
 import { useAnalyticsBuzon } from '@/hooks/comercial/useAnalyticsDesglosado';
+import { analyticsService } from '@/services/comercial/analytics';
 import { FiltrosSeccion } from './FiltrosSeccion';
 
 export function SectionBuzon() {
@@ -15,20 +16,21 @@ export function SectionBuzon() {
 
     const { data, isLoading, isError, isFetching } = useAnalyticsBuzon(fechaInicio, fechaFin, comercialId, empresa);
 
-    const exportarAExcel = () => {
-        if (!data || data.por_comercial.length === 0) {
-            toast.error('No hay datos para exportar');
-            return;
-        }
+    const exportarAExcel = async () => {
         try {
+            toast.info('Generando reporte...');
+            const detalle = await analyticsService.getDetalleBuzon(fechaInicio, fechaFin, comercialId, empresa);
+            if (!detalle || detalle.length === 0) {
+                toast.error('No hay datos para exportar');
+                return;
+            }
             const wb = XLSX.utils.book_new();
-            const wsData = XLSX.utils.json_to_sheet(data.por_comercial.map(c => ({
-                'ASESOR': c.nombre,
-                'ASIGNADOS': c.leads_asignados,
-                'CONVERTIDOS': c.convertidos,
-                'DESCARTADOS': c.descartados,
-                'EN GESTION': c.en_gestion,
-                'TIEMPO RESP. (min)': Math.round(c.avg_tiempo_respuesta_seg / 60)
+            const wsData = XLSX.utils.json_to_sheet(detalle.map(row => ({
+                'TELEFONO': row.telefono,
+                'ESTADO': row.estado,
+                'COMENTARIO': row.comentario,
+                'FECHA': row.fecha,
+                'COMERCIAL': row.comercial
             })));
             XLSX.utils.book_append_sheet(wb, wsData, "Buzón WhatsApp");
             XLSX.writeFile(wb, `Reporte_Buzon_${format(new Date(), 'yyyyMMdd')}.xlsx`);

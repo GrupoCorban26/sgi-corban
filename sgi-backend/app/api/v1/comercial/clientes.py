@@ -171,6 +171,37 @@ async def get_dashboard_buzon(
     )
 
 
+@router.get("/metricas/dashboard/buzon/detalle", dependencies=[Depends(get_current_active_auth)])
+async def get_dashboard_buzon_detalle(
+    fecha_inicio: date = Query(..., description="Fecha de inicio del reporte (YYYY-MM-DD)"),
+    fecha_fin: date = Query(..., description="Fecha de fin del reporte (YYYY-MM-DD)"),
+    comercial_id: Optional[int] = Query(None, description="Filtrar por comercial"),
+    empresa: Optional[str] = Query(None, description="Filtrar por empresa"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_token_payload),
+    comercial_ids_permitidos: list = Depends(resolver_comercial_ids)
+):
+    """Detalle individual de leads del Buzón WhatsApp para exportación Excel."""
+    roles = current_user.get("roles", [])
+    if not any(role in roles for role in ALLOWED_ALL):
+        raise HTTPException(status_code=403, detail="No tienes permisos para acceder al dashboard")
+    if fecha_inicio > fecha_fin:
+        raise HTTPException(status_code=400, detail="La fecha de inicio no puede ser posterior a la fecha de fin")
+        
+    filtro_comercial_ids = comercial_ids_permitidos
+    if comercial_id:
+        if comercial_ids_permitidos is None or comercial_id in comercial_ids_permitidos:
+            filtro_comercial_ids = [comercial_id]
+
+    service = AnalyticsService(db)
+    return await service.get_detalle_buzon(
+        datetime.combine(fecha_inicio, datetime.min.time()),
+        datetime.combine(fecha_fin, datetime.max.time()),
+        comercial_ids=filtro_comercial_ids,
+        empresa=empresa
+    )
+
+
 @router.get("", dependencies=[Depends(require_permission("clientes.listar"))])
 async def listar_clientes(
     busqueda: Optional[str] = Query(None, description="Buscar por RUC o razón social"),
