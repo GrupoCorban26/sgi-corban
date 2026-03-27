@@ -51,22 +51,13 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
     const hasBody = ['POST', 'PUT', 'PATCH'].includes(req.method);
     let body: BodyInit | null = null;
     if (hasBody) {
-        // Para FormData/multipart, pasar el body raw; para JSON, pasar el text
         if (contentType?.includes('multipart/form-data')) {
-            // Parsear el FormData entrante y reconstruirlo para el backend
-            // fetch() generará automáticamente el Content-Type con boundary correcto
-            const incomingFormData = await req.formData();
-            const outgoingFormData = new FormData();
-            for (const [key, value] of incomingFormData.entries()) {
-                if (value instanceof File) {
-                    outgoingFormData.append(key, value, value.name);
-                } else {
-                    outgoingFormData.append(key, value);
-                }
-            }
-            body = outgoingFormData;
-            // No fijar Content-Type — fetch() genera el boundary correcto automáticamente
-            delete (headers as Record<string, string>)['Content-Type'];
+            // Para multipart: pasar el body CRUDO como bytes
+            // El Content-Type original ya tiene el boundary → se mantiene en headers
+            const rawBytes = new Uint8Array(await req.arrayBuffer());
+            console.log(`[Proxy] Multipart upload: ${rawBytes.length} bytes, Content-Type: ${contentType?.substring(0, 80)}`);
+            body = rawBytes;
+            // headers['Content-Type'] ya está seteado arriba con el boundary original
         } else {
             body = await req.text();
         }
