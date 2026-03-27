@@ -226,7 +226,7 @@ def procesar_excel_asistencia(contenido: bytes, hora_corte: str = "08:10") -> As
             else:
                 raise HTTPException(status_code=400, detail="El archivo Excel no contiene hojas")
 
-        df = pd.read_excel(archivo, sheet_name=hoja_objetivo, header=None)
+        df = pd.read_excel(xl, sheet_name=hoja_objetivo, header=None)
         logger.info(f"Excel leído correctamente. Hoja: '{hoja_objetivo}', Filas: {len(df)}, Columnas: {len(df.columns)}")
 
     except HTTPException:

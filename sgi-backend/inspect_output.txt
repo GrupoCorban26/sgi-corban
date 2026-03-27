@@ -1,0 +1,78 @@
+﻿================================================================================
+FILE: C:\Users\egobu\Desktop\reporte_507.xls
+  Sheets: ['Reporte de Turnos', 'Reporte EstadÝstico', 'Reporte de Asistencia', 'Reporte de Excepciones']
+  Target sheet: 'Reporte de Asistencia'
+  Shape: (39, 21)
+  Row 0: ['c0=Reporte de Eventos de Asistencia']
+  Row 1: []
+  Row 2: ['c0=Periodo:', 'c2=2026-03-23 ~ 2026-03-27', 'c11=2026-03-27', 'c13=Fecha actual:']
+  Row 3: ['c0=23', 'c1=24', 'c2=25', 'c3=26', 'c4=27']
+  Row 4: ['c0=ID:', 'c2=40673964', 'c8=Nombre:', 'c10=Egoavil', 'c18=Departamento:', 'c20=Corban']
+  Row 5: []
+  Row 6: ['c0=ID:', 'c2=70362111', 'c8=Nombre:', 'c10=Maricielo', 'c18=Departamento:', 'c20=Corban']
+  Row 7: ['c0=08:10', 'c3=08:08', 'c4=08:00']
+  Row 8: ['c0=ID:', 'c2=40134006', 'c8=Nombre:', 'c10=Jhon', 'c18=Departamento:', 'c20=Corban']
+  Row 9: ['c0=18:28', 'c1=17:59']
+  Row 10: ['c0=ID:', 'c2=10625971', 'c8=Nombre:', 'c10=EvelynHernandez', 'c18=Departamento:', 'c20=Corban']
+  Row 11: ['c0=09:2919:08', 'c1=09:4119:27', 'c2=09:2619:09', 'c3=09:3018:46', 'c4=09:29']
+  Row 12: ['c0=ID:', 'c2=77156433', 'c8=Nombre:', 'c10=Fabio', 'c18=Departamento:', 'c20=Corban']
+  Row 13: ['c0=08:16', 'c1=08:56', 'c2=08:4018:20', 'c3=08:2818:11', 'c4=08:28']
+  Row 14: ['c0=ID:', 'c2=75136832', 'c8=Nombre:', 'c10=Karina', 'c18=Departamento:', 'c20=Corban']
+  Row 15: ['c0=08:2618:16', 'c1=08:3318:16', 'c2=08:2218:15', 'c3=08:3018:13', 'c4=08:24']
+  Row 16: ['c0=ID:', 'c2=72328604', 'c8=Nombre:', 'c10=Paola', 'c18=Departamento:', 'c20=Corban']
+  Row 17: ['c0=07:2317:00', 'c1=07:3617:01', 'c2=07:2617:17', 'c3=07:2717:00', 'c4=07:34']
+  Row 18: ['c0=ID:', 'c2=41034940', 'c8=Nombre:', 'c10=Jhonathan', 'c18=Departamento:', 'c20=Corban']
+  Row 19: ['c2=08:16', 'c3=08:0318:26']
+
+================================================================================
+FILE: C:\Users\egobu\Desktop\1_StandardReport.xls
+  Sheets: ['Reporte de Turnos', 'Reporte EstadÝstico', 'Reporte de Asistencia', 'Reporte de Excepciones']
+  Target sheet: 'Reporte de Asistencia'
+  Shape: (58, 21)
+  Row 0: ['c0=Reporte de Eventos de Asistencia']
+  Row 1: []
+  Row 2: ['c0=Periodo:', 'c2=2026-03-23 ~ 2026-03-27', 'c11=2026-03-27', 'c13=Fecha actual:']
+  Row 3: ['c0=23', 'c1=24', 'c2=25', 'c3=26', 'c4=27']
+  Row 4: ['c0=ID:', 'c2=74546207', 'c8=Nombre:', 'c10=hilary', 'c18=Departamento:', 'c20=Empresa']
+  Row 5: []
+  Row 6: ['c0=ID:', 'c2=72604325', 'c8=Nombre:', 'c10=Esmeralda', 'c18=Departamento:', 'c20=Empresa']
+  Row 7: []
+  Row 8: ['c0=ID:', 'c2=75721201', 'c8=Nombre:', 'c10=josias', 'c18=Departamento:', 'c20=Empresa']
+  Row 9: []
+  Row 10: ['c0=ID:', 'c2=73776626', 'c8=Nombre:', 'c10=Dalia', 'c18=Departamento:', 'c20=Empresa']
+  Row 11: []
+  Row 12: ['c0=ID:', 'c2=47780904', 'c8=Nombre:', 'c10=aaranza', 'c18=Departamento:', 'c20=Empresa']
+  Row 13: []
+  Row 14: ['c0=ID:', 'c2=76624115', 'c8=Nombre:', 'c10=miriam', 'c18=Departamento:', 'c20=Empresa']
+  Row 15: ['c0=08:0818:35', 'c2=08:2318:20', 'c4=08:36']
+  Row 16: ['c0=ID:', 'c2=74371671', 'c8=Nombre:', 'c10=CRISTOFER', 'c18=Departamento:', 'c20=Empresa']
+  Row 17: ['c0=09:5618:30', 'c1=08:1618:58', 'c2=08:3318:36', 'c3=08:1718:19', 'c4=08:18']
+  Row 18: ['c0=ID:', 'c2=76938209', 'c8=Nombre:', 'c10=Dayeli', 'c18=Departamento:', 'c20=Empresa']
+  Row 19: []
+
+================================================================================
+FILE: C:\Users\egobu\Desktop\reporte_508.xls
+  Sheets: ['Reporte de Turnos', 'Reporte EstadÝstico', 'Reporte de Asistencia', 'Reporte de Excepciones']
+  Target sheet: 'Reporte de Asistencia'
+  Shape: (40, 21)
+  Row 0: ['c0=Reporte de Eventos de Asistencia']
+  Row 1: []
+  Row 2: ['c0=Periodo:', 'c2=2026-03-23 ~ 2026-03-27', 'c11=2026-03-27', 'c13=Fecha actual:']
+  Row 3: ['c0=23', 'c1=24', 'c2=25', 'c3=26', 'c4=27']
+  Row 4: ['c0=ID:', 'c2=71125448', 'c8=Nombre:', 'c10=YELLY', 'c18=Departamento:', 'c20=Empresa']
+  Row 5: ['c0=08:1212:34', 'c1=07:5413:04', 'c2=08:0818:0218:0218:02', 'c3=08:0018:05', 'c4=08:14']
+  Row 6: ['c0=ID:', 'c2=74644489', 'c8=Nombre:', 'c10=BRANCO', 'c18=Departamento:', 'c20=Empresa']
+  Row 7: ['c0=08:1918:21', 'c1=08:1618:31', 'c2=08:07', 'c3=08:19', 'c4=08:45']
+  Row 8: ['c0=ID:', 'c2=75391183', 'c8=Nombre:', 'c10=ANDREA', 'c18=Departamento:', 'c20=Empresa']
+  Row 9: []
+  Row 10: ['c0=ID:', 'c2=60938361', 'c8=Nombre:', 'c10=EVELIA', 'c18=Departamento:', 'c20=Empresa']
+  Row 11: ['c0=08:1718:11', 'c1=08:3818:52', 'c2=08:1718:05', 'c3=08:0918:08', 'c4=08:2112:14']
+  Row 12: ['c0=ID:', 'c2=73103425', 'c8=Nombre:', 'c10=HECTOR', 'c18=Departamento:', 'c20=Empresa']
+  Row 13: ['c0=08:2718:03', 'c1=08:34', 'c2=08:1318:03', 'c3=08:1118:04', 'c4=08:09']
+  Row 14: ['c0=ID:', 'c2=77224598', 'c8=Nombre:', 'c10=DIANA', 'c18=Departamento:', 'c20=Empresa']
+  Row 15: ['c0=08:0018:03', 'c1=08:2218:5618:56', 'c2=08:03', 'c3=08:0718:0618:0718:07', 'c4=08:09']
+  Row 16: ['c0=ID:', 'c2=74719031', 'c8=Nombre:', 'c10=KATHY', 'c18=Departamento:', 'c20=Empresa']
+  Row 17: ['c0=08:0718:0118:03', 'c1=08:0418:01', 'c2=08:0718:01', 'c3=08:0518:08', 'c4=08:19']
+  Row 18: ['c0=ID:', 'c2=72028740', 'c8=Nombre:', 'c10=ISRRAEL', 'c18=Departamento:', 'c20=Empresa']
+  Row 19: ['c0=08:1018:03', 'c1=08:1718:02', 'c2=08:1018:00', 'c3=08:0918:01', 'c4=08:16']
+

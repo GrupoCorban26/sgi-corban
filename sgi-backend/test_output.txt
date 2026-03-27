@@ -1,0 +1,49 @@
+﻿
+============================================================
+Testing: C:\Users\egobu\Desktop\reporte_507.xls
+  File size: 43520 bytes
+  SUCCESS: 18 empleados, 10 con tardanzas
+    - EVELYNHERNANDEZ: 5 tardanzas
+    - FABIO: 5 tardanzas
+    - KARINA: 5 tardanzas
+    - DYLAN: 5 tardanzas
+    - KEIT: 5 tardanzas
+    - DAYANE: 5 tardanzas
+    - YOSELF: 4 tardanzas
+    - VALERY: 3 tardanzas
+    - JHON: 2 tardanzas
+    - JHONATHAN: 1 tardanzas
+
+============================================================
+Testing: C:\Users\egobu\Desktop\1_StandardReport.xls
+  File size: 51712 bytes
+  SUCCESS: 27 empleados, 8 con tardanzas
+    - CRISTOFER: 5 tardanzas
+    - CIELO: 5 tardanzas
+    - ALEX: 4 tardanzas
+    - YACKELINE: 4 tardanzas
+    - HARLEY: 3 tardanzas
+    - MIRIAM: 2 tardanzas
+    - JULIEETH: 2 tardanzas
+    - MIJAEL: 1 tardanzas
+
+============================================================
+Testing: C:\Users\egobu\Desktop\reporte_508.xls
+  File size: 37376 bytes
+  SUCCESS: 18 empleados, 16 con tardanzas
+    - ARANZA: 5 tardanzas
+    - BRANCO: 4 tardanzas
+    - EVELIA: 4 tardanzas
+    - HECTOR: 4 tardanzas
+    - DAYANARA: 4 tardanzas
+    - KARINA: 4 tardanzas
+    - YADHIRA: 3 tardanzas
+    - DALIA: 3 tardanzas
+    - YELLY: 2 tardanzas
+    - ISRRAEL: 2 tardanzas
+    - NICOLLE: 2 tardanzas
+    - BRIGHIT: 2 tardanzas
+    - DIANA: 1 tardanzas
+    - KATHY: 1 tardanzas
+    - MARIEL: 1 tardanzas
+    - MIGUEL: 1 tardanzas
