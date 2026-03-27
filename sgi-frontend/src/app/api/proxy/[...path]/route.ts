@@ -53,9 +53,9 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
     if (hasBody) {
         // Para FormData/multipart, pasar el body raw; para JSON, pasar el text
         if (contentType?.includes('multipart/form-data')) {
-            // Pasar el body como stream y MANTENER el Content-Type original
+            // Leer el body completo como ArrayBuffer y MANTENER el Content-Type original
             // que ya incluye el boundary (ej: multipart/form-data; boundary=----WebKitFormBoundary...)
-            body = req.body;
+            body = Buffer.from(await req.arrayBuffer());
         } else {
             body = await req.text();
         }
