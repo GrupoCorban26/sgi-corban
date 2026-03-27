@@ -53,9 +53,9 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
     if (hasBody) {
         // Para FormData/multipart, pasar el body raw; para JSON, pasar el text
         if (contentType?.includes('multipart/form-data')) {
-            body = await req.blob();
-            // No setear Content-Type manualmente para multipart — fetch genera el boundary
-            delete (headers as Record<string, string>)['Content-Type'];
+            // Pasar el body como stream y MANTENER el Content-Type original
+            // que ya incluye el boundary (ej: multipart/form-data; boundary=----WebKitFormBoundary...)
+            body = req.body;
         } else {
             body = await req.text();
         }
