@@ -47,7 +47,6 @@ export const useProcesarAsistencia = () => {
             const { data } = await api.post<AsistenciaReporteResponse>(
                 `/administracion/asistencia/procesar-reporte?hora_corte=${encodeURIComponent(horaCorte)}`,
                 formData,
-                { headers: { 'Content-Type': 'multipart/form-data' } }
             );
             return data;
         },
@@ -65,7 +64,6 @@ export const exportarReporteAsistencia = async (archivo: File, horaCorte: string
         `/administracion/asistencia/exportar-reporte?hora_corte=${encodeURIComponent(horaCorte)}`,
         formData,
         {
-            headers: { 'Content-Type': 'multipart/form-data' },
             responseType: 'blob',
         }
     );
