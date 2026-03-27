@@ -44,11 +44,18 @@ export const useProcesarAsistencia = () => {
             const formData = new FormData();
             formData.append('file', archivo);
 
-            const { data } = await api.post<AsistenciaReporteResponse>(
-                `/administracion/asistencia/procesar-reporte?hora_corte=${encodeURIComponent(horaCorte)}`,
-                formData,
+            // Usar ruta dedicada que maneja multipart correctamente (no el proxy genérico)
+            const response = await fetch(
+                `/api/asistencia/procesar?hora_corte=${encodeURIComponent(horaCorte)}`,
+                { method: 'POST', body: formData }
             );
-            return data;
+
+            if (!response.ok) {
+                const errorData = await response.json().catch(() => ({ detail: 'Error desconocido' }));
+                throw { response: { data: errorData, status: response.status } };
+            }
+
+            return await response.json() as AsistenciaReporteResponse;
         },
     });
 };
@@ -60,21 +67,25 @@ export const exportarReporteAsistencia = async (archivo: File, horaCorte: string
     const formData = new FormData();
     formData.append('file', archivo);
 
-    const response = await api.post(
-        `/administracion/asistencia/exportar-reporte?hora_corte=${encodeURIComponent(horaCorte)}`,
-        formData,
-        {
-            responseType: 'blob',
-        }
+    // Usar ruta dedicada para exportar (no el proxy genérico)
+    const response = await fetch(
+        `/api/asistencia/exportar?hora_corte=${encodeURIComponent(horaCorte)}`,
+        { method: 'POST', body: formData }
     );
 
+    if (!response.ok) {
+        throw new Error('Error al exportar el reporte');
+    }
+
+    const blob = await response.blob();
+
     // Crear el enlace de descarga
-    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const url = window.URL.createObjectURL(blob);
     const enlace = document.createElement('a');
     enlace.href = url;
 
     // Intentar obtener nombre del archivo del header
-    const disposicion = response.headers['content-disposition'];
+    const disposicion = response.headers.get('content-disposition');
     const nombreArchivo = disposicion
         ? disposicion.split('filename=')[1]?.replace(/"/g, '')
         : `reporte_tardanzas_${new Date().toISOString().slice(0, 10)}.xlsx`;
@@ -85,3 +96,4 @@ export const exportarReporteAsistencia = async (archivo: File, horaCorte: string
     enlace.remove();
     window.URL.revokeObjectURL(url);
 };
+
