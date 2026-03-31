@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChatConversationPreview } from '@/types/chat';
-import { Bot, Headset } from 'lucide-react';
+import { Bot, Headset, Smartphone } from 'lucide-react';
 
 interface Props {
     conv: ChatConversationPreview;
@@ -115,7 +115,7 @@ export default function ConversationItem({ conv, isSelected, onClick }: Props) {
                         )}
                     </div>
 
-                    {/* Badge de estado + Asesor asignado */}
+                    {/* Badge de estado + Celular + Asesor asignado */}
                     <div className="mt-1.5 flex items-center gap-2">
                         <span className={`
                             inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-semibold
@@ -124,6 +124,12 @@ export default function ConversationItem({ conv, isSelected, onClick }: Props) {
                             <span className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
                             {estadoLabel}
                         </span>
+                        {conv.escalado_a_directo && (
+                            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-semibold bg-orange-50 text-orange-600">
+                                <Smartphone size={10} className="flex-shrink-0" />
+                                Celular
+                            </span>
+                        )}
                         {conv.nombre_asignado && (
                             <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 font-medium truncate">
                                 <Headset size={10} className="flex-shrink-0" />
