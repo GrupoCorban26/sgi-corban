@@ -370,9 +370,18 @@ export default function BaseComercialPage() {
                             `}
                           >
                             <option value={0}>Seleccionar caso...</option>
-                            {casosFiltrados.map((c: CasoLlamada) => (
-                              <option key={c.id} value={c.id}>{c.nombre}</option>
-                            ))}
+                            {casosFiltrados.map((c: CasoLlamada) => {
+                              const esGestionable = c.gestionable || c.is_positive;
+                              return (
+                                <option 
+                                  key={c.id} 
+                                  value={c.id}
+                                  className={esGestionable ? "bg-indigo-50 text-indigo-700 font-semibold" : "text-gray-700"}
+                                >
+                                  {esGestionable ? `✦ ${c.nombre}` : c.nombre}
+                                </option>
+                              );
+                            })}
                           </select>
                         )}
                       </td>

@@ -21,7 +21,8 @@ export interface CasoLlamada {
     id: number;
     nombre: string;
     contestado: boolean;
-    is_positive: boolean;
+    is_positive?: boolean; // deprecated, use gestionable instead
+    gestionable?: boolean;
 }
 
 export interface FiltroBase {
