@@ -179,23 +179,24 @@ export default function TransaccionesPage() {
                             <tr>
                                 <th className="px-4 py-3">RUC</th>
                                 <th className="px-4 py-3">Razón Social</th>
-                                <th className="px-4 py-3 text-right">FOB Datasur</th>
-                                <th className="px-4 py-3 text-right">FOB China</th>
-                                <th className="px-4 py-3 text-right">FOB Total</th>
-                                <th className="px-4 py-3 text-right">Transacciones</th>
+                                <th className="px-4 py-3 text-center">Frecuencia</th>
+                                <th className="px-4 py-3 text-center">Prox. Embarque</th>
+                                <th className="px-4 py-3 text-right">FOB Anual</th>
+                                <th className="px-4 py-3 text-right">Flete Anual</th>
+                                <th className="px-4 py-3 text-right">Peso Anual (KG)</th>
+                                <th className="px-4 py-3 text-right">Embarques</th>
+                                <th className="px-4 py-3 text-right">Agentes</th>
                                 <th className="px-4 py-3">Países Origen</th>
-                                <th className="px-4 py-3">Partidas</th>
-                                <th className="px-4 py-3 text-center">China</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-200">
                             {loading && data.length === 0 ? (
-                                <tr><td colSpan={9} className="px-6 py-8 text-center text-gray-500">
+                                <tr><td colSpan={10} className="px-6 py-8 text-center text-gray-500">
                                     <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
                                     Cargando datos...
                                 </td></tr>
                             ) : data.length === 0 ? (
-                                <tr><td colSpan={9} className="px-6 py-8 text-center text-gray-500">No hay registros. Sube un Excel para comenzar.</td></tr>
+                                <tr><td colSpan={10} className="px-6 py-8 text-center text-gray-500">No hay registros. Sube un Excel para comenzar.</td></tr>
                             ) : (
                                 data.map((item, idx) => (
                                     <tr
@@ -205,19 +206,23 @@ export default function TransaccionesPage() {
                                     >
                                         <td className="px-4 py-3 font-medium text-gray-900">{item.ruc}</td>
                                         <td className="px-4 py-3 max-w-xs truncate" title={item.razon_social}>{item.razon_social}</td>
-                                        <td className="px-4 py-3 text-right font-medium">{item.fob_datasur_mundo?.toLocaleString('es-PE', { style: 'currency', currency: 'USD' })}</td>
-                                        <td className="px-4 py-3 text-right">{item.fob_sunat_china?.toLocaleString('es-PE', { style: 'currency', currency: 'USD' }) || '—'}</td>
-                                        <td className="px-4 py-3 text-right font-semibold text-emerald-700">{item.fob_total_real?.toLocaleString('es-PE', { style: 'currency', currency: 'USD' })}</td>
-                                        <td className="px-4 py-3 text-right">{item.transacciones_datasur?.toLocaleString()}</td>
-                                        <td className="px-4 py-3 max-w-[150px] truncate" title={item.paises_origen}>{item.paises_origen}</td>
-                                        <td className="px-4 py-3 max-w-[150px] truncate" title={item.partidas_arancelarias}>{item.partidas_arancelarias}</td>
                                         <td className="px-4 py-3 text-center">
-                                            {item.importa_de_china === 'SI' ? (
-                                                <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full text-xs font-semibold">SÍ</span>
-                                            ) : (
-                                                <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-full text-xs">NO</span>
-                                            )}
+                                            {item.categoria_frecuencia ? (
+                                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${item.categoria_frecuencia.toUpperCase().includes('ALTA') ? 'bg-green-100 text-green-800' :
+                                                    item.categoria_frecuencia.toUpperCase().includes('MEDIA') ? 'bg-yellow-100 text-yellow-800' :
+                                                        'bg-gray-100 text-gray-800'
+                                                    }`}>
+                                                    {item.categoria_frecuencia}
+                                                </span>
+                                            ) : '—'}
                                         </td>
+                                        <td className="px-4 py-3 text-center text-gray-600">{item.prox_embarque_estimado || '—'}</td>
+                                        <td className="px-4 py-3 text-right font-semibold text-emerald-700">{item.fob_anual_usd?.toLocaleString('es-PE', { style: 'currency', currency: 'USD' })}</td>
+                                        <td className="px-4 py-3 text-right text-gray-600">{item.flete_anual_usd?.toLocaleString('es-PE', { style: 'currency', currency: 'USD' })}</td>
+                                        <td className="px-4 py-3 text-right text-gray-600">{(item.peso_anual_kg || 0).toLocaleString()}</td>
+                                        <td className="px-4 py-3 text-right">{item.embarques_anuales?.toLocaleString()}</td>
+                                        <td className="px-4 py-3 text-right">{item.agentes_distintos || 0}</td>
+                                        <td className="px-4 py-3 max-w-[150px] truncate" title={item.paises_origen}>{item.paises_origen}</td>
                                     </tr>
                                 ))
                             )}

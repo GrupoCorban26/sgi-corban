@@ -36,9 +36,7 @@ export const importacionesService = {
     uploadImportaciones: async (file: File): Promise<{ success: boolean; message: string; records_count: number }> => {
         const formData = new FormData();
         formData.append('file', file);
-        const { data } = await api.post('/importaciones/upload', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        const { data } = await api.post('/importaciones/upload', formData);
         return data;
     }
 };

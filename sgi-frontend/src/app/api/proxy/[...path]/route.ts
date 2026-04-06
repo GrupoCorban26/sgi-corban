@@ -52,12 +52,11 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
     let body: BodyInit | null = null;
     if (hasBody) {
         if (contentType?.includes('multipart/form-data')) {
-            // Crear un Blob con el tipo multipart original (incluye boundary)
-            // fetch() usa Blob.type como Content-Type automáticamente
+            // Pasar los bytes crudos directamente — NO usar Blob porque
+            // Blob.type convierte a lowercase y corrompe el boundary (case-sensitive)
             const rawBody = await req.arrayBuffer();
-            body = new Blob([rawBody], { type: contentType });
-            // Quitar Content-Type de headers — fetch lo setea desde Blob.type
-            delete (headers as Record<string, string>)['Content-Type'];
+            body = rawBody;
+            // Mantener Content-Type original en headers (tiene el boundary correcto)
             console.log(`[Proxy] Multipart: ${rawBody.byteLength} bytes`);
         } else {
             body = await req.text();

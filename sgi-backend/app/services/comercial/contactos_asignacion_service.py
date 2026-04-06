@@ -173,7 +173,7 @@ class ContactosAsignacionService:
             stmt_validos = select(
                 ClienteContacto.id,
                 ClienteContacto.ruc,
-                RegistroImportacion.cant_agentes_aduana,
+                RegistroImportacion.agentes_distintos,
                 func.row_number().over(
                     partition_by=ClienteContacto.ruc, 
                     order_by=ClienteContacto.id.asc()
@@ -192,14 +192,14 @@ class ContactosAsignacionService:
                 conditions = [RegistroImportacion.paises_origen.like(f"%{re.sub(r'[%_]', '', p)}%") for p in pais_origen]
                 stmt_validos = stmt_validos.where(or_(*conditions))
             if partida_arancelaria:
-                conditions_partida = [RegistroImportacion.partidas_arancelarias.like(f"%{re.sub(r'[%_]', '', p)}%") for p in partida_arancelaria]
-                stmt_validos = stmt_validos.where(or_(*conditions_partida))
+                # Ya no tenemos partidas arancelarias en la DB, ignoramos este bloque o tiramos error
+                pass
                 
             subq_validos = stmt_validos.subquery('validos')
             
             # Priorizar: agentes 0 o >1 van primero. Agentes 1 van al final.
             prioridad_agentes = case(
-                (subq_validos.c.cant_agentes_aduana == 1, 1),
+                (subq_validos.c.agentes_distintos == 1, 1),
                 else_=0
             )
             
@@ -417,24 +417,25 @@ class ContactosAsignacionService:
         return {"success": True, "message": "Feedback enviado correctamente"}
     
     async def get_filtros_base(self):
-        """Obtiene países y partidas disponibles para filtrar."""
+        """Obtiene países disponibles para filtrar."""
         from collections import Counter
         
-        # Obtener todos los valores de paises_origen y partidas_arancelarias
+        # Obtener todos los valores de paises_origen
         resultado = await self.db.execute(
             select(
-                RegistroImportacion.paises_origen,
-                RegistroImportacion.partidas_arancelarias
+                RegistroImportacion.paises_origen
             ).where(RegistroImportacion.paises_origen.isnot(None))
         )
         filas = resultado.all()
         
-        # Procesar países: separador ' - '
+        # Procesar países: separador ' - ' o '/'
         contador_paises = Counter()
         for fila in filas:
             if fila.paises_origen:
-                for pais in fila.paises_origen.split(' - '):
-                    pais_limpio = pais.strip()
+                # Separar por guiones o diagonales si existen múltiples países en una celda
+                partes = fila.paises_origen.replace('/', '-').split('-')
+                for parte in partes:
+                    pais_limpio = parte.strip()
                     if pais_limpio:
                         contador_paises[pais_limpio] += 1
         
@@ -443,21 +444,7 @@ class ContactosAsignacionService:
             for pais, cantidad in contador_paises.most_common()
         ]
         
-        # Procesar partidas arancelarias: separador ','
-        contador_partidas = Counter()
-        for fila in filas:
-            if fila.partidas_arancelarias:
-                for partida in fila.partidas_arancelarias.split(','):
-                    partida_limpia = partida.strip()[:4]  # Solo los primeros 4 dígitos
-                    if partida_limpia:
-                        contador_partidas[partida_limpia] += 1
-        
-        partidas = [
-            {"partida": partida, "cantidad": cantidad}
-            for partida, cantidad in contador_partidas.most_common()
-        ]
-        
-        return {"paises": paises, "partidas": partidas}
+        return {"paises": paises, "partidas": []}
 
     async def create_contacto_manual(self, data, user_id: int):
         """Crea un contacto manual y lo asigna inmediatamente al comercial.

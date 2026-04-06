@@ -106,9 +106,7 @@ export function useImportarSispac() {
             const formData = new FormData();
             formData.append('file', file);
             formData.append('empresa', empresa);
-            const { data } = await api.post(`${ORDENES_URL}/importar-sispac`, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            });
+            const { data } = await api.post(`${ORDENES_URL}/importar-sispac`, formData);
             return data;
         },
         onSuccess: () => {
@@ -125,9 +123,7 @@ export function useImportarSintad() {
         mutationFn: async (file) => {
             const formData = new FormData();
             formData.append('file', file);
-            const { data } = await api.post(`${ORDENES_URL}/importar-sintad`, formData, {
-                headers: { 'Content-Type': 'multipart/form-data' },
-            });
+            const { data } = await api.post(`${ORDENES_URL}/importar-sintad`, formData);
             return data;
         },
         onSuccess: () => {

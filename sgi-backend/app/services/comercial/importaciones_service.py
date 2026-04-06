@@ -15,22 +15,26 @@ class ImportacionesService:
     # Mapeo EXACTO de columnas del Excel a columnas de la tabla BD
     COLUMN_MAPPING = {
         'ruc': 'ruc',
-        'razon_social': 'razon_social',
-        'fob_datasur_mundo': 'fob_datasur_mundo',
-        'fob_sunat_china': 'fob_sunat_china',
-        'fob_total_real': 'fob_total_real',
-        'transacciones_datasur': 'transacciones_datasur',
+        'empresa': 'razon_social',
+        'categoria_frecuencia': 'categoria_frecuencia',
+        'prox_embarque_estimado': 'prox_embarque_estimado',
+        'meses_distintos': 'meses_distintos',
+        'embarques_anuales': 'embarques_anuales',
+        'agentes_distintos': 'agentes_distintos',
+        'fob_anual_usd': 'fob_anual_usd',
+        'flete_anual_usd': 'flete_anual_usd',
+        'peso_anual_kg': 'peso_anual_kg',
+        'flete_x_kg_usd': 'flete_x_kg_usd',
         'paises_origen': 'paises_origen',
-        'partidas_arancelarias': 'partidas_arancelarias',
-        'importa_de_china': 'importa_de_china',
-        'cant_agentes_aduana': 'cant_agentes_aduana',
+        'aduanas': 'aduanas',
     }
     
     # Columnas válidas de la tabla BD
     VALID_DB_COLUMNS = {
-        'ruc', 'razon_social', 'fob_datasur_mundo', 'fob_sunat_china',
-        'fob_total_real', 'transacciones_datasur', 'paises_origen',
-        'partidas_arancelarias', 'importa_de_china', 'cant_agentes_aduana'
+        'ruc', 'razon_social', 'categoria_frecuencia', 'prox_embarque_estimado',
+        'meses_distintos', 'embarques_anuales', 'agentes_distintos', 
+        'fob_anual_usd', 'flete_anual_usd', 'peso_anual_kg', 
+        'flete_x_kg_usd', 'paises_origen', 'aduanas'
     }
 
     @staticmethod
@@ -81,25 +85,19 @@ class ImportacionesService:
                 if 'ruc' in df.columns:
                     df['ruc'] = df['ruc'].apply(lambda x: str(int(x)) if pd.notna(x) and x != '' else None)
                 
-                # Limpiar columnas numéricas (convertir strings vacías y valores inválidos a None)
-                numeric_columns = ['fob_datasur_mundo', 'fob_sunat_china', 'fob_total_real', 'transacciones_datasur', 'cant_agentes_aduana']
+                # Limpiar columnas numéricas
+                numeric_columns = ['embarques_anuales', 'fob_anual_usd', 'flete_anual_usd', 'peso_anual_kg', 'flete_x_kg_usd']
                 for col in numeric_columns:
                     if col in df.columns:
                         df[col] = pd.to_numeric(df[col], errors='coerce')
                         df[col] = df[col].where(pd.notnull(df[col]), None)
                 
                 # Convertir columnas enteras
-                for col_int in ['transacciones_datasur', 'cant_agentes_aduana']:
+                for col_int in ['meses_distintos', 'agentes_distintos']:
                     if col_int in df.columns:
                         df[col_int] = df[col_int].apply(
                             lambda x: int(x) if pd.notna(x) and x is not None else None
                         )
-                
-                # Convertir importa_de_china a string limpio
-                if 'importa_de_china' in df.columns:
-                    df['importa_de_china'] = df['importa_de_china'].apply(
-                        lambda x: str(x).strip() if pd.notna(x) and x is not None else None
-                    )
                 
                 # 1. Truncate
                 await db.execute(text("TRUNCATE TABLE comercial.registro_importaciones"))
@@ -161,7 +159,7 @@ class ImportacionesService:
             elif sort_by_ruc == 'asc':
                 order_by = "ORDER BY ri.ruc ASC"
             else:
-                order_by = "ORDER BY ri.fob_total_real DESC"
+                order_by = "ORDER BY ri.fob_anual_usd DESC"
             
             # Additional where logic
             params_dict = {"search": search, "pais_origen": pais_origen, "cant_agentes": cant_agentes}
@@ -170,7 +168,7 @@ class ImportacionesService:
                 base_where += " AND ri.paises_origen LIKE '%' + :pais_origen + '%' "
                 
             if cant_agentes is not None:
-                base_where += " AND ri.cant_agentes_aduana = :cant_agentes "
+                base_where += " AND ri.agentes_distintos = :cant_agentes "
             
             # Count query
             count_query = f"""

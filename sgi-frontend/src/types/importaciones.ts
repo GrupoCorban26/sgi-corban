@@ -2,13 +2,17 @@ export interface Importacion {
     id?: number;
     ruc?: string;
     razon_social?: string;
-    fob_datasur_mundo?: number;
-    fob_sunat_china?: number;
-    fob_total_real?: number;
-    transacciones_datasur?: number;
+    fob_anual_usd?: number;
+    flete_anual_usd?: number;
+    flete_x_kg_usd?: number;
+    peso_anual_kg?: number;
+    embarques_anuales?: number;
+    agentes_distintos?: number;
+    meses_distintos?: number;
+    categoria_frecuencia?: string;
+    prox_embarque_estimado?: string;
     paises_origen?: string;
-    partidas_arancelarias?: string;
-    importa_de_china?: string;
+    aduanas?: string;
 }
 
 export interface ImportacionResponse {

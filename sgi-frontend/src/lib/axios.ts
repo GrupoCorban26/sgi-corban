@@ -11,11 +11,11 @@ import axios from 'axios';
  */
 
 // El proxy corre en el mismo origen que Next.js, así que usamos ruta relativa
+// No setear Content-Type por defecto — axios lo detecta automáticamente:
+//   • Objetos JS  → application/json
+//   • FormData    → multipart/form-data (con boundary)
 const api = axios.create({
     baseURL: '/api/proxy',
-    headers: {
-        'Content-Type': 'application/json',
-    },
 });
 
 // Interceptor de respuesta: manejar errores de autenticación y autorización

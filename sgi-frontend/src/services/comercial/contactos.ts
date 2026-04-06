@@ -53,9 +53,9 @@ export const contactosService = {
     upload: async (file: File): Promise<{ message: string; inserted: number; updated: number }> => {
         const formData = new FormData();
         formData.append('file', file);
-        const { data } = await api.post('/contactos/upload', formData, {
-            headers: { 'Content-Type': 'multipart/form-data' }
-        });
+        // No setear Content-Type manualmente — axios lo hace automáticamente
+        // con el boundary correcto cuando detecta FormData
+        const { data } = await api.post('/contactos/upload', formData);
         return data;
     },
 

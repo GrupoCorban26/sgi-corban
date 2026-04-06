@@ -39,10 +39,10 @@ async def get_base_comercial(
                 cc.telefono,
                 cc.correo,
                 cc.estado,
-                ri.fob_total_real,
-                ri.transacciones_datasur,
-                ri.importa_de_china,
-                ri.cant_agentes_aduana
+                ri.fob_anual_usd,
+                ri.embarques_anuales,
+                ri.categoria_frecuencia,
+                ri.agentes_distintos
             FROM comercial.cliente_contactos cc
             INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
             WHERE cc.is_active = 1
@@ -55,7 +55,7 @@ async def get_base_comercial(
                 (SELECT COUNT(*) FROM base_filter) as total_contactos_general,
                 
                 (SELECT COUNT(DISTINCT ruc) FROM base_filter 
-                 WHERE cant_agentes_aduana > 1 OR cant_agentes_aduana = 0 OR cant_agentes_aduana IS NULL) as empresas_multi_0_agentes,
+                 WHERE agentes_distintos > 1 OR agentes_distintos = 0 OR agentes_distintos IS NULL) as empresas_multi_0_agentes,
                  
                 (SELECT COUNT(*) FROM base_filter) as contactos_disponibles,
                 
@@ -83,16 +83,16 @@ async def get_base_comercial(
             cc.telefono,
             cc.correo,
             cc.estado,
-            ri.fob_total_real,
-            ri.transacciones_datasur,
-            ri.importa_de_china
+            ri.fob_anual_usd,
+            ri.embarques_anuales,
+            ri.categoria_frecuencia
         FROM comercial.cliente_contactos cc
         INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
         WHERE cc.is_active = 1
           AND cc.estado = 'DISPONIBLE'
           AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)
           AND (:search IS NULL OR ri.ruc LIKE '%' + :search + '%' OR ri.razon_social LIKE '%' + :search + '%')
-        ORDER BY ri.fob_total_real DESC, ri.transacciones_datasur DESC
+        ORDER BY ri.fob_anual_usd DESC, ri.embarques_anuales DESC
         OFFSET :offset ROWS FETCH NEXT :page_size ROWS ONLY
     """)
     
@@ -122,7 +122,7 @@ async def get_base_stats(
         WITH base_filter AS (
             SELECT 
                 cc.ruc,
-                ri.cant_agentes_aduana
+                ri.agentes_distintos
             FROM comercial.cliente_contactos cc
             INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
             WHERE cc.is_active = 1
@@ -133,7 +133,7 @@ async def get_base_stats(
             (SELECT COUNT(*) FROM base_filter) as total_contactos_general,
                
             (SELECT COUNT(DISTINCT ruc) FROM base_filter
-             WHERE cant_agentes_aduana > 1 OR cant_agentes_aduana = 0 OR cant_agentes_aduana IS NULL) as empresas_multi_0_agentes,
+             WHERE agentes_distintos > 1 OR agentes_distintos = 0 OR agentes_distintos IS NULL) as empresas_multi_0_agentes,
              
             (SELECT COUNT(*) FROM base_filter) as contactos_disponibles,
                

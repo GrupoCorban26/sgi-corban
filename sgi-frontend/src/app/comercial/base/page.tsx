@@ -43,7 +43,6 @@ export default function BaseComercialPage() {
 
   // Estado para filtros
   const [paisSeleccionado, setPaisSeleccionado] = useState<string[]>([]);
-  const [partidaSeleccionada, setPartidaSeleccionada] = useState<string[]>([]);
   const [showFiltros, setShowFiltros] = useState(false);
 
   // Estado de feedback local para todos los contactos
@@ -75,8 +74,7 @@ export default function BaseComercialPage() {
   const handleCargarBase = async () => {
     try {
       const result = await cargarBase({
-        paisOrigen: paisSeleccionado.length > 0 ? paisSeleccionado : undefined,
-        partidaArancelaria: partidaSeleccionada.length > 0 ? partidaSeleccionada : undefined
+        paisOrigen: paisSeleccionado.length > 0 ? paisSeleccionado : undefined
       });
 
       // Construir mensaje informativo
@@ -190,16 +188,6 @@ export default function BaseComercialPage() {
                 onChange={setPaisSeleccionado}
                 placeholder="Seleccionar países..."
                 searchPlaceholder="Buscar país..."
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Partida Arancelaria</label>
-              <MultiSelect
-                options={filtros.partidas.map(p => ({ value: p.partida, label: p.partida, count: p.cantidad }))}
-                selectedValues={partidaSeleccionada}
-                onChange={setPartidaSeleccionada}
-                placeholder="Seleccionar partidas..."
-                searchPlaceholder="Buscar partida..."
               />
             </div>
           </div>
