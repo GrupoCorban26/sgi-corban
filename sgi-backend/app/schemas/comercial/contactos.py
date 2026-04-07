@@ -5,6 +5,7 @@ from datetime import datetime
 
 class ContactoBase(BaseModel):
     ruc: str = Field(..., max_length=11)
+    razon_social: Optional[str] = Field(None, max_length=255)
     nombre: Optional[str] = Field(None, max_length=150)
     cargo: Optional[str] = Field(None, max_length=100)
     telefono: str = Field(..., max_length=20)
@@ -25,6 +26,7 @@ class ContactoCreate(ContactoBase):
 
 class ContactoManualCreate(BaseModel):
     ruc: str = Field(..., max_length=11)
+    razon_social: Optional[str] = Field(None, max_length=255)
     nombre: Optional[str] = Field(None, max_length=150)
     cargo: Optional[str] = Field(None, max_length=100)
     telefono: Optional[str] = Field(None, max_length=20)
@@ -43,6 +45,7 @@ class AsignarLeadManual(BaseModel):
 
 class ContactoUpdate(BaseModel):
     nombre: Optional[str] = None
+    razon_social: Optional[str] = None
     cargo: Optional[str] = None
     telefono: Optional[str] = None
     email: Optional[str] = None

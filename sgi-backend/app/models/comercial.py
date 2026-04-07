@@ -90,6 +90,7 @@ class ClienteContacto(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     ruc = Column(String(11), nullable=False)
+    razon_social = Column(String(255))
     nombre = Column(String(150))
     cargo = Column(String(100))
     telefono = Column(String(20), nullable=False)

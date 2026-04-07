@@ -40,7 +40,7 @@ const ModalExportarContent = () => {
     const handleExport = async () => {
         setIsExporting(true);
         try {
-            const params: any = {};
+            const params: Record<string, string[] | boolean> = {};
 
             // Si hay productos seleccionados, enviarlos
             // Si no hay ninguno seleccionado, asumimos que quiere exportar TODO (o nada? User expectation usually is filters apply to restrict. If empty maybe all? Let's assume empty list means ALL for now, or force selection)

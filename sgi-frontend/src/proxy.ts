@@ -17,7 +17,7 @@ function getUserDataFromCookie(request: NextRequest): UserData | null {
     }
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
     const token = request.cookies.get('token');
     const userData = getUserDataFromCookie(request);
@@ -68,7 +68,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
 }
 
-// Configurar en qué rutas se ejecuta el middleware
+// Configurar en qué rutas se ejecuta el proxy
 export const config = {
     matcher: [
         /*

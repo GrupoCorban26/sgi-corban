@@ -19,9 +19,12 @@ interface AreaSeries {
   color: string;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ChartDataRecord = Record<string, any>;
+
 interface AreaChartCardProps {
   title?: string;
-  data: any[];
+  data: ChartDataRecord[];
   xKey: string;
   series: AreaSeries[];
   className?: string;

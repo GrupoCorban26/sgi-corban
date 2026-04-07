@@ -9,14 +9,14 @@ export interface ActionState {
   success?: boolean;
 }
 
-export async function handleLoginAction(prevState: any, formData: FormData) {
+export async function handleLoginAction(prevState: ActionState, formData: FormData) {
   const correo = formData.get('correo') as string;
   const password = formData.get('password') as string;
 
   let targetPath = '';
 
   try {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/login/`, {
+    const res = await fetch(`${process.env.API_URL}/login/`, {
       method: 'POST',
       headers: {
         // 2. Cambiamos el Content-Type
@@ -94,7 +94,7 @@ export async function handleLogoutAction() {
   // Revocar sesión en el backend antes de limpiar cookies
   if (token) {
     try {
-      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/login/logout`, {
+      await fetch(`${process.env.API_URL}/login/logout`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` }
       });

@@ -20,9 +20,12 @@ interface BarConfig {
   color: string;  // Color base de la barra
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ChartDataRecord = Record<string, any>;
+
 interface BarChartCardProps {
   title?: string;
-  data: any[];
+  data: ChartDataRecord[];
   xKey: string;
   bars: BarConfig[];
   className?: string;

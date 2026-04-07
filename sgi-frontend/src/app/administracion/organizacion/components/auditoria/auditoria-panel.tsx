@@ -1,7 +1,13 @@
 import { History } from 'lucide-react';
 import { TimelineItem } from './timeline-item';
+import { Empleado } from '@/types/organizacion/empleado';
 
-export function AuditoriaPanel({ onClose, entity }: any) {
+interface AuditoriaPanelProps {
+  onClose: () => void;
+  entity: Empleado | null;
+}
+
+export function AuditoriaPanel({ onClose, entity }: AuditoriaPanelProps) {
   return (
     <div className="fixed inset-0 z-50 flex justify-end">
       <div className="absolute inset-0 bg-black/20 backdrop-blur-sm" onClick={onClose} />
@@ -14,7 +20,7 @@ export function AuditoriaPanel({ onClose, entity }: any) {
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
         </div>
         <div className="space-y-6">
-          <p className="text-sm font-semibold text-gray-700">Registro: <span className="text-blue-600">{entity?.name}</span></p>
+          <p className="text-sm font-semibold text-gray-700">Registro: <span className="text-blue-600">{entity?.nombres} {entity?.apellido_paterno}</span></p>
           <div className="space-y-8 relative before:absolute before:inset-0 before:ml-2 before:h-full before:w-0.5 before:bg-gray-100">
             <TimelineItem date="02 Ene 2026" user="Maricielo" action="Update" details="Cambio de nombre" />
             <TimelineItem date="15 Dic 2025" user="Sistema" action="Created" details="Carga inicial" />

@@ -16,10 +16,12 @@ async def upload_importaciones(
     db: AsyncSession = Depends(get_db),
     _: dict = Depends(get_current_active_auth)
 ):
+    """Sube un Excel de importaciones (reemplaza datos anteriores)."""
     if not file.filename.endswith(('.xls', '.xlsx')):
-        raise HTTPException(status_code=400, detail="File must be an Excel file")
-        
-    return await ImportacionesService.process_excel_import(db, file)
+        raise HTTPException(status_code=400, detail="El archivo debe ser un Excel (.xls o .xlsx)")
+
+    service = ImportacionesService(db)
+    return await service.process_excel_import(file)
 
 @router.get("/", response_model=ImportacionPagination)
 async def list_importaciones(
@@ -28,14 +30,18 @@ async def list_importaciones(
     search: str = Query(None),
     sin_telefono: bool = Query(False),
     sort_by_ruc: str = Query(None, description="Ordenar por RUC: 'asc' o 'desc'"),
-    pais_origen: str = Query(None, description="Filtrar por pais de origen exacto"),
+    pais_origen: str = Query(None, description="Filtrar por país de origen exacto"),
     cant_agentes: int = Query(None, description="Filtrar por cantidad de agentes de aduana"),
     db: AsyncSession = Depends(get_db),
     _: dict = Depends(get_current_active_auth)
 ):
-    return await ImportacionesService.get_importaciones(db, page, page_size, search, sin_telefono, sort_by_ruc, pais_origen, cant_agentes)
+    """Lista importaciones con paginación y filtros."""
+    service = ImportacionesService(db)
+    return await service.get_importaciones(page, page_size, search, sin_telefono, sort_by_ruc, pais_origen, cant_agentes)
 
 @router.get("/paises/dropdown")
 async def get_paises(db: AsyncSession = Depends(get_db)):
-    """Devuelve listado de países únicos disponibles en importaciones (para filtros)"""
-    return await ImportacionesService.get_paises_dropdown(db)
+    """Devuelve listado de países únicos disponibles en importaciones (para filtros).
+    Endpoint público - usado por scripts externos de Python."""
+    service = ImportacionesService(db)
+    return await service.get_paises_dropdown()

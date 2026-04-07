@@ -20,9 +20,12 @@ interface LineSeries {
   color: string;  // Color de la línea (ej: "#1e3a8a")
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ChartDataRecord = Record<string, any>;
+
 interface LineChartCardProps {
   title?: string;
-  data: any[];           // El array de objetos con los datos
+  data: ChartDataRecord[];           // El array de objetos con los datos
   xKey: string;          // La llave para el eje X (ej: "mes" o "fecha")
   series: LineSeries[];  // Lista de líneas a graficar
   className?: string;

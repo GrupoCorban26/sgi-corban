@@ -37,8 +37,8 @@ interface EntityConfig {
 interface ModalContentProps {
     entityType: EntityType;
     departamentoToEdit: Departamento | null;
-    areaToEdit: any | null;
-    cargoToEdit: any | null;
+    areaToEdit: Area | null;
+    cargoToEdit: Cargo | null;
     parentDepartamentoId: number | null;
     parentAreaId: number | null;
     isOpen: boolean;

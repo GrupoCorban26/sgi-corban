@@ -6,8 +6,6 @@ interface Props {
     msg: ChatMessage;
 }
 
-const API_BASE = process.env.NEXT_PUBLIC_API_HOST || 'http://localhost:8000';
-
 export default function MessageBubble({ msg }: Props) {
     const isOut = msg.direccion === 'SALIENTE';
     const isBot = msg.remitente_tipo === 'BOT';
@@ -32,7 +30,8 @@ export default function MessageBubble({ msg }: Props) {
     const getMediaUrl = () => {
         if (!msg.media_url) return null;
         if (msg.media_url.startsWith('http')) return msg.media_url;
-        return `${API_BASE}${msg.media_url}`;
+        // Servir media a través del proxy para no exponer la URL del backend
+        return `/api/proxy${msg.media_url}`;
     };
 
     const renderMediaContent = () => {

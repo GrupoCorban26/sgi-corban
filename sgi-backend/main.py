@@ -69,20 +69,11 @@ from app.api.v1.administracion.asistencia import router as asistencia_router
 # Lifespan: tareas de inicio y cierre del servidor
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: iniciar scheduler de disponibilidad
-    from app.services.scheduler import iniciar_scheduler
-    scheduler_task = asyncio.create_task(iniciar_scheduler())
-    logger.info("✅ Scheduler de disponibilidad buzón iniciado")
+    logger.info("Levantando FastAPI Server... (El scheduler ahora corre en worker_tareas.py separado)")
     
     yield
     
-    # Shutdown: cancelar scheduler
-    scheduler_task.cancel()
-    try:
-        await scheduler_task
-    except asyncio.CancelledError:
-        pass
-    logger.info("⏹️ Scheduler detenido")
+    logger.info("FastAPI Server detenido")
 
 
 app = FastAPI(

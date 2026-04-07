@@ -18,7 +18,7 @@ async def login(
     request: Request,
     db: AsyncSession = Depends(get_db)
 ):
-    # 3. Accedemos a los datos mediante 'payload.correo' (ya no es .username)
+    # 1. Buscar usuario por correo
     auth_svc = AuthService(db)
     user_data = await auth_svc.obtener_usuario_por_correo(payload.correo)
     
@@ -28,7 +28,7 @@ async def login(
             detail="Usuario o contraseña incorrectos" # Mejor mensaje por seguridad
         )
 
-    # 4. Verificamos contraseña usando 'payload.password'
+    # 2. Verificar contraseña
     if not security.verificar_password(payload.password, user_data['password_hash']):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, 
@@ -36,7 +36,7 @@ async def login(
         )
     
     # 3. Validar si está bloqueado
-    if user_data['is_bloqueado']:
+    if user_data.get('is_bloqueado'):
         raise HTTPException(status_code=403, detail="Cuenta bloqueada")
 
     # 4. Generar Token (incluir roles para el menú del frontend)
@@ -50,7 +50,7 @@ async def login(
         }
     )
 
-    # 5. REGISTRAR SESIÓN EN BD
+    # 5. Registrar sesión en BD
     # Obtenemos IP y User-Agent del request
     client_ip = request.client.host if request.client else None
     user_agent = request.headers.get("user-agent")

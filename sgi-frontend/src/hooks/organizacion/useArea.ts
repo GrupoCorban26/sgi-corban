@@ -14,7 +14,7 @@ export const useAreas = (busqueda = '', departamentoId: number | null = null, pa
     const listQuery = useQuery({
         queryKey: ['areas', busqueda, departamentoId, page, pageSize],
         queryFn: async () => {
-            const params: any = { page, page_size: pageSize };
+            const params: Record<string, string | number> = { page, page_size: pageSize };
             if (busqueda) params.busqueda = busqueda;
             if (departamentoId) params.departamento_id = departamentoId;
 

@@ -50,7 +50,7 @@ class ContactosAsignacionService:
                 "id": cc.id,
                 "ruc": cc.ruc,
                 "nombre": cc.nombre,
-                "razon_social": ri_rs or cl_rs or "Sin razón social",
+                "razon_social": cc.razon_social or ri_rs or cl_rs or "Sin razón social",
                 "telefono": cc.telefono,
                 "correo": cc.correo,
                 "cargo": cc.cargo,
@@ -62,6 +62,7 @@ class ContactosAsignacionService:
                 "fecha_asignacion": cc.fecha_asignacion,
                 "fecha_llamada": cc.fecha_llamada,
                 "is_client": cc.is_client
+
             })
         return data
     
@@ -471,9 +472,11 @@ class ContactosAsignacionService:
             # Actualizar datos del contacto existente en vez de fallar
             if data.nombre:
                 contacto_existente.nombre = data.nombre
+            if getattr(data, 'razon_social', None):
+                contacto_existente.razon_social = data.razon_social
             if data.cargo:
                 contacto_existente.cargo = data.cargo
-            if data.email:
+            if getattr(data, 'email', None):
                 contacto_existente.correo = data.email
             contacto_existente.updated_at = func.now()
             
@@ -489,10 +492,11 @@ class ContactosAsignacionService:
             # 2. Crear contacto nuevo
             contacto = ClienteContacto(
                 ruc=data.ruc,
+                razon_social=getattr(data, 'razon_social', None),
                 nombre=data.nombre or "Sin nombre",
                 cargo=data.cargo,
                 telefono=data.telefono,
-                correo=data.email,
+                correo=getattr(data, 'email', None),
                 origen='MANUAL',
                 is_client=False,
                 is_active=True,

@@ -36,8 +36,9 @@ export const useImportaciones = () => {
             );
             setData(res.data);
             setTotal(res.total);
-        } catch (err: any) {
-            const message = err.response?.data?.detail || err.message || 'Error al cargar datos';
+        } catch (err: unknown) {
+            const axiosErr = err as { response?: { data?: { detail?: string } }; message?: string };
+            const message = axiosErr.response?.data?.detail || axiosErr.message || 'Error al cargar datos';
             setError(message);
             console.error('Error fetching importaciones:', err);
         } finally {
@@ -70,8 +71,9 @@ export const useImportaciones = () => {
             // Refresh data after upload
             await fetchImportaciones();
             return result;
-        } catch (err: any) {
-            const message = err.response?.data?.detail || err.message || 'Error al subir archivo';
+        } catch (err: unknown) {
+            const axiosErr = err as { response?: { data?: { detail?: string } }; message?: string };
+            const message = axiosErr.response?.data?.detail || axiosErr.message || 'Error al subir archivo';
             setError(message);
             throw new Error(message);
         } finally {

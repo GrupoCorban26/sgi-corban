@@ -3,16 +3,20 @@ from typing import Optional
 from decimal import Decimal
 
 class ImportacionBase(BaseModel):
-    id: Optional[int] = None
+    id: int
     ruc: Optional[str] = None
     razon_social: Optional[str] = None
-    fob_datasur_mundo: Optional[Decimal] = None
-    fob_sunat_china: Optional[Decimal] = None
-    fob_total_real: Optional[Decimal] = None
-    transacciones_datasur: Optional[int] = None
+    fob_anual_usd: Optional[Decimal] = None
+    flete_anual_usd: Optional[Decimal] = None
+    flete_x_kg_usd: Optional[Decimal] = None
+    peso_anual_kg: Optional[Decimal] = None
+    embarques_anuales: Optional[Decimal] = None
+    agentes_distintos: Optional[int] = None
+    meses_distintos: Optional[int] = None
+    categoria_frecuencia: Optional[str] = None
+    prox_embarque_estimado: Optional[str] = None
     paises_origen: Optional[str] = None
-    partidas_arancelarias: Optional[str] = None
-    importa_de_china: Optional[str] = None
+    aduanas: Optional[str] = None
 
 class ImportacionResponse(ImportacionBase):
     model_config = ConfigDict(from_attributes=True)

@@ -2,36 +2,27 @@
 
 import { useState } from 'react';
 import { ExcelUploader } from '@/components/common/ExcelUploader';
-import { ContactsModal } from '@/components/importaciones/ContactsModal';
-import { Search, AlertCircle, CheckCircle, Loader2, ArrowDownWideNarrow } from 'lucide-react';
+import { ContactsModal } from '@/components/common/ContactsModal';
+import { AlertCircle, CheckCircle } from 'lucide-react';
 import { useImportaciones } from '@/hooks/comercial/useImportaciones';
+import TransaccionesToolbar from './components/TransaccionesToolbar';
+import ImportacionesTable from './components/ImportacionesTable';
+import Pagination from '@/components/ui/Pagination';
 
 export default function TransaccionesPage() {
     const {
-        data,
-        total,
-        loading,
-        error,
-        page,
-        setPage,
-        search,
-        setSearch,
-        sinTelefono,
-        setSinTelefono,
-        sortByRuc,
-        setSortByRuc,
-        paisOrigen,
-        setPaisOrigen,
-        cantAgentes,
-        setCantAgentes,
-        paisesDropdown,
-        pageSize,
-        uploadFile,
-        refresh  // Agregar refresh para poder actualizar la lista
+        data, total, loading, error,
+        page, setPage, search, setSearch,
+        sinTelefono, setSinTelefono,
+        sortByRuc, setSortByRuc,
+        paisOrigen, setPaisOrigen,
+        cantAgentes, setCantAgentes,
+        paisesDropdown, pageSize,
+        uploadFile, refresh
     } = useImportaciones();
 
     const [selectedRuc, setSelectedRuc] = useState<string | null>(null);
-    const [selectedRazonSocial, setSelectedRazonSocial] = useState<string>('');
+    const [selectedRazonSocial, setSelectedRazonSocial] = useState('');
     const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
     const handleUpload = async (file: File) => {
@@ -42,34 +33,21 @@ export default function TransaccionesPage() {
                 type: 'success',
                 message: result.message || `Se importaron ${result.records_count} registros`
             });
-            // Auto-hide after 5 seconds
             setTimeout(() => setUploadStatus(null), 5000);
-        } catch (err: any) {
-            setUploadStatus({ type: 'error', message: err.message });
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : 'Error al subir archivo';
+            setUploadStatus({ type: 'error', message });
         }
-    };
-
-    const handleRowClick = (ruc: string, razonSocial: string) => {
-        setSelectedRuc(ruc);
-        setSelectedRazonSocial(razonSocial);
     };
 
     const handleToggleSortRuc = () => {
-        if (sortByRuc === 'desc') {
-            setSortByRuc(null); // Desactivar ordenamiento
-        } else {
-            setSortByRuc('desc'); // Ordenar de mayor a menor
-        }
-        setPage(1); // Volver a la primera página
-    };
-
-    // Refrescar lista cuando se crea/elimina un contacto (para que desaparezca del filtro "sin teléfono")
-    const handleContactCreated = () => {
-        refresh();
+        setSortByRuc(sortByRuc === 'desc' ? null : 'desc');
+        setPage(1);
     };
 
     return (
         <div className="space-y-6">
+            {/* Header + Upload */}
             <div className="flex justify-between items-start">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Transacciones</h1>
@@ -80,27 +58,22 @@ export default function TransaccionesPage() {
                 </div>
             </div>
 
-            {/* Toast Notifications */}
+            {/* Notifications */}
             {uploadStatus && (
-                <div className={`flex items-center gap-3 p-4 rounded-lg border ${uploadStatus.type === 'success'
-                    ? 'bg-green-50 border-green-200 text-green-800'
-                    : 'bg-red-50 border-red-200 text-red-800'
-                    }`}>
+                <div className={`flex items-center gap-3 p-4 rounded-lg border ${
+                    uploadStatus.type === 'success'
+                        ? 'bg-green-50 border-green-200 text-green-800'
+                        : 'bg-red-50 border-red-200 text-red-800'
+                }`}>
                     {uploadStatus.type === 'success'
                         ? <CheckCircle className="w-5 h-5 text-green-600" />
                         : <AlertCircle className="w-5 h-5 text-red-600" />
                     }
                     <span>{uploadStatus.message}</span>
-                    <button
-                        onClick={() => setUploadStatus(null)}
-                        className="ml-auto text-gray-500 hover:text-gray-700"
-                    >
-                        ✕
-                    </button>
+                    <button onClick={() => setUploadStatus(null)} className="ml-auto text-gray-500 hover:text-gray-700">✕</button>
                 </div>
             )}
 
-            {/* API Error */}
             {error && (
                 <div className="flex items-center gap-3 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
                     <AlertCircle className="w-5 h-5 text-red-600" />
@@ -108,160 +81,42 @@ export default function TransaccionesPage() {
                 </div>
             )}
 
+            {/* Data Table */}
             <div className="bg-white rounded-lg shadow border border-gray-200">
-                <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-                    <div className="flex items-center gap-4">
-                        <div className="relative w-64">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-                            <input
-                                type="text"
-                                placeholder="Buscar por RUC o Razón Social..."
-                                value={search}
-                                onChange={(e) => setSearch(e.target.value)}
-                                className="pl-9 pr-4 py-2 border rounded-lg text-sm w-full focus:ring-2 focus:ring-blue-500 outline-none"
-                            />
-                        </div>
-                        <button
-                            onClick={handleToggleSortRuc}
-                            className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 border ${sortByRuc === 'desc'
-                                ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
-                                : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
-                                }`}
-                            title="Ordenar RUC de mayor a menor"
-                        >
-                            <ArrowDownWideNarrow className="w-4 h-4" />
-                            RUC {sortByRuc === 'desc' ? '↓' : ''}
-                        </button>
+                <TransaccionesToolbar
+                    search={search}
+                    onSearchChange={setSearch}
+                    sortByRuc={sortByRuc}
+                    onToggleSortRuc={handleToggleSortRuc}
+                    paisOrigen={paisOrigen}
+                    onPaisOrigenChange={setPaisOrigen}
+                    paisesDropdown={paisesDropdown}
+                    cantAgentes={cantAgentes}
+                    onCantAgentesChange={setCantAgentes}
+                    sinTelefono={sinTelefono}
+                    onSinTelefonoChange={setSinTelefono}
+                    loading={loading}
+                    total={total}
+                    onPageReset={() => setPage(1)}
+                />
 
-                        <div className="flex items-center gap-2">
-                            <select
-                                value={paisOrigen}
-                                onChange={(e) => { setPaisOrigen(e.target.value); setPage(1); }}
-                                className="px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none w-40"
-                            >
-                                <option value="">Todos los países</option>
-                                {paisesDropdown.map(pais => (
-                                    <option key={pais} value={pais}>{pais}</option>
-                                ))}
-                            </select>
-                        </div>
+                <ImportacionesTable
+                    data={data}
+                    loading={loading}
+                    onRowClick={(ruc, razonSocial) => {
+                        setSelectedRuc(ruc);
+                        setSelectedRazonSocial(razonSocial);
+                    }}
+                />
 
-                        <div className="flex items-center gap-2">
-                            <input
-                                type="number"
-                                min={0}
-                                placeholder="Cant. agentes..."
-                                value={cantAgentes}
-                                onChange={(e) => { setCantAgentes(e.target.value); setPage(1); }}
-                                className="px-3 py-2 border rounded-lg text-sm w-36 focus:ring-2 focus:ring-blue-500 outline-none"
-                            />
-                        </div>
-
-                        <label className="flex items-center gap-2 cursor-pointer ml-2">
-                            <input
-                                type="checkbox"
-                                checked={sinTelefono}
-                                onChange={(e) => { setSinTelefono(e.target.checked); setPage(1); }}
-                                className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                            />
-                            <span className="text-sm text-gray-600 whitespace-nowrap">Solo sin teléfono</span>
-                        </label>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        {loading && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
-                        <span className="text-sm text-gray-500">{total.toLocaleString()} registros</span>
-                    </div>
-                </div>
-
-                <div className="overflow-x-auto">
-                    <table className="w-full text-sm text-left">
-                        <thead className="bg-gray-50 text-gray-700 font-medium border-b">
-                            <tr>
-                                <th className="px-4 py-3">RUC</th>
-                                <th className="px-4 py-3">Razón Social</th>
-                                <th className="px-4 py-3 text-center">Frecuencia</th>
-                                <th className="px-4 py-3 text-center">Prox. Embarque</th>
-                                <th className="px-4 py-3 text-right">FOB Anual</th>
-                                <th className="px-4 py-3 text-right">Flete Anual</th>
-                                <th className="px-4 py-3 text-right">Peso Anual (KG)</th>
-                                <th className="px-4 py-3 text-right">Embarques</th>
-                                <th className="px-4 py-3 text-right">Agentes</th>
-                                <th className="px-4 py-3">Países Origen</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                            {loading && data.length === 0 ? (
-                                <tr><td colSpan={10} className="px-6 py-8 text-center text-gray-500">
-                                    <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
-                                    Cargando datos...
-                                </td></tr>
-                            ) : data.length === 0 ? (
-                                <tr><td colSpan={10} className="px-6 py-8 text-center text-gray-500">No hay registros. Sube un Excel para comenzar.</td></tr>
-                            ) : (
-                                data.map((item, idx) => (
-                                    <tr
-                                        key={idx}
-                                        onClick={() => handleRowClick(String(item.ruc) || '', item.razon_social || '')}
-                                        className="hover:bg-blue-50 cursor-pointer transition-colors"
-                                    >
-                                        <td className="px-4 py-3 font-medium text-gray-900">{item.ruc}</td>
-                                        <td className="px-4 py-3 max-w-xs truncate" title={item.razon_social}>{item.razon_social}</td>
-                                        <td className="px-4 py-3 text-center">
-                                            {item.categoria_frecuencia ? (
-                                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${item.categoria_frecuencia.toUpperCase().includes('ALTA') ? 'bg-green-100 text-green-800' :
-                                                    item.categoria_frecuencia.toUpperCase().includes('MEDIA') ? 'bg-yellow-100 text-yellow-800' :
-                                                        'bg-gray-100 text-gray-800'
-                                                    }`}>
-                                                    {item.categoria_frecuencia}
-                                                </span>
-                                            ) : '—'}
-                                        </td>
-                                        <td className="px-4 py-3 text-center text-gray-600">{item.prox_embarque_estimado || '—'}</td>
-                                        <td className="px-4 py-3 text-right font-semibold text-emerald-700">{item.fob_anual_usd?.toLocaleString('es-PE', { style: 'currency', currency: 'USD' })}</td>
-                                        <td className="px-4 py-3 text-right text-gray-600">{item.flete_anual_usd?.toLocaleString('es-PE', { style: 'currency', currency: 'USD' })}</td>
-                                        <td className="px-4 py-3 text-right text-gray-600">{(item.peso_anual_kg || 0).toLocaleString()}</td>
-                                        <td className="px-4 py-3 text-right">{item.embarques_anuales?.toLocaleString()}</td>
-                                        <td className="px-4 py-3 text-right">{item.agentes_distintos || 0}</td>
-                                        <td className="px-4 py-3 max-w-[150px] truncate" title={item.paises_origen}>{item.paises_origen}</td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-
-                <div className="p-4 border-t border-gray-200 flex justify-between items-center">
-                    <button
-                        disabled={page === 1 || loading}
-                        onClick={() => setPage(p => p - 1)}
-                        className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        Anterior
-                    </button>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                        <span>Página</span>
-                        <input
-                            type="number"
-                            min={1}
-                            max={Math.ceil(total / pageSize) || 1}
-                            value={page}
-                            onChange={(e) => {
-                                const newPage = parseInt(e.target.value) || 1;
-                                const maxPage = Math.ceil(total / pageSize) || 1;
-                                setPage(Math.max(1, Math.min(newPage, maxPage)));
-                            }}
-                            className="w-16 px-2 py-1 border rounded text-center focus:ring-2 focus:ring-blue-500 outline-none"
-                        />
-                        <span>de {Math.ceil(total / pageSize) || 1}</span>
-                    </div>
-                    <button
-                        disabled={data.length < pageSize || loading}
-                        onClick={() => setPage(p => p + 1)}
-                        className="px-3 py-1 border rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        Siguiente
-                    </button>
-                </div>
+                <Pagination
+                    page={page}
+                    total={total}
+                    pageSize={pageSize}
+                    loading={loading}
+                    dataLength={data.length}
+                    onPageChange={setPage}
+                />
             </div>
 
             {selectedRuc && (
@@ -270,7 +125,7 @@ export default function TransaccionesPage() {
                     razonSocial={selectedRazonSocial}
                     isOpen={true}
                     onClose={() => setSelectedRuc(null)}
-                    onContactCreated={handleContactCreated}
+                    onContactCreated={refresh}
                 />
             )}
         </div>

@@ -5,6 +5,7 @@ import { Calendar, Clock, MapPin, FileText, Gift, Building2, Save, X, Loader2, C
 import { toast } from 'sonner';
 import { useCitas, Cita, CitaCreate, CitaUpdate } from '@/hooks/comercial/useCitas';
 import { useClientes } from '@/hooks/comercial/useClientes';
+import { Cliente } from '@/types/cliente';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { ModalBase, ModalHeader, ModalFooter } from '@/components/ui/modal';
 
@@ -105,12 +106,12 @@ export default function ModalCita({ isOpen, onClose, citaToEdit }: ModalCitaProp
     };
 
     // Filtered list for search
-    const filteredClientes = clientes?.filter((c: any) =>
+    const filteredClientes = clientes?.filter((c: Cliente) =>
         c.razon_social?.toLowerCase().includes(searchTerm.toLowerCase())
     ) || [];
 
     // Selected client label
-    const selectedCliente = clientes?.find((c: any) => c.id === clienteId);
+    const selectedCliente = clientes?.find((c: Cliente) => c.id === clienteId);
 
     return (
         <ModalBase isOpen={isOpen} onClose={onClose}>
@@ -166,7 +167,7 @@ export default function ModalCita({ isOpen, onClose, citaToEdit }: ModalCitaProp
                                         {searchTerm ? 'Sin resultados' : 'No hay clientes en tu cartera'}
                                     </div>
                                 ) : (
-                                    filteredClientes.map((c: any) => (
+                                    filteredClientes.map((c: Cliente) => (
                                         <div
                                             key={c.id}
                                             onClick={() => {

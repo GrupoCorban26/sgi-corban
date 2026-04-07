@@ -81,8 +81,7 @@ export default function ChatInput({ inboxId, disabled = false }: Props) {
         inputRef.current?.focus();
     };
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const handleEmojiSelect = (emojiData: any) => {
+    const handleEmojiSelect = (emojiData: { emoji: string }) => {
         setMessage(prev => prev + emojiData.emoji);
         inputRef.current?.focus();
     };

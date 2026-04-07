@@ -6,11 +6,7 @@ import RecordatorioLlamadas from '@/components/comercial/RecordatorioLlamadas';
 import UpcomingAppointments from '@/components/comercial/UpcomingAppointments';
 import ModalCita from '@/components/comercial/ModalCita';
 
-interface Props {
-  data: any[];
-}
-
-export default function ComercialDashboardContent({ data }: Props) {
+export default function ComercialDashboardContent() {
   const [isCitaOpen, setIsCitaOpen] = useState(false);
 
   return (

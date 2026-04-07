@@ -2,66 +2,56 @@
 
 import { useState } from 'react';
 import {
-  Database, Upload, Loader2, AlertCircle, Phone, Mail,
-  CheckCircle2, RefreshCw, Filter, Save, UserPlus, X, Plus, Briefcase
+  Database, Upload, Loader2, Filter, RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBaseComercial } from '@/hooks/comercial/useBaseComercial';
 import { ContactoAsignado, CasoLlamada } from '@/types/base-comercial';
 import { MultiSelect } from '@/components/ui/MultiSelect';
 import ModalContactosCliente from '../cartera/components/modal-contactos-cliente';
+import BaseStatsBar from './components/BaseStatsBar';
+import FeedbackRow from './components/FeedbackRow';
 
-// Colores para estados de feedback
-const ESTADO_STYLES = {
-  completo: 'bg-green-50 border-green-200',
-  incompleto: 'bg-white border-gray-200',
-  editando: 'bg-blue-50 border-blue-200'
-};
+interface FeedbackState {
+  contesto: boolean | null;
+  caso_id: number;
+  comentario: string;
+}
 
 export default function BaseComercialPage() {
   const {
-    contactos,
-    filtros,
-    casos,
-    isLoading,
-    isLoadingContactos,
-    tieneContactosSinGuardar,
-    todosGuardados,
-    tieneContactos,
-    cargarBase,
-    isCargarBaseLoading,
-    actualizarFeedback,
-    isActualizandoFeedback,
-    refetch,
-    crearContactoManual,
-    isCreandoContactoManual
+    contactos, filtros, casos,
+    isLoading, isLoadingContactos,
+    tieneContactosSinGuardar, tieneContactos,
+    cargarBase, isCargarBaseLoading,
+    actualizarFeedback, isActualizandoFeedback,
+    refetch
   } = useBaseComercial();
 
-
-
-  // ... (existing comments/code)
-
-  // Estado para filtros
+  // Filtro de país
   const [paisSeleccionado, setPaisSeleccionado] = useState<string[]>([]);
   const [showFiltros, setShowFiltros] = useState(false);
 
-  // Estado de feedback local para todos los contactos
-  const [feedbackLocal, setFeedbackLocal] = useState<{ [key: number]: { contesto: boolean | null; caso_id: number; comentario: string } }>({});
+  // Feedback local para todos los contactos
+  const [feedbackLocal, setFeedbackLocal] = useState<{ [key: number]: FeedbackState }>({});
 
-  // Estado para modal de contactos (Modal avanzado compartido con Cartera)
+  // Modal de contactos
   const [isContactosModalOpen, setIsContactosModalOpen] = useState(false);
   const [contactosRuc, setContactosRuc] = useState('');
   const [contactosRazonSocial, setContactosRazonSocial] = useState('');
 
-  // Estado para rastrear filas editadas DESPUÉS de guardar (necesitan re-guardar)
+  // Filas editadas después de guardar
   const [editedAfterSave, setEditedAfterSave] = useState<Set<number>>(new Set());
 
-  // Inicializar feedbackLocal cuando se cargan los contactos
-  const getFeedback = (contacto: ContactoAsignado) => {
+  // Separar casos por contestado
+  const casosContesto = casos.filter((c: CasoLlamada) => c.contestado);
+  const casosNoContesto = casos.filter((c: CasoLlamada) => !c.contestado);
+
+  // Obtener feedback (local o del servidor)
+  const getFeedback = (contacto: ContactoAsignado): FeedbackState => {
     if (feedbackLocal[contacto.id]) {
       return feedbackLocal[contacto.id];
     }
-    // Determinar contesto basado en caso actual
     const casoActual = casos.find((c: CasoLlamada) => c.id === contacto.caso_id);
     return {
       contesto: casoActual ? casoActual.contestado : null,
@@ -77,14 +67,11 @@ export default function BaseComercialPage() {
         paisOrigen: paisSeleccionado.length > 0 ? paisSeleccionado : undefined
       });
 
-      // Construir mensaje informativo
       let mensaje = `¡${result.cantidad} contactos cargados!`;
-
       if (result.contactos_liberados && result.contactos_liberados > 0) {
         mensaje += ` (${result.contactos_liberados} liberados por inactividad)`;
       }
 
-      // Mostrar info de RUCs excluidos si hay
       const excluidos = result.rucs_excluidos;
       if (excluidos && (excluidos.CAIDO || excluidos.INACTIVO)) {
         const partes = [];
@@ -107,36 +94,23 @@ export default function BaseComercialPage() {
       toast.error('Completa el caso y comentario');
       return;
     }
-
     try {
-      await actualizarFeedback({
-        id: contacto.id,
-        casoId: fb.caso_id,
-        comentario: fb.comentario
-      });
+      await actualizarFeedback({ id: contacto.id, casoId: fb.caso_id, comentario: fb.comentario });
       toast.success('Feedback guardado');
-      // Quitar de editados ya que se acaba de guardar
-      setEditedAfterSave(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(contacto.id);
-        return newSet;
-      });
+      setEditedAfterSave(prev => { const s = new Set(prev); s.delete(contacto.id); return s; });
       refetch();
     } catch {
       toast.error('Error al guardar feedback');
     }
   };
 
-
-  const getEstadoContacto = (contacto: ContactoAsignado): string => {
-    const fb = getFeedback(contacto);
-    if (fb.caso_id && fb.comentario) return 'completo';
-    return 'incompleto';
+  const handleFeedbackChange = (id: number, fb: FeedbackState) => {
+    setFeedbackLocal(prev => ({ ...prev, [id]: fb }));
   };
 
-  // Separar casos por contestado
-  const casosContesto = casos.filter((c: CasoLlamada) => c.contestado);
-  const casosNoContesto = casos.filter((c: CasoLlamada) => !c.contestado);
+  const handleMarkEdited = (id: number) => {
+    setEditedAfterSave(prev => { const s = new Set(prev); s.add(id); return s; });
+  };
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6 bg-gray-50 min-h-screen">
@@ -147,17 +121,14 @@ export default function BaseComercialPage() {
             <Database className="text-indigo-600" />
             Base de Prospectos
           </h1>
-          <p className="text-sm text-gray-500">
-            Gestiona tus contactos asignados y registra el feedback
-          </p>
+          <p className="text-sm text-gray-500">Gestiona tus contactos asignados y registra el feedback</p>
         </div>
         <div className="flex gap-3">
           <button
             onClick={() => setShowFiltros(!showFiltros)}
             className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium hover:bg-white transition-colors"
           >
-            <Filter size={18} />
-            Filtros
+            <Filter size={18} /> Filtros
           </button>
           <button
             onClick={handleCargarBase}
@@ -165,17 +136,13 @@ export default function BaseComercialPage() {
             className="cursor-pointer flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-md shadow-indigo-200 transition-all disabled:cursor-not-allowed"
             title={tieneContactosSinGuardar ? 'Guarda todos los registros antes de cargar más' : 'Cargar 50 nuevos contactos'}
           >
-            {isCargarBaseLoading ? (
-              <Loader2 size={18} className="animate-spin" />
-            ) : (
-              <Upload size={18} />
-            )}
+            {isCargarBaseLoading ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
             Cargar Base
           </button>
         </div>
       </div>
 
-      {/* Panel de Filtros */}
+      {/* Filtros Panel */}
       {showFiltros && (
         <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
           <h3 className="font-semibold text-gray-700 mb-3">Filtrar antes de cargar</h3>
@@ -195,28 +162,9 @@ export default function BaseComercialPage() {
       )}
 
       {/* Stats */}
-      {tieneContactos && (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-4 rounded-xl text-white shadow-lg">
-            <div className="text-sm opacity-80">Total Asignados</div>
-            <div className="text-2xl font-bold">{contactos.length}</div>
-          </div>
-          <div className="bg-gradient-to-br from-green-500 to-green-600 p-4 rounded-xl text-white shadow-lg">
-            <div className="text-sm opacity-80">Guardados</div>
-            <div className="text-2xl font-bold">
-              {contactos.filter((c: ContactoAsignado) => c.fecha_llamada !== null).length}
-            </div>
-          </div>
-          <div className="bg-gradient-to-br from-amber-500 to-amber-600 p-4 rounded-xl text-white shadow-lg">
-            <div className="text-sm opacity-80">Pendientes</div>
-            <div className="text-2xl font-bold">
-              {contactos.filter((c: ContactoAsignado) => c.fecha_llamada === null).length}
-            </div>
-          </div>
-        </div>
-      )}
+      {tieneContactos && <BaseStatsBar contactos={contactos} />}
 
-      {/* Tabla de Contactos */}
+      {/* Tabla */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         {isLoading || isLoadingContactos ? (
           <div className="flex flex-col items-center justify-center h-64 text-gray-400">
@@ -245,223 +193,42 @@ export default function BaseComercialPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {contactos.map((contacto: ContactoAsignado) => {
-                  const estado = getEstadoContacto(contacto);
-                  const fb = getFeedback(contacto);
-
-                  // Filtrar casos según si contestó o no
-                  const casosFiltrados = fb.contesto === true
-                    ? casosContesto
-                    : fb.contesto === false
-                      ? casosNoContesto
-                      : [];
-
-                  return (
-                    <tr
-                      key={contacto.id}
-                      className={`${ESTADO_STYLES[estado as keyof typeof ESTADO_STYLES]} transition-all duration-200 hover:shadow-sm`}
-                    >
-                      <td className="px-4 py-3 font-mono text-xs text-gray-600">{contacto.ruc}</td>
-                      <td className="px-4 py-3 max-w-[180px]">
-                        <span className="font-medium text-gray-800 truncate block" title={contacto.razon_social}>
-                          {contacto.razon_social}
-                        </span>
-                        <button
-                          onClick={() => {
-                            setContactosRuc(contacto.ruc || '');
-                            setContactosRazonSocial(contacto.razon_social || '');
-                            setIsContactosModalOpen(true);
-                          }}
-                          className="text-xs text-indigo-600 hover:text-indigo-800 flex items-center gap-1 mt-1"
-                          title="Agregar otro contacto a esta empresa"
-                        >
-                          <UserPlus size={12} /> Agregar contacto
-                        </button>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs text-gray-700">{contacto.telefono || '-'}</span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs text-gray-700 truncate max-w-[140px] block" title={contacto.correo || ''}>{contacto.correo || '-'}</span>
-                      </td>
-                      {/* CONTESTÓ - Dropdown moderno siempre visible */}
-                      <td className="px-3 py-2">
-                        <div className="relative">
-                          <select
-                            value={fb.contesto === null ? '' : fb.contesto ? 'si' : 'no'}
-                            onChange={(e) => {
-                              const nuevoContesto = e.target.value === '' ? null : e.target.value === 'si';
-                              setFeedbackLocal(prev => ({
-                                ...prev,
-                                [contacto.id]: {
-                                  ...fb,
-                                  contesto: nuevoContesto,
-                                  caso_id: 0
-                                }
-                              }));
-                              // Marcar como editado después de guardar
-                              setEditedAfterSave(prev => {
-                                const newSet = new Set(prev);
-                                newSet.add(contacto.id);
-                                return newSet;
-                              });
-                            }}
-                            className={`
-                              w-24 appearance-none cursor-pointer
-                              px-3 py-2 text-xs font-medium
-                              border-2 rounded-xl
-                              transition-all duration-200
-                              focus:outline-none focus:ring-2 focus:ring-offset-1
-                              ${fb.contesto === true
-                                ? 'bg-green-50 border-green-300 text-green-700 focus:ring-green-400'
-                                : fb.contesto === false
-                                  ? 'bg-red-50 border-red-300 text-red-700 focus:ring-red-400'
-                                  : 'bg-gray-50 border-gray-200 text-gray-600 focus:ring-indigo-400'
-                              }
-                            `}
-                          >
-                            <option value="">-- Sel --</option>
-                            <option value="si">✓ Sí</option>
-                            <option value="no">✗ No</option>
-                          </select>
-                        </div>
-                      </td>
-                      {/* CASO - Dropdown moderno siempre visible */}
-                      <td className="px-3 py-2">
-                        {fb.contesto === null ? (
-                          <span className="text-xs text-gray-400 italic px-2">Primero contestó</span>
-                        ) : (
-                          <select
-                            value={fb.caso_id}
-                            onChange={(e) => {
-                              setFeedbackLocal(prev => ({
-                                ...prev,
-                                [contacto.id]: { ...fb, caso_id: Number(e.target.value) }
-                              }));
-                              // Marcar como editado después de guardar
-                              setEditedAfterSave(prev => {
-                                const newSet = new Set(prev);
-                                newSet.add(contacto.id);
-                                return newSet;
-                              });
-                            }}
-                            className={`
-                              w-full max-w-[180px] appearance-none cursor-pointer
-                              px-3 py-2 text-xs font-medium
-                              border-2 rounded-xl
-                              transition-all duration-200
-                              focus:outline-none focus:ring-2 focus:ring-offset-1
-                              ${fb.caso_id
-                                ? 'bg-indigo-50 border-indigo-300 text-indigo-700 focus:ring-indigo-400'
-                                : 'bg-gray-50 border-gray-200 text-gray-600 focus:ring-indigo-400'
-                              }
-                            `}
-                          >
-                            <option value={0}>Seleccionar caso...</option>
-                            {casosFiltrados.map((c: CasoLlamada) => {
-                              const esGestionable = c.gestionable || c.is_positive;
-                              return (
-                                <option 
-                                  key={c.id} 
-                                  value={c.id}
-                                  className={esGestionable ? "bg-indigo-50 text-indigo-700 font-semibold" : "text-gray-700"}
-                                >
-                                  {esGestionable ? `✦ ${c.nombre}` : c.nombre}
-                                </option>
-                              );
-                            })}
-                          </select>
-                        )}
-                      </td>
-                      {/* COMENTARIO - Input siempre visible */}
-                      <td className="px-3 py-2">
-                        <input
-                          type="text"
-                          value={fb.comentario}
-                          onChange={(e) => {
-                            setFeedbackLocal(prev => ({
-                              ...prev,
-                              [contacto.id]: { ...fb, comentario: e.target.value }
-                            }));
-                            // Marcar como editado después de guardar
-                            setEditedAfterSave(prev => {
-                              const newSet = new Set(prev);
-                              newSet.add(contacto.id);
-                              return newSet;
-                            });
-                          }}
-                          placeholder="Agregar comentario..."
-                          className={`
-                            w-full max-w-[200px]
-                            px-3 py-2 text-xs
-                            border-2 rounded-xl
-                            transition-all duration-200
-                            placeholder:text-gray-400
-                            focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-indigo-400
-                            ${fb.comentario
-                              ? 'bg-blue-50 border-blue-200 text-gray-800'
-                              : 'bg-gray-50 border-gray-200 text-gray-600'
-                            }
-                          `}
-                        />
-                      </td>
-                      {/* ESTADO + GUARDAR */}
-                      <td className="px-3 py-2">
-                        <div className="flex items-center gap-2 justify-center">
-                          {estado === 'completo' ? (
-                            (contacto.fecha_llamada !== null && !editedAfterSave.has(contacto.id)) ? (
-                              <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-lg">
-                                <CheckCircle2 size={12} />
-                                Guardado
-                              </span>
-                            ) : (
-                              <button
-                                onClick={() => handleGuardarFeedback(contacto)}
-                                disabled={isActualizandoFeedback}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-semibold rounded-lg shadow-sm hover:shadow-md hover:from-green-600 hover:to-emerald-600 transition-all duration-200 disabled:opacity-50"
-                              >
-                                {isActualizandoFeedback ? (
-                                  <Loader2 size={12} className="animate-spin" />
-                                ) : (
-                                  <CheckCircle2 size={12} />
-                                )}
-                                Guardar
-                              </button>
-                            )
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 text-amber-700">
-                              <AlertCircle size={12} />
-                              Pendiente
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                {contactos.map((contacto: ContactoAsignado) => (
+                  <FeedbackRow
+                    key={contacto.id}
+                    contacto={contacto}
+                    feedback={getFeedback(contacto)}
+                    casosContesto={casosContesto}
+                    casosNoContesto={casosNoContesto}
+                    isEdited={editedAfterSave.has(contacto.id)}
+                    isActualizando={isActualizandoFeedback}
+                    onFeedbackChange={handleFeedbackChange}
+                    onGuardar={handleGuardarFeedback}
+                    onMarkEdited={handleMarkEdited}
+                    onOpenContactos={(ruc, razonSocial) => {
+                      setContactosRuc(ruc);
+                      setContactosRazonSocial(razonSocial);
+                      setIsContactosModalOpen(true);
+                    }}
+                  />
+                ))}
               </tbody>
             </table>
           </div>
         )}
       </div>
 
-      {/* Footer info */}
+      {/* Footer */}
       {tieneContactos && (
         <div className="flex items-center justify-between text-sm text-gray-500">
-          <p>
-            Haz clic en una fila para editar el feedback.
-          </p>
-          <button
-            onClick={() => refetch()}
-            className="flex items-center gap-1 hover:text-indigo-600 transition-colors"
-          >
-            <RefreshCw size={14} />
-            Actualizar
+          <p>Haz clic en una fila para editar el feedback.</p>
+          <button onClick={() => refetch()} className="flex items-center gap-1 hover:text-indigo-600 transition-colors">
+            <RefreshCw size={14} /> Actualizar
           </button>
         </div>
       )}
 
-      {/* Modal Contactos Avanzado (Compartido con Cartera) */}
+      {/* Modal Contactos */}
       <ModalContactosCliente
         isOpen={isContactosModalOpen}
         onClose={() => setIsContactosModalOpen(false)}

@@ -11,9 +11,12 @@ import {
 } from 'recharts';
 import { cn } from '@/lib/utils';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ChartDataRecord = Record<string, any>;
+
 interface PieChartCardProps {
   title?: string;
-  data: any[];           // [{ name: 'Aéreo', value: 400 }, ...]
+  data: ChartDataRecord[];           // [{ name: 'Aéreo', value: 400 }, ...]
   categoryKey?: string;  // Por defecto 'value'
   nameKey?: string;      // Por defecto 'name'
   colors?: string[];     // Array de colores hexadecimales

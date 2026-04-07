@@ -81,9 +81,16 @@ class ContactosExcelService:
         to_insert = []
         
         for _, row in df_new.iterrows():
-            nombre = row.get('nombre') or row.get('contacto') or row.get('razon_social') or row.get('empresa')
+            nombre = row.get('nombre') or row.get('contacto')
             if pd.isna(nombre): nombre = None
             
+            razon_social = row.get('razon_social') or row.get('empresa')
+            if pd.isna(razon_social): razon_social = None
+            
+            # Si no hay nombre de persona pero sí hay razón social, usar la razón social
+            if not nombre and razon_social:
+                nombre = razon_social
+
             # Logica Asignación
             asignado_a = row.get('asignado_a')
             if pd.isna(asignado_a): asignado_a = None
@@ -98,6 +105,7 @@ class ContactosExcelService:
             
             to_insert.append({
                 "ruc": row['ruc'],
+                "razon_social": razon_social,
                 "telefono": row['telefono'],
                 "nombre": nombre,
                 "correo": row.get('correo') if pd.notna(row.get('correo')) else None,
@@ -124,8 +132,8 @@ class ContactosExcelService:
         """Ejecuta inserción por lotes."""
         await self.db.execute(
             text("""INSERT INTO comercial.cliente_contactos 
-                    (ruc, telefono, nombre, correo, origen, is_client, is_active, estado, asignado_a, fecha_asignacion, created_at) 
-                    VALUES (:ruc, :telefono, :nombre, :correo, :origen, :is_client, :is_active, :estado, :asignado_a, :fecha_asignacion, GETDATE())"""), 
+                    (ruc, razon_social, telefono, nombre, correo, origen, is_client, is_active, estado, asignado_a, fecha_asignacion, created_at) 
+                    VALUES (:ruc, :razon_social, :telefono, :nombre, :correo, :origen, :is_client, :is_active, :estado, :asignado_a, :fecha_asignacion, GETDATE())"""), 
             batch
         )
 
