@@ -289,9 +289,45 @@ async def _scheduler_reset_disponibilidad():
             logger.error(f"[SCHEDULER] Error en reset de disponibilidad: {e}", exc_info=True)
             await asyncio.sleep(3600)
 
+async def _scheduler_leads_sin_respuesta():
+    """Loop que ejecuta la asignación automática de leads sin respuesta."""
+    logger.info("[SCHEDULER] Tarea de asignación de leads sin respuesta iniciada.")
+    while True:
+        try:
+            await asyncio.sleep(INTERVALO_VERIFICACION_MINUTOS * 60)
+            await _asignar_leads_sin_respuesta()
+        except asyncio.CancelledError:
+            logger.info("[SCHEDULER] Tarea de asignación de leads detenida.")
+            break
+        except Exception as e:
+            logger.error(f"[SCHEDULER] Error en asignación de leads: {e}", exc_info=True)
+            await asyncio.sleep(60)
+
+
+async def _scheduler_cotizaciones_abandonadas():
+    """Loop que ejecuta la auto-derivación de cotizaciones abandonadas."""
+    logger.info("[SCHEDULER] Tarea de derivación de cotizaciones iniciada.")
+    from app.services.comercial.chatbot_service import ChatbotService
+    
+    while True:
+        try:
+            await asyncio.sleep(INTERVALO_COTIZACIONES_MINUTOS * 60)
+            async with AsyncSessionLocal() as db:
+                chatbot_svc = ChatbotService(db)
+                await chatbot_svc.auto_derivar_cotizaciones_abandonadas()
+        except asyncio.CancelledError:
+            logger.info("[SCHEDULER] Tarea de derivación de cotizaciones detenida.")
+            break
+        except Exception as e:
+            logger.error(f"[SCHEDULER] Error en derivación de cotizaciones: {e}", exc_info=True)
+            await asyncio.sleep(60)
+
+
 async def iniciar_scheduler():
     """Inicia todas las tareas programadas del sistema."""
     logger.info("[SCHEDULER] Iniciando todas las tareas programadas...")
     await asyncio.gather(
         _scheduler_reset_disponibilidad(),
+        _scheduler_leads_sin_respuesta(),
+        _scheduler_cotizaciones_abandonadas()
     )
