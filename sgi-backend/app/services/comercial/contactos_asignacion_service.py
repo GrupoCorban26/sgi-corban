@@ -193,8 +193,8 @@ class ContactosAsignacionService:
                 conditions = [RegistroImportacion.paises_origen.like(f"%{re.sub(r'[%_]', '', p)}%") for p in pais_origen]
                 stmt_validos = stmt_validos.where(or_(*conditions))
             if partida_arancelaria:
-                # Ya no tenemos partidas arancelarias en la DB, ignoramos este bloque o tiramos error
-                pass
+                conditions_partida = [RegistroImportacion.partidas_arancelarias.like(f"%{re.sub(r'[%_]', '', p)}%") for p in partida_arancelaria]
+                stmt_validos = stmt_validos.where(or_(*conditions_partida))
                 
             subq_validos = stmt_validos.subquery('validos')
             
@@ -445,7 +445,29 @@ class ContactosAsignacionService:
             for pais, cantidad in contador_paises.most_common()
         ]
         
-        return {"paises": paises, "partidas": []}
+        # Obtener partidas arancelarias
+        resultado_partidas = await self.db.execute(
+            select(
+                RegistroImportacion.partidas_arancelarias
+            ).where(RegistroImportacion.partidas_arancelarias.isnot(None))
+        )
+        filas_partidas = resultado_partidas.all()
+        
+        contador_partidas = Counter()
+        for fila in filas_partidas:
+            if fila.partidas_arancelarias:
+                partes = fila.partidas_arancelarias.split(' - ')
+                for parte in partes:
+                    partida_limpia = parte.strip()
+                    if partida_limpia:
+                        contador_partidas[partida_limpia] += 1
+        
+        partidas = [
+            {"partida": partida, "cantidad": cantidad}
+            for partida, cantidad in contador_partidas.most_common()
+        ]
+        
+        return {"paises": paises, "partidas": partidas}
 
     async def create_contacto_manual(self, data, user_id: int):
         """Crea un contacto manual y lo asigna inmediatamente al comercial.

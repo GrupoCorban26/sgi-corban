@@ -17,6 +17,7 @@ class ImportacionBase(BaseModel):
     prox_embarque_estimado: Optional[str] = None
     paises_origen: Optional[str] = None
     aduanas: Optional[str] = None
+    partidas_arancelarias: Optional[str] = None
 
 class ImportacionResponse(ImportacionBase):
     model_config = ConfigDict(from_attributes=True)

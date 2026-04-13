@@ -33,6 +33,7 @@ class ImportacionesService:
         'flete_x_kg_usd': 'flete_x_kg_usd',
         'paises_origen': 'paises_origen',
         'aduanas': 'aduanas',
+        'partidas_arancelarias': 'partidas_arancelarias',
     }
 
     # Columnas válidas de la tabla BD
@@ -40,7 +41,8 @@ class ImportacionesService:
         'ruc', 'razon_social', 'categoria_frecuencia', 'prox_embarque_estimado',
         'meses_distintos', 'embarques_anuales', 'agentes_distintos',
         'fob_anual_usd', 'flete_anual_usd', 'peso_anual_kg',
-        'flete_x_kg_usd', 'paises_origen', 'aduanas'
+        'flete_x_kg_usd', 'paises_origen', 'aduanas',
+        'partidas_arancelarias'
     }
 
     def __init__(self, db: AsyncSession):

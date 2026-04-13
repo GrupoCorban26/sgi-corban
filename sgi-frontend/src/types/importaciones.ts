@@ -13,6 +13,7 @@ export interface Importacion {
     prox_embarque_estimado?: string;
     paises_origen?: string;
     aduanas?: string;
+    partidas_arancelarias?: string;
 }
 
 export interface ImportacionResponse {
