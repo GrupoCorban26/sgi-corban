@@ -19,9 +19,9 @@ class RegistroImportacion(Base):
     flete_anual_usd = Column(Numeric(15, 2))
     peso_anual_kg = Column(Numeric(15, 2))
     flete_x_kg_usd = Column(Numeric(10, 2))
-    paises_origen = Column(String(2000))
+    paises_origen = Column(Text)
     aduanas = Column(String(2000))
-    partidas_arancelarias = Column(String(2000))
+    partidas_arancelarias = Column(Text)
 
 class CasoLlamada(Base):
     __tablename__ = "casos_llamada"
