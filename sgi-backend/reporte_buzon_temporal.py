@@ -16,6 +16,7 @@ Eliminar este archivo después de usarlo.
 
 import pyodbc
 import pandas as pd
+import struct
 from datetime import datetime
 from dotenv import load_dotenv
 import os
@@ -43,6 +44,14 @@ conn_str = (
     f"TrustServerCertificate=yes;"
 )
 conn = pyodbc.connect(conn_str)
+
+# ── Fix: Converter para DATETIMEOFFSET (ODBC type -155) ──────────────────────
+def handle_datetimeoffset(dto_value):
+    """Convierte el valor binario de DATETIMEOFFSET a datetime de Python."""
+    tup = struct.unpack("<6hI2h", dto_value)
+    return datetime(tup[0], tup[1], tup[2], tup[3], tup[4], tup[5], tup[6] // 1000)
+
+conn.add_output_converter(-155, handle_datetimeoffset)
 
 print(f"✅ Conectado a {DB_NAME} en {DB_SERVER}")
 print(f"📅 Rango: {FECHA_DESDE}  →  {FECHA_HASTA}\n")
