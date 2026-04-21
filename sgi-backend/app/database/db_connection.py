@@ -10,14 +10,19 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
-# CODIFICAR contraseña y construir URL
-password_encoded = urllib.parse.quote_plus(settings.DB_PASS)
-
-# Para Driver 18+ es vital 'TrustServerCertificate=yes' en local
-DB_URL = (
-    f"mssql+aioodbc://{settings.DB_USER}:{password_encoded}@{settings.DB_SERVER}/{settings.DB_NAME}?"
-    f"driver={settings.DB_DRIVER}&TrustServerCertificate=yes"
+# Construir cadena de conexión ODBC nativa (soporta instancias con nombre como localhost\SQLEXPRESS)
+odbc_connection_string = (
+    f"DRIVER={{{settings.DB_DRIVER}}};"
+    f"SERVER={settings.DB_SERVER};"
+    f"DATABASE={settings.DB_NAME};"
+    f"UID={settings.DB_USER};"
+    f"PWD={settings.DB_PASS};"
+    f"TrustServerCertificate=yes;"
+    f"LoginTimeout=30;"
 )
+
+# URL-encode la cadena ODBC completa para SQLAlchemy
+DB_URL = f"mssql+aioodbc:///?odbc_connect={urllib.parse.quote_plus(odbc_connection_string)}"
 
 # Crear el motor asíncrono
 engine = create_async_engine(
