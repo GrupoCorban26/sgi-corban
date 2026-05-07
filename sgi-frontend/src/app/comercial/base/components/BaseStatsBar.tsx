@@ -5,8 +5,8 @@ interface BaseStatsBarProps {
 }
 
 export default function BaseStatsBar({ contactos }: BaseStatsBarProps) {
-  const guardados = contactos.filter((c) => c.fecha_llamada !== null).length;
-  const pendientes = contactos.filter((c) => c.fecha_llamada === null).length;
+  const guardados = contactos.filter((c) => c.completado).length;
+  const pendientes = contactos.filter((c) => !c.completado).length;
 
   return (
     <div className="grid grid-cols-3 gap-4">

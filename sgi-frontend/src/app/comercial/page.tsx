@@ -1,14 +1,13 @@
-"use client"; // Marcamos este archivo como cliente
+'use client';
 
 import ComercialDashboardContent from '@/components/comercial/ComercialDashboardContent';
 
-export default function DashboardCharts() {
+export default function ComercialPage() {
   return (
-    <main className='space-y-8'>
-      <h1 className='font-extrabold text-azul-500 uppercase text-center pt-6 text-3xl'>Bienvenido, Comercial</h1>
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-indigo-50/30">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         <ComercialDashboardContent />
       </div>
-    </main>
+    </div>
   );
 }

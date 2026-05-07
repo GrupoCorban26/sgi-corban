@@ -17,7 +17,6 @@ class UsuarioCreate(BaseModel):
 class UsuarioUpdate(BaseModel):
     correo_corp: Optional[EmailStr] = None
     is_active: Optional[bool] = None
-    debe_cambiar_pass: Optional[bool] = None
     is_bloqueado: Optional[bool] = None
     roles: Optional[List[int]] = None
 
@@ -58,7 +57,6 @@ class EmpleadoSinUsuario(BaseModel):
     area_nombre: Optional[str] = None
     cargo_nombre: Optional[str] = None
 
-
 class UsuarioResponse(BaseModel):
     id: int
     empleado_id: Optional[int] = None
@@ -67,7 +65,6 @@ class UsuarioResponse(BaseModel):
     is_active: bool
     is_bloqueado: bool
     ultimo_acceso: Optional[datetime] = None
-    debe_cambiar_pass: bool = False
     roles: Optional[str] = None
     total_registros: Optional[int] = None
 
@@ -80,7 +77,6 @@ class UsuarioDetailResponse(BaseModel):
     is_active: bool
     is_bloqueado: bool
     ultimo_acceso: Optional[datetime] = None
-    debe_cambiar_pass: bool
     intentos_fallidos: int = 0
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

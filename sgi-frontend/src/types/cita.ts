@@ -16,9 +16,9 @@ export interface Cita {
     comercial_id: number;
     fecha: string;
     hora: string;
-    tipo_cita: string;
-    direccion: string;
-    motivo: string;
+    tipo_cita?: string;
+    direccion?: string;
+    motivo?: string;
     objetivo_campo?: string;
     con_presente: boolean;
     estado: 'PENDIENTE' | 'APROBADO' | 'RECHAZADO' | 'TERMINADO';
@@ -33,7 +33,8 @@ export interface Cita {
     conductor_info?: string;
     comerciales_asignados?: ComercialAsignado[];
 
-    created_at: string;
+    created_at?: string;
+    created_by?: number;
 }
 
 export interface CitaCreate {

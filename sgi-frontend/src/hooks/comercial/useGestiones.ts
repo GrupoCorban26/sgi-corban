@@ -15,11 +15,11 @@ export interface Gestion {
 }
 
 export interface GestionCreate {
-    tipo: string;
-    resultado: string;
+    medio_id: number;
+    motivo_id: number;
     comentario?: string;
     proxima_fecha_contacto?: string;
-    nuevo_estado?: string;
+    nuevo_estado_id?: number;
 }
 
 // ============================================
@@ -49,6 +49,7 @@ export const useGestiones = (clienteId: number | null) => {
             queryClient.invalidateQueries({ queryKey: ['gestiones', clienteId] });
             queryClient.invalidateQueries({ queryKey: ['clientes'] });
             queryClient.invalidateQueries({ queryKey: ['clientes-stats'] });
+            queryClient.invalidateQueries({ queryKey: ['cliente-timeline'] });
         },
     });
 

@@ -1,41 +1,22 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 from typing import Optional
 from datetime import date, datetime
-from enum import Enum
-
-
-class TipoGestion(str, Enum):
-    LLAMADA = "LLAMADA"
-    EMAIL = "EMAIL"
-    WHATSAPP = "WHATSAPP"
-    VISITA = "VISITA"
-    OTRO = "OTRO"
-
-
-class ResultadoGestion(str, Enum):
-    SEGUIMIENTO_CARGA = "SEGUIMIENTO_CARGA"
-    FIDELIZACION = "FIDELIZACION"
-    DUDAS_CLIENTE = "DUDAS_CLIENTE"
-    QUIERE_COTIZACION = "QUIERE_COTIZACION"
 
 
 class GestionCreate(BaseModel):
-    tipo: TipoGestion
-    resultado: ResultadoGestion
+    medio_id: int
+    motivo_id: int
     comentario: Optional[str] = None
     proxima_fecha_contacto: Optional[date] = None
-    nuevo_estado: Optional[str] = None  # Cambio de estado opcional del cliente
+    nuevo_estado_id: Optional[int] = None  # Cambio de estado opcional del cliente
 
 
 class GestionResponse(BaseModel):
     id: int
     cliente_id: int
-    comercial_id: int
-    comercial_nombre: Optional[str] = None
-    tipo: str
-    resultado: str
+    medio_nombre: Optional[str] = None
+    motivo_nombre: Optional[str] = None
     comentario: Optional[str] = None
-    proxima_fecha_contacto: Optional[date] = None
     created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChatConversationPreview } from '@/types/chat';
-import { Bot, Headset, Smartphone } from 'lucide-react';
+import { Bot, Headset, Smartphone, Clock } from 'lucide-react';
 
 interface Props {
     conv: ChatConversationPreview;
@@ -128,6 +128,18 @@ export default function ConversationItem({ conv, isSelected, onClick }: Props) {
                             <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-semibold bg-orange-50 text-orange-600">
                                 <Smartphone size={10} className="flex-shrink-0" />
                                 Celular
+                            </span>
+                        )}
+                        {conv.modo === 'ASESOR' && (
+                            <span className={`
+                                inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-semibold
+                                ${conv.ventana_abierta
+                                    ? 'bg-green-50 text-green-600'
+                                    : 'bg-red-50 text-red-500'
+                                }
+                            `}>
+                                <Clock size={10} className="flex-shrink-0" />
+                                {conv.ventana_abierta ? '24h activa' : '24h expirada'}
                             </span>
                         )}
                         {conv.nombre_asignado && (

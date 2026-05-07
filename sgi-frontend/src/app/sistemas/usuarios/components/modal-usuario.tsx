@@ -47,7 +47,6 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
     const [password, setPassword] = useState('');
     const [showPassword, setShowPassword] = useState(false);
     const [selectedRoles, setSelectedRoles] = useState<number[]>([]);
-    const [debeCambiarPass, setDebeCambiarPass] = useState(false);
     const [isBloqueado, setIsBloqueado] = useState(false);
     const [isChangePasswordMode, setIsChangePasswordMode] = useState(false);
 
@@ -69,15 +68,15 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
 
         if (usuarioToEdit) {
             setCorreo(usuarioToEdit.correo_corp || '');
-            setDebeCambiarPass(usuarioToEdit.debe_cambiar_pass || false);
             setIsBloqueado(usuarioToEdit.is_bloqueado || false);
-            setSelectedRoles([]); // Roles logic remains distinct as before
+            // Selected roles should come from UsuarioDetail response, not basic Usuario
+            // But we will handle roles_ids correctly if they exist.
+            setSelectedRoles(usuarioToEdit.roles_ids || []);
         } else {
             setEmpleadoId('');
             setCorreo('');
             setPassword('');
             setSelectedRoles([]);
-            setDebeCambiarPass(false);
             setIsBloqueado(false);
         }
         setIsChangePasswordMode(false);
@@ -179,7 +178,6 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
             if (isEditMode && usuarioToEdit) {
                 const updateData: UsuarioUpdate = {
                     correo_corp: correo,
-                    debe_cambiar_pass: debeCambiarPass,
                     is_bloqueado: isBloqueado,
                     roles: selectedRoles,
                 };
@@ -206,7 +204,7 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
                 || 'Ocurrió un error';
             toast.error(errMsg);
         }
-    }, [validateForm, isEditMode, usuarioToEdit, correo, debeCambiarPass, isBloqueado, selectedRoles, empleadoId, password, updateMutation, createMutation, changePasswordMutation, isChangePasswordMode, config.successMessage, handleClose]);
+    }, [validateForm, isEditMode, usuarioToEdit, correo, isBloqueado, selectedRoles, empleadoId, password, updateMutation, createMutation, changePasswordMutation, isChangePasswordMode, config.successMessage, handleClose]);
 
     const hasErrors = Object.keys(errors).length > 0;
 
@@ -415,15 +413,6 @@ function ModalContent({ usuarioToEdit, isOpen }: ModalContentProps) {
                 {/* Opciones adicionales (solo editar) */}
                 {isEditMode && (
                     <div className="space-y-3 pt-2 border-t border-gray-100">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                            <input
-                                type="checkbox"
-                                checked={debeCambiarPass}
-                                onChange={(e) => setDebeCambiarPass(e.target.checked)}
-                                className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-                            />
-                            <span className="text-sm text-gray-700">Forzar cambio de contraseña</span>
-                        </label>
                         <label className="flex items-center gap-2 cursor-pointer">
                             <input
                                 type="checkbox"

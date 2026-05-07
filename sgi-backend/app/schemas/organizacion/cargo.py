@@ -15,8 +15,8 @@ class CargoCreate(CargoBase):
 
 
 class CargoUpdate(CargoBase):
-    nombre: Optional[str] = None,
-    descripcion: Optional[str] = None,
+    nombre: Optional[str] = None
+    descripcion: Optional[str] = None
     area_id: Optional[int] = None
 
 
@@ -55,4 +55,10 @@ class CargoDropdown(BaseModel):
     id: int
     nombre: str
     
+    model_config = ConfigDict(from_attributes=True)
+
+class CargoByAreaDropdown(BaseModel):
+    id: int
+    nombre: str
+    area_id: int
     model_config = ConfigDict(from_attributes=True)

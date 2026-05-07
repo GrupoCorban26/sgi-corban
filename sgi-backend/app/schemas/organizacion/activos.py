@@ -45,7 +45,6 @@ class ActivoResponse(BaseModel):
     codigo_inventario: Optional[str] = None
     estado_id: Optional[int] = None
     estado_nombre: Optional[str] = None  # Nombre del estado (BUENO, MALOGRADO, etc.)
-    estado_nombre: Optional[str] = None  # Nombre del estado (BUENO, MALOGRADO, etc.)
     estado_color: Optional[str] = None
     is_disponible: bool = True
     is_active: bool = True
@@ -55,7 +54,10 @@ class ActivoResponse(BaseModel):
     # Campos de asignación actual (si no está disponible)
     empleado_asignado_id: Optional[int] = None
     empleado_asignado_nombre: Optional[str] = None
+    empleado_asignado_dni: Optional[str] = None
     fecha_asignacion: Optional[datetime] = None
+    tiene_carta: Optional[bool] = None
+    fecha_carta: Optional[datetime] = None
     
     model_config = ConfigDict(from_attributes=True)
 

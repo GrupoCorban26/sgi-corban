@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 
 class InboxBase(BaseModel):
@@ -14,19 +14,19 @@ class InboxDistribute(BaseModel):
     telefono: str
     mensaje: str
     nombre_display: Optional[str] = None
-    tipo_interes: Optional[str] = None  # IMPORTACION, ASESORIA, DUDAS
+    tipo_interes: Optional[str] = None  # ASESORIA, COTIZACION, CARGA_LISTA
 
 class InboxResponse(InboxBase):
     id: int
     asignado_a: Optional[int]
     estado: str
     tipo_interes: Optional[str] = None
+    tipo_asignacion: Optional[str] = None
     fecha_recepcion: datetime
-    fecha_gestion: Optional[datetime]
-    
-    # Nested user info
+    fecha_gestion: Optional[datetime] = None
+
+    # Resolved via JOIN in service
     nombre_asignado: Optional[str] = None
-    telefono_asignado: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -36,10 +36,9 @@ class InboxDistributionResponse(BaseModel):
     assigned_to: dict # { id, nombre, whatsapp }
 
 class InboxDescartarRequest(BaseModel):
-    motivo_descarte: str
+    motivo_descarte_id: int
     comentario_descarte: str
-    enviar_mensaje: bool = True  # Por defecto envía mensaje al cliente
+    enviar_mensaje: bool = True
 
 class InboxAsignarManualRequest(BaseModel):
     comercial_id: int
-

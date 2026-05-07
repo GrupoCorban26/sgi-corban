@@ -1,5 +1,6 @@
 """
-ImportacionesService - Procesamiento de Excel de importaciones y consultas.
+ImportacionesService - Procesamiento de Excel de prospectos y consultas.
+Formato: Prospectos v2 (generar_prospectos.py)
 Migrado al Patrón A (clase con self.db) para consistencia con el resto del proyecto.
 """
 import logging
@@ -16,33 +17,30 @@ _lock_importacion = asyncio.Lock()
 
 
 class ImportacionesService:
-    """Servicio de importaciones: procesamiento de Excel y consultas."""
+    """Servicio de importaciones: procesamiento de Excel de prospectos y consultas."""
 
     # Mapeo EXACTO de columnas del Excel a columnas de la tabla BD
     COLUMN_MAPPING = {
         'ruc': 'ruc',
-        'empresa': 'razon_social',
-        'categoria_frecuencia': 'categoria_frecuencia',
-        'prox_embarque_estimado': 'prox_embarque_estimado',
-        'meses_distintos': 'meses_distintos',
-        'embarques_anuales': 'embarques_anuales',
+        'razon_social': 'razon_social',
+        'sector': 'sector',
+        'score': 'score',
         'agentes_distintos': 'agentes_distintos',
-        'fob_anual_usd': 'fob_anual_usd',
-        'flete_anual_usd': 'flete_anual_usd',
-        'peso_anual_kg': 'peso_anual_kg',
-        'flete_x_kg_usd': 'flete_x_kg_usd',
-        'paises_origen': 'paises_origen',
-        'aduanas': 'aduanas',
-        'partidas_arancelarias': 'partidas_arancelarias',
+        'total_embarques': 'total_embarques',
+        'meses_activos': 'meses_activos',
+        'fob_promedio': 'fob_promedio',
+        'via_predominante': 'via_predominante',
+        'paises_principales': 'paises_principales',
+        'ultima_importacion': 'ultima_importacion',
+        'dias_desde_ultima': 'dias_desde_ultima',
     }
 
     # Columnas válidas de la tabla BD
     VALID_DB_COLUMNS = {
-        'ruc', 'razon_social', 'categoria_frecuencia', 'prox_embarque_estimado',
-        'meses_distintos', 'embarques_anuales', 'agentes_distintos',
-        'fob_anual_usd', 'flete_anual_usd', 'peso_anual_kg',
-        'flete_x_kg_usd', 'paises_origen', 'aduanas',
-        'partidas_arancelarias'
+        'ruc', 'razon_social', 'sector', 'score',
+        'agentes_distintos', 'total_embarques', 'meses_activos',
+        'fob_promedio', 'via_predominante', 'paises_principales',
+        'ultima_importacion', 'dias_desde_ultima'
     }
 
     def __init__(self, db: AsyncSession):
@@ -70,7 +68,7 @@ class ImportacionesService:
 
     async def process_excel_import(self, file: UploadFile):
         """
-        Procesa un Excel de importaciones.
+        Procesa un Excel de prospectos.
         1. Limpia la tabla (TRUNCATE)
         2. Inserta registros
         """
@@ -95,18 +93,27 @@ class ImportacionesService:
                 if 'ruc' in df.columns:
                     df['ruc'] = df['ruc'].apply(lambda x: str(int(x)) if pd.notna(x) and x != '' else None)
 
-                # Limpiar columnas numéricas
-                numeric_columns = ['embarques_anuales', 'fob_anual_usd', 'flete_anual_usd', 'peso_anual_kg', 'flete_x_kg_usd']
-                for col in numeric_columns:
+                # Limpiar columnas numéricas (decimales)
+                numeric_float_columns = ['score', 'fob_promedio']
+                for col in numeric_float_columns:
                     if col in df.columns:
                         df[col] = pd.to_numeric(df[col], errors='coerce')
                         df[col] = df[col].where(pd.notnull(df[col]), None)
 
                 # Convertir columnas enteras
-                for col_int in ['meses_distintos', 'agentes_distintos']:
+                integer_columns = ['agentes_distintos', 'total_embarques', 'meses_activos', 'dias_desde_ultima']
+                for col_int in integer_columns:
                     if col_int in df.columns:
                         df[col_int] = df[col_int].apply(
                             lambda x: int(x) if pd.notna(x) and x is not None else None
+                        )
+
+                # Asegurar columnas de texto
+                text_columns = ['sector', 'via_predominante', 'paises_principales', 'ultima_importacion']
+                for col_txt in text_columns:
+                    if col_txt in df.columns:
+                        df[col_txt] = df[col_txt].apply(
+                            lambda x: str(x).strip() if pd.notna(x) and x is not None else None
                         )
 
                 # 1. Truncate
@@ -135,7 +142,7 @@ class ImportacionesService:
 
                 return {
                     "success": True,
-                    "message": f"Se importaron {len(records)} registros correctamente.",
+                    "message": f"Se importaron {len(records)} prospectos correctamente.",
                     "records_count": len(records),
                     "columns_used": valid_columns
                 }
@@ -147,7 +154,7 @@ class ImportacionesService:
                 raise HTTPException(status_code=500, detail=f"Error: {str(e)}")
 
     async def get_importaciones(self, page: int, page_size: int, search: str = None, sin_telefono: bool = False, sort_by_ruc: str = None, pais_origen: str = None, cant_agentes: int = None):
-        """Lista importaciones con paginación. Opcionalmente filtra empresas sin teléfono registrado."""
+        """Lista prospectos con paginación. Opcionalmente filtra empresas sin teléfono registrado."""
         try:
             offset = (page - 1) * page_size
 
@@ -168,13 +175,13 @@ class ImportacionesService:
             elif sort_by_ruc == 'asc':
                 order_by = "ORDER BY ri.ruc ASC"
             else:
-                order_by = "ORDER BY ri.fob_anual_usd DESC"
+                order_by = "ORDER BY ri.score DESC, ri.dias_desde_ultima ASC"
 
             # Parámetros adicionales
             params_dict = {"search": search, "pais_origen": pais_origen, "cant_agentes": cant_agentes}
 
             if pais_origen is not None and pais_origen.strip() != '':
-                base_where += " AND ri.paises_origen LIKE '%' + :pais_origen + '%' "
+                base_where += " AND ri.paises_principales LIKE '%' + :pais_origen + '%' "
 
             if cant_agentes is not None:
                 base_where += " AND ri.agentes_distintos = :cant_agentes "
@@ -205,12 +212,12 @@ class ImportacionesService:
             return {"total": 0, "page": page, "page_size": page_size, "data": []}
 
     async def get_paises_dropdown(self):
-        """Devuelve listado de países únicos (valores exactos, separando múltiples países por - o /)."""
+        """Devuelve listado de países únicos (valores exactos, separando múltiples países por | )."""
         try:
             query = """
-                SELECT DISTINCT paises_origen 
+                SELECT DISTINCT paises_principales 
                 FROM comercial.registro_importaciones 
-                WHERE paises_origen IS NOT NULL AND RTRIM(LTRIM(paises_origen)) <> ''
+                WHERE paises_principales IS NOT NULL AND RTRIM(LTRIM(paises_principales)) <> ''
             """
             result = await self.db.execute(text(query))
             rows = result.scalars().all()
@@ -218,8 +225,8 @@ class ImportacionesService:
             paises_unicos = set()
             for row in rows:
                 if row:
-                    # Separar por guiones o diagonales si existen múltiples países en una celda
-                    partes = row.replace('/', '-').split('-')
+                    # Separar por pipes (formato del nuevo Excel: "CHINA | ESTADOS UNIDOS | COREA DEL SUR")
+                    partes = row.replace('/', '|').split('|')
                     for parte in partes:
                         pais_limpio = parte.strip()
                         if pais_limpio:

@@ -256,9 +256,7 @@ export default function CarteraGlobalPage() {
                                     <tr key={cliente.id} className="hover:bg-indigo-50/30 transition-colors group">
                                         <td className="px-6 py-4">
                                             <div className="text-sm font-semibold text-gray-800">{cliente.razon_social}</div>
-                                            {cliente.nombre_comercial && (
-                                                <div className="text-xs text-gray-500">{cliente.nombre_comercial}</div>
-                                            )}
+                                            {/* nombre_comercial removido */}
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className="text-sm text-gray-600">
@@ -266,13 +264,13 @@ export default function CarteraGlobalPage() {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${ESTADO_COLORS[cliente.tipo_estado] || 'bg-gray-100'}`}>
-                                                {ESTADO_LABELS[cliente.tipo_estado] || cliente.tipo_estado}
+                                            <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${ESTADO_COLORS[cliente.estado_nombre || ''] || 'bg-gray-100'}`}>
+                                                {ESTADO_LABELS[cliente.estado_nombre || ''] || cliente.estado_nombre || 'Desconocido'}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
                                             <span className="text-sm text-gray-600">
-                                                {formatDate(cliente.ultimo_contacto)}
+                                                {formatDate(cliente.updated_at || cliente.created_at)}
                                             </span>
                                         </td>
                                         <td className="px-6 py-4">
@@ -281,8 +279,8 @@ export default function CarteraGlobalPage() {
                                             </span>
                                         </td>
                                         <td className="px-6 py-4 max-w-[200px]">
-                                            <p className="text-sm text-gray-600 truncate" title={cliente.comentario_ultima_llamada || ''}>
-                                                {cliente.comentario_ultima_llamada || '-'}
+                                            <p className="text-sm text-gray-600 truncate">
+                                                -
                                             </p>
                                         </td>
                                         <td className="px-6 py-4">

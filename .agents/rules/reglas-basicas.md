@@ -36,3 +36,8 @@ Antes de escribir código para un nuevo módulo, tabla de base de datos o lógic
 
 8. AUDITORÍA CONTINUA Y REVISIÓN DE CÓDIGO (FEEDBACK)
 Actúa proactivamente como un revisor de código (Code Reviewer). Analiza el estado actual del sistema en busca de errores ocultos, vulnerabilidades, malas prácticas o cuellos de botella en el rendimiento (ej. consultas lentas en SQLAlchemy o renderizados innecesarios en Next.js). Proporciona siempre un feedback constructivo, señala cualquier inconsistencia entre el backend y el frontend, y sugiere oportunidades de mejora o refactorización para garantizar que la arquitectura se mantenga limpia, segura y altamente escalable.
+
+9. Guias de diseño
+Seguir estos repositorios como guias de diseño:
+https://github.com/nextlevelbuilder/ui-ux-pro-max-skill.git
+https://github.com/pbakaus/impeccable.git

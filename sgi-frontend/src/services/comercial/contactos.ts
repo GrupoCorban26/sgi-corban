@@ -3,7 +3,7 @@
  * Usa interceptores para inyección automática de token
  */
 import api from '@/lib/axios';
-import { Contacto, ContactosListResponse, KpisGestion } from '@/types/contactos';
+import { Contacto, ContactosListResponse, KpisGestion, Lote } from '@/types/contactos';
 
 export const contactosService = {
     getByRuc: async (ruc: string): Promise<Contacto[]> => {
@@ -67,5 +67,37 @@ export const contactosService = {
     assignManual: async (ruc: string, comercial_id: number): Promise<{ success: boolean; message: string }> => {
         const { data } = await api.post(`/contactos/asignar-manual/${ruc}`, { comercial_id });
         return data;
-    }
+    },
+
+    // =========================================================================
+    // LOTES
+    // =========================================================================
+
+    getLotes: async (): Promise<Lote[]> => {
+        const { data } = await api.get('/contactos/lotes/');
+        return data;
+    },
+
+    createLote: async (nombre: string): Promise<Lote> => {
+        const { data } = await api.post('/contactos/lotes/', { nombre });
+        return data;
+    },
+
+    toggleLote: async (loteId: number): Promise<{ success: boolean; is_active: boolean; message: string }> => {
+        const { data } = await api.put(`/contactos/lotes/${loteId}/toggle`);
+        return data;
+    },
+
+    uploadToLote: async (loteId: number, file: File): Promise<{
+        message: string;
+        inserted: number;
+        duplicates: number;
+        total_processed: number;
+        lote_nombre: string;
+    }> => {
+        const formData = new FormData();
+        formData.append('file', file);
+        const { data } = await api.post(`/contactos/lotes/${loteId}/upload`, formData);
+        return data;
+    },
 };

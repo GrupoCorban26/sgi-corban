@@ -24,6 +24,7 @@ class BaseComercialService:
         search_param = search if search else None
 
         # Stats query con CTEs
+        # JOIN con estado_contacto para filtrar por nombre del estado
         stats_query = text("""
             WITH base_filter AS (
                 SELECT 
@@ -32,15 +33,16 @@ class BaseComercialService:
                     ri.razon_social,
                     cc.telefono,
                     cc.correo,
-                    cc.estado,
-                    ri.fob_anual_usd,
-                    ri.embarques_anuales,
-                    ri.categoria_frecuencia,
+                    ec.nombre AS estado,
+                    ri.fob_promedio,
+                    ri.total_embarques,
+                    ri.sector,
                     ri.agentes_distintos
                 FROM comercial.cliente_contactos cc
                 INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
+                INNER JOIN comercial.estado_contacto ec ON cc.estado_id = ec.id
                 WHERE cc.is_active = 1
-                  AND cc.estado = 'DISPONIBLE'
+                  AND ec.nombre = 'DISPONIBLE'
                   AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)
                   AND (:search IS NULL OR ri.ruc LIKE '%' + :search + '%' OR ri.razon_social LIKE '%' + :search + '%')
             ),
@@ -76,17 +78,18 @@ class BaseComercialService:
                 ri.razon_social,
                 cc.telefono,
                 cc.correo,
-                cc.estado,
-                ri.fob_anual_usd,
-                ri.embarques_anuales,
-                ri.categoria_frecuencia
+                ec.nombre AS estado,
+                ri.fob_promedio,
+                ri.total_embarques,
+                ri.sector
             FROM comercial.cliente_contactos cc
             INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
+            INNER JOIN comercial.estado_contacto ec ON cc.estado_id = ec.id
             WHERE cc.is_active = 1
-              AND cc.estado = 'DISPONIBLE'
+              AND ec.nombre = 'DISPONIBLE'
               AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)
               AND (:search IS NULL OR ri.ruc LIKE '%' + :search + '%' OR ri.razon_social LIKE '%' + :search + '%')
-            ORDER BY ri.fob_anual_usd DESC, ri.embarques_anuales DESC
+            ORDER BY ri.score DESC, ri.total_embarques DESC
             OFFSET :offset ROWS FETCH NEXT :page_size ROWS ONLY
         """)
 
@@ -115,8 +118,9 @@ class BaseComercialService:
                     ri.agentes_distintos
                 FROM comercial.cliente_contactos cc
                 INNER JOIN comercial.registro_importaciones ri ON cc.ruc = ri.ruc
+                INNER JOIN comercial.estado_contacto ec ON cc.estado_id = ec.id
                 WHERE cc.is_active = 1
-                  AND cc.estado = 'DISPONIBLE'
+                  AND ec.nombre = 'DISPONIBLE'
                   AND cc.ruc NOT IN (SELECT ruc FROM comercial.clientes WHERE ruc IS NOT NULL)
             )
             SELECT 

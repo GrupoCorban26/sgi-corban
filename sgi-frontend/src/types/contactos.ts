@@ -4,7 +4,6 @@ export interface Contacto {
     razon_social?: string;
     cargo?: string;
     telefono: string;
-    email?: string;
     correo?: string;
     origen?: string;
     is_client: boolean;
@@ -12,6 +11,7 @@ export interface Contacto {
     caso?: string;
     contestado?: string;
     estado?: string;
+    lote_nombre?: string;
     fecha_asignacion?: string;
     asignado_a?: number;
     created_at?: string;
@@ -38,4 +38,14 @@ export interface KpisGestion {
     tasa_contactabilidad: number;
     tasa_positivos: number;
     casos_distribucion: { name: string; value: number }[];
+}
+
+export interface Lote {
+    id: number;
+    nombre: string;
+    is_active: boolean;
+    total_contactos: number;
+    disponibles: number;
+    created_by_nombre?: string;
+    created_at: string;
 }

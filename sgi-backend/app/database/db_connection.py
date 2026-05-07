@@ -11,15 +11,25 @@ logger = logging.getLogger(__name__)
 settings = get_settings()
 
 # Construir cadena de conexión ODBC nativa (soporta instancias con nombre como localhost\SQLEXPRESS)
-odbc_connection_string = (
-    f"DRIVER={{{settings.DB_DRIVER}}};"
-    f"SERVER={settings.DB_SERVER};"
-    f"DATABASE={settings.DB_NAME};"
-    f"UID={settings.DB_USER};"
-    f"PWD={settings.DB_PASS};"
-    f"TrustServerCertificate=yes;"
-    f"LoginTimeout=30;"
-)
+if settings.DB_TRUSTED:
+    odbc_connection_string = (
+        f"DRIVER={{{settings.DB_DRIVER}}};"
+        f"SERVER={settings.DB_SERVER};"
+        f"DATABASE={settings.DB_NAME};"
+        f"Trusted_Connection=yes;"
+        f"TrustServerCertificate=yes;"
+        f"LoginTimeout=30;"
+    )
+else:
+    odbc_connection_string = (
+        f"DRIVER={{{settings.DB_DRIVER}}};"
+        f"SERVER={settings.DB_SERVER};"
+        f"DATABASE={settings.DB_NAME};"
+        f"UID={settings.DB_USER};"
+        f"PWD={settings.DB_PASS};"
+        f"TrustServerCertificate=yes;"
+        f"LoginTimeout=30;"
+    )
 
 # URL-encode la cadena ODBC completa para SQLAlchemy
 DB_URL = f"mssql+aioodbc:///?odbc_connect={urllib.parse.quote_plus(odbc_connection_string)}"

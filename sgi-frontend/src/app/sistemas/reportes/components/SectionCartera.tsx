@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 
 import { useAnalyticsCartera } from '@/hooks/comercial/useAnalyticsDesglosado';
+import { analyticsService } from '@/services/comercial/analytics';
 import { FiltrosSeccion } from './FiltrosSeccion';
 
 export function SectionCartera() {
@@ -12,30 +13,29 @@ export function SectionCartera() {
     const [fechaFin, setFechaFin] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
     const [comercialId, setComercialId] = useState<string | undefined>();
     const [empresa, setEmpresa] = useState<string | undefined>();
+    const [isExporting, setIsExporting] = useState(false);
 
     const { data, isLoading, isError, isFetching } = useAnalyticsCartera(fechaInicio, fechaFin, comercialId, empresa);
 
-    const exportarAExcel = () => {
-        if (!data || data.por_comercial.length === 0) {
-            toast.error('No hay datos para exportar');
-            return;
-        }
+    const exportarAExcel = async () => {
         try {
+            setIsExporting(true);
+            toast.info('Generando reporte...');
+            const detalle = await analyticsService.getDetalleCartera(fechaInicio, fechaFin, comercialId, empresa);
+            if (!detalle || detalle.length === 0) {
+                toast.error('No hay datos para exportar');
+                return;
+            }
             const wb = XLSX.utils.book_new();
-            const wsData = XLSX.utils.json_to_sheet(data.por_comercial.map(c => ({
-                'Agente': c.nombre,
-                'Seguimiento de carga': c.seguimiento_carga,
-                'Fidelización': c.fidelizacion,
-                'Dudas del cliente': c.dudas_cliente,
-                'Quiere cotización': c.quiere_cotizacion,
-                'TOTAL': c.total
-            })));
+            const wsData = XLSX.utils.json_to_sheet(detalle);
             XLSX.utils.book_append_sheet(wb, wsData, "Cartera");
             XLSX.writeFile(wb, `Reporte_Cartera_${format(new Date(), 'yyyyMMdd')}.xlsx`);
             toast.success('Reporte exportado correctamente');
         } catch (error) {
             console.error('Error exporting to Excel:', error);
             toast.error('Error al generar el archivo Excel');
+        } finally {
+            setIsExporting(false);
         }
     };
 
@@ -56,6 +56,7 @@ export function SectionCartera() {
                 empresa={empresa}
                 setEmpresa={setEmpresa}
                 onExport={exportarAExcel}
+                isExporting={isExporting}
                 hasData={!!data && data.por_comercial.length > 0}
             />
 

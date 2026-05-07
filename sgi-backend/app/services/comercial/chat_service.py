@@ -5,7 +5,6 @@ from sqlalchemy.orm import selectinload
 from fastapi import HTTPException
 from datetime import datetime, timedelta
 from typing import List, Optional
-from app.utils.horario_laboral import calcular_segundos_horario_laboral
 
 from app.models.chat_message import ChatMessage
 from app.models.comercial_inbox import Inbox
@@ -72,7 +71,7 @@ class ChatService:
                 "mensajes_no_leidos": unread,
                 "ultimo_mensaje_preview": latest_msg[:50] + "..." if latest_msg and len(latest_msg) > 50 else latest_msg,
                 "asignado_a": ibx.asignado_a,
-                "nombre_asignado": ibx.nombre_asignado,
+                "nombre_asignado": await self._get_nombre_asignado(ibx.asignado_a),
                 "ventana_abierta": ventana,
                 "escalado_a_directo": ibx.escalado_a_directo or False
             })
@@ -131,7 +130,7 @@ class ChatService:
                 "mensajes_no_leidos": unread,
                 "ultimo_mensaje_preview": latest_msg[:50] + "..." if latest_msg and len(latest_msg) > 50 else latest_msg,
                 "asignado_a": ibx.asignado_a,
-                "nombre_asignado": ibx.nombre_asignado,
+                "nombre_asignado": await self._get_nombre_asignado(ibx.asignado_a),
                 "ventana_abierta": ventana,
                 "escalado_a_directo": ibx.escalado_a_directo or False
             })
@@ -146,6 +145,17 @@ class ChatService:
         if ref.tzinfo:
             ref = ref.replace(tzinfo=None)
         return (datetime.now() - ref).total_seconds() < 86400
+
+    async def _get_nombre_asignado(self, usuario_id: int | None) -> str | None:
+        """Obtiene el nombre del usuario asignado via JOIN."""
+        if not usuario_id:
+            return None
+        from app.models.administrativo import Empleado
+        stmt = select(func.concat(Empleado.nombres, ' ', Empleado.apellido_paterno))\
+            .join(Usuario, Usuario.empleado_id == Empleado.id)\
+            .where(Usuario.id == usuario_id)
+        result = await self.db.execute(stmt)
+        return result.scalar()
 
     async def get_messages(self, inbox_id: int):
         """Get history of messages for a specific conversation."""
@@ -189,14 +199,8 @@ class ChatService:
                 if inbox.estado in ['NUEVO', 'PENDIENTE']:
                     inbox.estado = 'EN_GESTION'
                     
-                if not inbox.fecha_primera_respuesta:
-                    inbox.fecha_primera_respuesta = datetime.now()
-                    base_date = inbox.fecha_asignacion or inbox.fecha_recepcion
-                    if base_date:
-                        base_date_naive = base_date.replace(tzinfo=None) if base_date.tzinfo else base_date
-                        inbox.tiempo_respuesta_segundos = calcular_segundos_horario_laboral(
-                            base_date_naive, datetime.now()
-                        )
+                if not inbox.fecha_gestion:
+                    inbox.fecha_gestion = datetime.now()
                 
                 # Destruir sesión activa del bot para que el bot no se entrometa
                 from app.services.comercial.chatbot_service import ChatbotService
@@ -234,6 +238,15 @@ class ChatService:
         inbox.modo = 'ASESOR'
         if inbox.estado in ['NUEVO', 'PENDIENTE']:
             inbox.estado = 'EN_GESTION'
+
+        # Registrar primera interacción del comercial
+        if not inbox.fecha_gestion:
+            inbox.fecha_gestion = datetime.now()
+            # Calcular SLA: tiempo de respuesta en horas hábiles
+            if inbox.fecha_asignacion and not inbox.tiempo_respuesta_segundos:
+                from app.utils.horario_laboral import calcular_segundos_horario_laboral
+                base = inbox.fecha_asignacion.replace(tzinfo=None) if inbox.fecha_asignacion.tzinfo else inbox.fecha_asignacion
+                inbox.tiempo_respuesta_segundos = calcular_segundos_horario_laboral(base, datetime.now())
             
         await self.db.commit()
         return inbox
@@ -260,6 +273,15 @@ class ChatService:
         inbox.estado = nuevo_estado
         if nuevo_estado in ['CIERRE', 'DESCARTADO']:
             inbox.modo = 'BOT'
+            inbox.fecha_cierre = datetime.now()
+
+        # Si cambia a EN_GESTION manualmente, registrar primera gestión y SLA
+        if nuevo_estado == 'EN_GESTION' and not inbox.fecha_gestion:
+            inbox.fecha_gestion = datetime.now()
+            if inbox.fecha_asignacion and not inbox.tiempo_respuesta_segundos:
+                from app.utils.horario_laboral import calcular_segundos_horario_laboral
+                base = inbox.fecha_asignacion.replace(tzinfo=None) if inbox.fecha_asignacion.tzinfo else inbox.fecha_asignacion
+                inbox.tiempo_respuesta_segundos = calcular_segundos_horario_laboral(base, datetime.now())
             
         await self.db.commit()
         return inbox

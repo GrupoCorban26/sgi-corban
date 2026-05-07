@@ -63,6 +63,8 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
         }
     }
 
+    console.log(`[Proxy] ${req.method} → ${url.toString()} | Body: ${body ? (typeof body === 'string' ? body.substring(0, 200) : `[binary ${(body as ArrayBuffer).byteLength}b]`) : 'null'}`);
+
     try {
         const backendResponse = await fetch(url.toString(), {
             method: req.method,
@@ -72,6 +74,11 @@ async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ pa
 
         // Respuesta directa (JSON, etc.)
         const responseBody = await backendResponse.arrayBuffer();
+
+        if (backendResponse.status >= 400) {
+            const errorText = new TextDecoder().decode(responseBody);
+            console.error(`[Proxy] Backend responded ${backendResponse.status}: ${errorText.substring(0, 500)}`);
+        }
 
         return new NextResponse(responseBody, {
             status: backendResponse.status,

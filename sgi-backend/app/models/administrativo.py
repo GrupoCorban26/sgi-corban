@@ -72,7 +72,7 @@ class Empleado(Base):
     apellido_materno = Column(String(100))
     fecha_nacimiento = Column(Date)
     tipo_documento = Column(String(20), default="DNI", nullable=False)
-    nro_documento = Column(String(20), nullable=False)
+    nro_documento = Column(String(20), nullable=False, index=True)
     celular = Column(String(20))
     email_personal = Column(String(100))
     direccion = Column(String(200))
@@ -119,8 +119,8 @@ class Activo(Base):
     producto = Column(String(50), nullable=False)
     marca = Column(String(50))
     modelo = Column(String(50))
-    serie = Column(String(100))
-    codigo_inventario = Column(String(50))
+    serie = Column(String(100), index=True)
+    codigo_inventario = Column(String(50), index=True)
     estado_id = Column(Integer, ForeignKey("adm.estado_activo.id"), nullable=True)
     is_disponible = Column(Boolean, default=True, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
@@ -199,8 +199,8 @@ class LineaCorporativa(Base):
     __table_args__ = {"schema": "adm"}
 
     id = Column(Integer, primary_key=True, index=True)
-    numero = Column(String(20), nullable=False, unique=True)  # 987654321
-    gmail = Column(String(100), nullable=False, unique=True)  # grupocorban01@gmail.com
+    numero = Column(String(20), nullable=False, unique=True, index=True)  # 987654321
+    gmail = Column(String(100), nullable=False, unique=True, index=True)  # grupocorban01@gmail.com
     operador = Column(String(30))  # Claro, Movistar, Entel, Bitel
     plan = Column(String(50))  # Descripción del plan
     proveedor = Column(String(50))  # CORBAN ADUANAS, CORBAN TRANS LOGISTIC, EBL
@@ -289,4 +289,45 @@ class ProductoOficina(Base):
 
     # Relationships
     categoria = relationship("CategoriaProductoOficina", back_populates="productos")
+
+
+class HistorialCargo(Base):
+    """Auditoría de cambios de puesto y área (Ascensos, rotaciones)"""
+    __tablename__ = "historial_cargos"
+    __table_args__ = {"schema": "adm"}
+
+    id = Column(Integer, primary_key=True, index=True)
+    empleado_id = Column(Integer, ForeignKey("adm.empleados.id"), nullable=False)
+    cargo_anterior_id = Column(Integer, ForeignKey("adm.cargos.id"), nullable=True)
+    cargo_nuevo_id = Column(Integer, ForeignKey("adm.cargos.id"), nullable=False)
+    area_anterior_id = Column(Integer, ForeignKey("adm.areas.id"), nullable=True)
+    area_nueva_id = Column(Integer, ForeignKey("adm.areas.id"), nullable=False)
+    motivo = Column(String(100)) # 'INGRESO', 'ASCENSO', 'ROTACION', 'ERROR_CORRECCION'
+    registrado_por = Column(Integer, ForeignKey("seg.usuarios.id"))
+    fecha_cambio = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Relationships
+    empleado = relationship("Empleado", backref="historial_cargos")
+
+
+class MovimientoProductoOficina(Base):
+    """Kardex: Registro inmutable de entradas y salidas para auditoría y reversión de errores"""
+    __tablename__ = "movimientos_producto_oficina"
+    __table_args__ = {"schema": "adm"}
+
+    id = Column(Integer, primary_key=True, index=True)
+    producto_id = Column(Integer, ForeignKey("adm.productos_oficina.id"), nullable=False)
+    tipo_movimiento = Column(String(20), nullable=False) # 'INGRESO', 'SALIDA', 'AJUSTE_ERROR'
+    cantidad = Column(Integer, nullable=False) # Positivo para ingreso, negativo para salida
+    stock_resultante = Column(Integer, nullable=False) # Foto del stock en ese instante
+    motivo = Column(String(200))
+    registrado_por = Column(Integer, ForeignKey("seg.usuarios.id"))
+    fecha_movimiento = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    # Relación con la transacción que originó el error en caso de revertir
+    movimiento_revertido_id = Column(Integer, ForeignKey("adm.movimientos_producto_oficina.id"), nullable=True)
+
+    # Relationships
+    producto = relationship("ProductoOficina", backref="historial_movimientos")
+
 

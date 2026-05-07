@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   devIndicators: false,
-  // output: 'standalone', // Descomentar solo para deploy con Docker
+  output: 'standalone',
 };
 
 export default nextConfig;

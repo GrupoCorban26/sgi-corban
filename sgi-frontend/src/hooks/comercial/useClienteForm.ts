@@ -6,9 +6,7 @@ import { toast } from 'sonner';
 export interface FormErrors {
     razon_social?: string;
     ruc?: string;
-    ultimo_contacto?: string;
     proxima_fecha_contacto?: string;
-    comentario?: string;
 }
 
 interface UseClienteFormProps {
@@ -16,22 +14,19 @@ interface UseClienteFormProps {
     initialData?: Partial<ClienteUpdate>;
     onSuccess?: (ruc: string, razonSocial: string, id?: number) => void;
     onClose?: () => void;
+    isFromBuzon?: boolean;
 }
 
-export function useClienteForm({ clienteToEdit, initialData, onSuccess, onClose }: UseClienteFormProps) {
+export function useClienteForm({ clienteToEdit, initialData, onSuccess, onClose, isFromBuzon }: UseClienteFormProps) {
     const isEditMode = !!clienteToEdit;
     const { createMutation, updateMutation } = useClientes();
 
     // Form state
     const [ruc, setRuc] = useState('');
     const [razonSocial, setRazonSocial] = useState('');
-    const [nombreComercial, setNombreComercial] = useState('');
     const [direccionFiscal, setDireccionFiscal] = useState('');
-    const [tipoEstado, setTipoEstado] = useState('PROSPECTO');
-    const [ultimoContacto, setUltimoContacto] = useState('');
-    const [comentario, setComentario] = useState('');
+    const [estadoId, setEstadoId] = useState<number | null>(1); // 1 = Prospecto
     const [proximaFecha, setProximaFecha] = useState('');
-    const [areaEncargadaId, setAreaEncargadaId] = useState<number | null>(null);
     const [comercialEncargadoId, setComercialEncargadoId] = useState<number | null>(null);
 
     // Validation state
@@ -45,36 +40,23 @@ export function useClienteForm({ clienteToEdit, initialData, onSuccess, onClose 
         if (clienteToEdit) {
             setRuc(clienteToEdit.ruc || '');
             setRazonSocial(clienteToEdit.razon_social || '');
-            setNombreComercial(clienteToEdit.nombre_comercial || '');
             setDireccionFiscal(clienteToEdit.direccion_fiscal || '');
-            setTipoEstado(clienteToEdit.tipo_estado || 'PROSPECTO');
-            setUltimoContacto(clienteToEdit.ultimo_contacto || '');
-            setComentario(clienteToEdit.comentario_ultima_llamada || '');
+            setEstadoId(clienteToEdit.estado_id || 1);
             setProximaFecha(clienteToEdit.proxima_fecha_contacto || '');
-            setAreaEncargadaId(clienteToEdit.area_encargada_id || null);
             setComercialEncargadoId(clienteToEdit.comercial_encargado_id || null);
         } else if (initialData) {
-            // New Client with pre-filled data (e.g. from Inbox)
             setRuc(initialData.ruc || '');
             setRazonSocial(initialData.razon_social || '');
-            setNombreComercial(initialData.nombre_comercial || '');
             setDireccionFiscal(initialData.direccion_fiscal || '');
-            setTipoEstado(initialData.tipo_estado || 'PROSPECTO');
-            setUltimoContacto(initialData.ultimo_contacto ? String(initialData.ultimo_contacto) : '');
-            setComentario(initialData.comentario_ultima_llamada || '');
+            setEstadoId(initialData.estado_id || 1);
             setProximaFecha(initialData.proxima_fecha_contacto ? String(initialData.proxima_fecha_contacto) : '');
-            setAreaEncargadaId(initialData.area_encargada_id || null);
             setComercialEncargadoId(initialData.comercial_encargado_id || null);
         } else {
             setRuc('');
             setRazonSocial('');
-            setNombreComercial('');
             setDireccionFiscal('');
-            setTipoEstado('PROSPECTO');
-            setUltimoContacto('');
-            setComentario('');
+            setEstadoId(1);
             setProximaFecha('');
-            setAreaEncargadaId(null);
             setComercialEncargadoId(null);
         }
         setErrors({});
@@ -91,15 +73,8 @@ export function useClienteForm({ clienteToEdit, initialData, onSuccess, onClose 
                 if (value && value.length !== 11) return 'El RUC debe tener 11 dígitos';
                 if (value && !/^\d+$/.test(value)) return 'El RUC solo puede contener números';
                 break;
-            case 'ultimo_contacto':
-                if (!value) return 'La fecha de último contacto es requerida';
-                break;
             case 'proxima_fecha_contacto':
                 if (!value) return 'La fecha de próximo contacto es requerida';
-                break;
-            case 'comentario':
-                if (!value.trim()) return 'El comentario es requerido';
-                if (value.trim().length < 5) return 'Mínimo 5 caracteres';
                 break;
         }
         return undefined;
@@ -122,9 +97,7 @@ export function useClienteForm({ clienteToEdit, initialData, onSuccess, onClose 
         const fields = {
             razon_social: razonSocial,
             ruc: ruc,
-            ultimo_contacto: ultimoContacto,
-            proxima_fecha_contacto: proximaFecha,
-            comentario: comentario
+            proxima_fecha_contacto: proximaFecha
         };
 
         Object.entries(fields).forEach(([key, value]) => {
@@ -134,11 +107,11 @@ export function useClienteForm({ clienteToEdit, initialData, onSuccess, onClose 
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
-    }, [razonSocial, ruc, ultimoContacto, proximaFecha, comentario]);
+    }, [razonSocial, ruc, proximaFecha]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setTouched(new Set(['razon_social', 'ruc', 'ultimo_contacto', 'proxima_fecha_contacto', 'comentario']));
+        setTouched(new Set(['razon_social', 'ruc', 'proxima_fecha_contacto']));
 
         if (!validateForm()) {
             toast.error('Por favor corrija los errores en el formulario');
@@ -149,13 +122,9 @@ export function useClienteForm({ clienteToEdit, initialData, onSuccess, onClose 
             const commonData = {
                 ruc: ruc || null,
                 razon_social: razonSocial.trim(),
-                nombre_comercial: nombreComercial.trim() || null,
                 direccion_fiscal: direccionFiscal.trim() || null,
-                tipo_estado: tipoEstado,
-                ultimo_contacto: ultimoContacto,
-                comentario_ultima_llamada: comentario.trim(),
-                proxima_fecha_contacto: proximaFecha,
-                area_encargada_id: areaEncargadaId,
+                estado_id: isFromBuzon ? 3 : estadoId,
+                proxima_fecha_contacto: proximaFecha || null,
                 comercial_encargado_id: comercialEncargadoId
             };
 
@@ -165,7 +134,7 @@ export function useClienteForm({ clienteToEdit, initialData, onSuccess, onClose 
             } else {
                 const response = await createMutation.mutateAsync(commonData);
                 toast.success('Cliente creado correctamente');
-                if (onSuccess && ruc) {
+                if (onSuccess) {
                     onSuccess(ruc, razonSocial.trim(), response.id);
                 }
             }
@@ -179,13 +148,9 @@ export function useClienteForm({ clienteToEdit, initialData, onSuccess, onClose 
         formState: {
             ruc, setRuc,
             razonSocial, setRazonSocial,
-            nombreComercial, setNombreComercial,
             direccionFiscal, setDireccionFiscal,
-            tipoEstado, setTipoEstado,
-            ultimoContacto, setUltimoContacto,
-            comentario, setComentario,
+            estadoId, setEstadoId,
             proximaFecha, setProximaFecha,
-            areaEncargadaId, setAreaEncargadaId,
             comercialEncargadoId, setComercialEncargadoId
         },
         errors,

@@ -1,6 +1,20 @@
+# ============================================
+# SGI Grupo Corban — Docker Compose (Producción)
+# ============================================
+# Arquitectura:
+#   Cloudflare Tunnel → localhost:3000 (Frontend)
+#   Cloudflare Tunnel → localhost:8000 (Backend)
+#   Worker de tareas (scheduler) en background
+# ============================================
+# Uso:
+#   docker compose up -d --build
+#   docker compose logs -f
+#   docker compose down
+# ============================================
+
 services:
   # ----------------------------------------------------------------
-  # BACKEND (FastAPI)
+  # BACKEND (FastAPI + Uvicorn)
   # ----------------------------------------------------------------
   backend:
     build: ./sgi-backend
@@ -8,55 +22,43 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-    environment:
-      - DB_SERVER=host.docker.internal
-      - DB_NAME=SGI_GrupoCorban
-      - DB_USER=UsuarioGeneral
-      - DB_PASS=Arguedasxd10$$
-      - DB_DRIVER=ODBC Driver 18 for SQL Server
-      - DB_TRUSTED=no
-      - DB_ENCRYPT=yes # Important for ODBC 18
-      - DB_TRUST_CERT=yes # Important for self-signed certs
-      # Adjust other env vars as needed
+    env_file:
+      - ./sgi-backend/.env.production
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      - backend_uploads:/app/uploads
 
   # ----------------------------------------------------------------
-  # FRONTEND (Next.js)
+  # WORKER DE TAREAS (Scheduler / Cron Jobs)
   # ----------------------------------------------------------------
-  frontend:
-    build: ./sgi-frontend
-    container_name: sgi_frontend
+  worker:
+    build: ./sgi-backend
+    container_name: sgi_worker
     restart: unless-stopped
-    ports:
-      - "3000:3000"
-    environment:
-      # URL del Backend accesible desde el navegador del usuario
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    command: ["python", "worker_tareas.py"]
+    env_file:
+      - ./sgi-backend/.env.production
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - backend
 
   # ----------------------------------------------------------------
-  # AUTOMATION (n8n)
+  # FRONTEND (Next.js Standalone)
   # ----------------------------------------------------------------
-  n8n:
-    image: n8nio/n8n:latest
-    container_name: sgi_n8n
+  frontend:
+    build:
+      context: ./sgi-frontend
+      args:
+        API_URL: https://api.sgi-grupocorban.com/api/v1
+        JWT_SECRET: ${JWT_SECRET}
+    container_name: sgi_frontend
     restart: unless-stopped
     ports:
-      - "5678:5678"
-    environment:
-      - N8N_HOST=localhost
-      - N8N_PORT=5678
-      - N8N_PROTOCOL=http
-      - WEBHOOK_URL=http://localhost:5678/
-      # Timezone
-      - GENERIC_TIMEZONE=America/Lima
-      - TZ=America/Lima
-    volumes:
-      - n8n_data:/home/node/.n8n
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
+      - "3000:3000"
+    depends_on:
+      - backend
 
 volumes:
-  n8n_data:
+  backend_uploads:

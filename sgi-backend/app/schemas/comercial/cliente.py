@@ -1,72 +1,38 @@
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional, Literal
+from typing import Optional
 from datetime import datetime, date
-
-
-# Catálogos controlados
-OrigenCliente = Literal[
-    "BASE_DATOS", "PUBLICIDAD_META", "CARTERA_PROPIA",
-    "WHATSAPP", "REFERIDO", "OTRO"
-]
-
-MOTIVOS_CAIDA_VALIDOS = [
-    "Precio alto",
-    "No responde",
-    "Ya no quiere trabajar con nosotros",
-]
-
-EstadoCliente = Literal[
-    "PROSPECTO", "EN_NEGOCIACION", "CERRADA", "EN_OPERACION", "CARGA_ENTREGADA", "CAIDO", "INACTIVO"
-]
 
 
 class ClienteBase(BaseModel):
     ruc: Optional[str] = Field(None, max_length=11)
     razon_social: str = Field(..., min_length=1, max_length=255)
-    nombre_comercial: Optional[str] = Field(None, max_length=255)
     direccion_fiscal: Optional[str] = Field(None, max_length=255)
     distrito_id: Optional[int] = None
-    tipo_estado: EstadoCliente = Field(default="PROSPECTO")
-    origen: Optional[OrigenCliente] = None
-    sub_origen: Optional[str] = Field(None, max_length=100)
-    comentario_ultima_llamada: Optional[str] = Field(None, max_length=500)
-    ultimo_contacto: Optional[datetime] = None
+    estado_id: Optional[int] = None
+    origen_id: Optional[int] = None
     proxima_fecha_contacto: Optional[date] = None
-
-    # Pipeline fields (legacy)
-    motivo_perdida: Optional[str] = Field(None, max_length=50)
-    fecha_perdida: Optional[date] = None
-    fecha_reactivacion: Optional[date] = None
-
-    # Pipeline fields — CAIDO
-    motivo_caida: Optional[str] = Field(None, max_length=100)
-    fecha_caida: Optional[date] = None
-    fecha_seguimiento_caida: Optional[date] = None
 
 
 class ClienteCreate(ClienteBase):
-    """Para crear un cliente - área y comercial se asignan automáticamente"""
+    """Para crear un cliente - comercial se asigna automáticamente"""
     pass
 
 
 class ClienteUpdate(ClienteBase):
     """Para actualizar un cliente"""
     razon_social: Optional[str] = Field(None, min_length=1, max_length=255)
-    area_encargada_id: Optional[int] = None
     comercial_encargado_id: Optional[int] = None
 
 
 class ClienteResponse(ClienteBase):
     id: int
-    area_encargada_id: Optional[int] = None
     comercial_encargado_id: Optional[int] = None
-    area_nombre: Optional[str] = None
     comercial_nombre: Optional[str] = None
-    ultimo_contacto: Optional[datetime] = None
-    fecha_primer_contacto: Optional[datetime] = None
-    fecha_conversion_cliente: Optional[datetime] = None
+    estado_nombre: Optional[str] = None
+    origen_nombre: Optional[str] = None
     is_active: bool = True
     created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -77,14 +43,14 @@ class ClienteDropdown(BaseModel):
     ruc: Optional[str] = None
 
 
-class ClienteMarcarCaido(BaseModel):
-    motivo_caida: str = Field(..., max_length=100)
-    fecha_seguimiento_caida: Optional[date] = None
-
-
 class ClienteCambiarEstado(BaseModel):
-    nuevo_estado: EstadoCliente
+    nuevo_estado_id: int
     motivo: Optional[str] = Field(None, max_length=500)
+
+
+class ClienteMarcarCaido(BaseModel):
+    motivo: str = Field(..., max_length=500)
+    fecha_seguimiento: Optional[date] = None
 
 
 # --- Schemas de Historial ---
@@ -92,10 +58,9 @@ class ClienteCambiarEstado(BaseModel):
 class ClienteHistorialResponse(BaseModel):
     id: int
     cliente_id: int
-    estado_anterior: Optional[str] = None
-    estado_nuevo: str
+    estado_anterior_nombre: Optional[str] = None
+    estado_nuevo_nombre: Optional[str] = None
     motivo: Optional[str] = None
-    origen_cambio: str
     tiempo_en_estado_anterior: Optional[int] = None  # minutos
     registrado_por: Optional[int] = None
     nombre_registrador: Optional[str] = None

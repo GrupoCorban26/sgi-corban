@@ -80,7 +80,6 @@ class AuthService:
                 "roles": roles,
                 "area_nombre": area_nombre,
                 "cargo_nombre": cargo_nombre,
-                "debe_cambiar_pass": usuario.debe_cambiar_pass
             }
 
         except Exception as e:

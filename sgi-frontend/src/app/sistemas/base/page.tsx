@@ -152,9 +152,9 @@ export default function BasePage() {
                                 <th className="px-4 py-3 text-left font-medium text-gray-600">Razón Social</th>
                                 <th className="px-4 py-3 text-left font-medium text-gray-600">Teléfono</th>
                                 <th className="px-4 py-3 text-left font-medium text-gray-600">Correo</th>
-                                <th className="px-4 py-3 text-right font-medium text-gray-600">FOB Anual</th>
-                                <th className="px-4 py-3 text-center font-medium text-gray-600">Embarques Anuales</th>
-                                <th className="px-4 py-3 text-center font-medium text-gray-600">Frecuencia</th>
+                                <th className="px-4 py-3 text-right font-medium text-gray-600">FOB Prom.</th>
+                                <th className="px-4 py-3 text-center font-medium text-gray-600">Embarques</th>
+                                <th className="px-4 py-3 text-left font-medium text-gray-600">Sector</th>
                                 <th className="px-4 py-3 text-center font-medium text-gray-600">Estado</th>
                             </tr>
                         </thead>
@@ -182,18 +182,11 @@ export default function BasePage() {
                                         <td className="px-4 py-3">{item.telefono}</td>
                                         <td className="px-4 py-3 text-xs text-gray-500">{item.correo || '-'}</td>
                                         <td className="px-4 py-3 text-right font-medium">
-                                            {item.fob_anual_usd?.toLocaleString('es-PE', { style: 'currency', currency: 'USD' }) || '-'}
+                                            {item.fob_promedio?.toLocaleString('es-PE', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }) || '-'}
                                         </td>
-                                        <td className="px-4 py-3 text-center">{item.embarques_anuales?.toLocaleString() || '-'}</td>
-                                        <td className="px-4 py-3 text-center">
-                                            {item.categoria_frecuencia ? (
-                                                <span className={`px-2 py-1 rounded-full text-xs font-semibold ${item.categoria_frecuencia.toUpperCase().includes('ALTA') ? 'bg-green-100 text-green-800' :
-                                                    item.categoria_frecuencia.toUpperCase().includes('MEDIA') ? 'bg-yellow-100 text-yellow-800' :
-                                                        'bg-gray-100 text-gray-800'
-                                                    }`}>
-                                                    {item.categoria_frecuencia}
-                                                </span>
-                                            ) : '—'}
+                                        <td className="px-4 py-3 text-center">{item.total_embarques?.toLocaleString() || '-'}</td>
+                                        <td className="px-4 py-3 text-xs text-gray-500 max-w-[140px] truncate" title={item.sector}>
+                                            {item.sector || '—'}
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             <span className={`px-2 py-0.5 rounded text-xs font-medium inline-block

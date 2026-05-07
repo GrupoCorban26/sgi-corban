@@ -3,25 +3,39 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .base import Base
 
+
+class LoteContactos(Base):
+    __tablename__ = "lotes_contactos"
+    __table_args__ = {"schema": "comercial"}
+
+    id = Column(Integer, primary_key=True, index=True)
+    nombre = Column(String(150), nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_by = Column(Integer, ForeignKey("seg.usuarios.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    # Relationships
+    usuario_creador = relationship("app.models.seguridad.Usuario", foreign_keys=[created_by])
+
+
 class RegistroImportacion(Base):
     __tablename__ = "registro_importaciones"
     __table_args__ = {"schema": "comercial"}
 
     id = Column(Integer, primary_key=True, index=True)
-    ruc = Column(String(11))
-    razon_social = Column(String(150))
-    categoria_frecuencia = Column(String(50))
-    prox_embarque_estimado = Column(String(20))
-    meses_distintos = Column(Integer)
-    embarques_anuales = Column(Numeric(10, 2))
+    ruc = Column(String(11), index=True)
+    razon_social = Column(String(250))
+    sector = Column(String(500))
+    score = Column(Numeric(5, 1))
     agentes_distintos = Column(Integer, default=0)
-    fob_anual_usd = Column(Numeric(15, 2))
-    flete_anual_usd = Column(Numeric(15, 2))
-    peso_anual_kg = Column(Numeric(15, 2))
-    flete_x_kg_usd = Column(Numeric(10, 2))
-    paises_origen = Column(Text)
-    aduanas = Column(String(2000))
-    partidas_arancelarias = Column(Text)
+    total_embarques = Column(Integer)
+    meses_activos = Column(Integer)
+    fob_promedio = Column(Numeric(15, 2))
+    via_predominante = Column(String(50))
+    paises_principales = Column(String(500))
+    ultima_importacion = Column(String(10))
+    dias_desde_ultima = Column(Integer)
+
 
 class CasoLlamada(Base):
     __tablename__ = "casos_llamada"
@@ -31,91 +45,59 @@ class CasoLlamada(Base):
     nombre = Column(String(100))
     contestado = Column(Boolean, default=False, nullable=False)
     gestionable = Column(Boolean, default=False, nullable=False)
-    # is_positive removido para no alterar BD
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    # Puedo acceder a CasoLlamada.casos_de_llamada
-    # Puedo acceder a ClienteContacto.caso
-    casos_de_llamada = relationship("ClienteContacto", back_populates="caso")
 
 class Cliente(Base):
     __tablename__ = "clientes"
     __table_args__ = {"schema": "comercial"}
 
     id = Column(Integer, primary_key=True, index=True)
-    ruc = Column(String(11))
+    ruc = Column(String(11), index=True)
     razon_social = Column(String(255), nullable=False)
-    nombre_comercial = Column(String(255))
     direccion_fiscal = Column(String(255))
     distrito_id = Column(Integer, ForeignKey("core.distritos.id"))
-    area_encargada_id = Column(Integer, ForeignKey("adm.areas.id"))
     comercial_encargado_id = Column(Integer, ForeignKey("seg.usuarios.id"))
-    ultimo_contacto = Column(DateTime(timezone=True))
-    comentario_ultima_llamada = Column(String(500))
     proxima_fecha_contacto = Column(Date)
-    
-    # Pipeline de Ventas (legacy — mantener por retrocompatibilidad)
-    motivo_perdida = Column(String(50), nullable=True)
-    fecha_perdida = Column(Date, nullable=True)
-    fecha_reactivacion = Column(Date, nullable=True)
-    
-    # Pipeline de Ventas — CAIDO
-    motivo_caida = Column(String(100), nullable=True)
-    fecha_caida = Column(Date, nullable=True)
-    fecha_seguimiento_caida = Column(Date, nullable=True)
-    
-    tipo_estado = Column(String(30), default="PROSPECTO", nullable=False)
-    origen = Column(String(50))  # BASE_DATOS, PUBLICIDAD_META, CARTERA_PROPIA, WHATSAPP, REFERIDO, OTRO
-    sub_origen = Column(String(100), nullable=True)  # Detalle adicional (ej. nombre de campaña Meta)
-    inbox_origen_id = Column(Integer, ForeignKey("comercial.inbox.id"), nullable=True)  # Lead de WhatsApp que originó este cliente
+    estado_id = Column(Integer, ForeignKey("comercial.estado_cliente.id"), index=True)
+    origen_id = Column(Integer, ForeignKey("comercial.origen_cliente.id"))
     is_active = Column(Boolean, default=True, nullable=False)
-    
-    # Timestamps de conversión para métricas
-    fecha_primer_contacto = Column(DateTime(timezone=True), nullable=True)
-    fecha_conversion_cliente = Column(DateTime(timezone=True), nullable=True)
-    
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    created_by = Column(Integer)
-    updated_by = Column(Integer)
+    created_by = Column(Integer, ForeignKey("seg.usuarios.id"))
+    updated_by = Column(Integer, ForeignKey("seg.usuarios.id"))
 
+    # Relationships
     distrito = relationship("app.models.core.Distrito")
-    area_encargada = relationship("app.models.administrativo.Area")
     comercial = relationship("app.models.seguridad.Usuario", foreign_keys=[comercial_encargado_id])
-    inbox_origen = relationship("app.models.comercial_inbox.Inbox", foreign_keys=[inbox_origen_id])
+    estado = relationship("app.models.comercial_catalogos.EstadoCliente")
+    origen = relationship("app.models.comercial_catalogos.OrigenCliente")
+    usuario_creador = relationship("app.models.seguridad.Usuario", foreign_keys=[created_by])
+    usuario_modificador = relationship("app.models.seguridad.Usuario", foreign_keys=[updated_by])
+
 
 class ClienteContacto(Base):
     __tablename__ = "cliente_contactos"
     __table_args__ = {"schema": "comercial"}
 
     id = Column(Integer, primary_key=True, index=True)
-    ruc = Column(String(11), nullable=False)
-    razon_social = Column(String(255))
+    ruc = Column(String(11), nullable=False, index=True)
     nombre = Column(String(150))
     cargo = Column(String(100))
-    telefono = Column(String(20), nullable=False)
+    telefono = Column(String(20), nullable=False, index=True)
     correo = Column(String(100))
     origen = Column(String(30))
-    is_client = Column(Boolean, default=False, nullable=False)
-    is_active = Column(Boolean, default=True, nullable=False)
+    estado_id = Column(Integer, ForeignKey("comercial.estado_contacto.id"), index=True)
+    lote_id = Column(Integer, ForeignKey("comercial.lotes_contactos.id"), index=True)
     is_principal = Column(Boolean, default=False, nullable=False)
-    
-    # Asignación
-    asignado_a = Column(Integer, ForeignKey("seg.usuarios.id"))
-    fecha_asignacion = Column(DateTime(timezone=True))
-    lote_asignacion = Column(Integer)
-    caso_id = Column(Integer, ForeignKey("comercial.casos_llamada.id"))
-    estado = Column(String(30), default="DISPONIBLE")
-    comentario = Column(String(500))
-    fecha_llamada = Column(DateTime(timezone=True))
+    is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-    usuario_asignado = relationship("app.models.seguridad.Usuario")
-    # Puedo acceder a ClienteContacto.caso 
-    # Puedo acceder a CasoLlamada.casos_de_llamada
-    caso = relationship("CasoLlamada", back_populates="casos_de_llamada")
+    # Relationships
+    estado = relationship("app.models.comercial_catalogos.EstadoContacto")
+    lote = relationship("LoteContactos")
 
 
 class Cita(Base):
@@ -123,57 +105,27 @@ class Cita(Base):
     __table_args__ = {"schema": "comercial"}
 
     id = Column(Integer, primary_key=True, index=True)
-    
-    # Tipo de agenda: INDIVIDUAL (comercial con cliente) o SALIDA_CAMPO (jefe sin cliente específico)
-    tipo_agenda = Column(String(30), default="INDIVIDUAL", nullable=False)
-    
-    # Cliente (nullable para salidas a campo)
+    tipo_cita = Column(String(50))
     cliente_id = Column(Integer, ForeignKey("comercial.clientes.id"), nullable=True)
-    comercial_id = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=False)  # Quien solicita/crea
-    
+    comercial_id = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=False, index=True)
     fecha = Column(DateTime, nullable=False)
     hora = Column(String(10), nullable=False)
-    
-    # Tipo de visita: VISITA_CLIENTE (ir a oficinas del cliente) o VISITA_OFICINA (cliente viene a nosotros)
-    tipo_cita = Column(String(50))
     direccion = Column(String(255))
-    motivo = Column(String(500))
-    con_presente = Column(Boolean, default=False)  # Llevar regalo
-    
-    # Campo adicional para salida a campo (objetivo de la salida)
-    objetivo_campo = Column(String(500), nullable=True)
-    
-    # Workflow
-    estado = Column(String(30), default="PENDIENTE")  # PENDIENTE, APROBADO, RECHAZADO, TERMINADO
-    motivo_rechazo = Column(String(500))
-    
-    # Asignación de recursos (opcional)
+    detalles = Column(String(500))
+    con_presente = Column(Boolean, default=False)
+    estado_id = Column(Integer, ForeignKey("comercial.estado_cita.id"), index=True)
+    is_confirmado = Column(Boolean, default=False, nullable=False)
     acompanado_por_id = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=True)
-    conductor_id = Column(Integer, ForeignKey("logistica.asignacion_vehiculos.id"), nullable=True)
-    
+    observacion = Column(String(500))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-    created_by = Column(Integer)
-    
+    created_by = Column(Integer, ForeignKey("seg.usuarios.id"))
+    updated_by = Column(Integer, ForeignKey("seg.usuarios.id"))
+
     # Relationships
     cliente = relationship("Cliente")
     comercial = relationship("app.models.seguridad.Usuario", foreign_keys=[comercial_id])
     acompanante = relationship("app.models.seguridad.Usuario", foreign_keys=[acompanado_por_id])
-    conductor = relationship("app.models.logistica.AsignacionVehiculo")
-    comerciales_asignados = relationship("CitaComercial", back_populates="cita", cascade="all, delete-orphan")
-
-
-class CitaComercial(Base):
-    """Tabla intermedia para asignar múltiples comerciales a una salida a campo"""
-    __tablename__ = "cita_comerciales"
-    __table_args__ = {"schema": "comercial"}
-
-    id = Column(Integer, primary_key=True, index=True)
-    cita_id = Column(Integer, ForeignKey("comercial.citas.id", ondelete="CASCADE"), nullable=False)
-    usuario_id = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=False)
-    confirmado = Column(Boolean, default=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    # Relationships
-    cita = relationship("Cita", back_populates="comerciales_asignados")
-    usuario = relationship("app.models.seguridad.Usuario")
+    estado = relationship("app.models.comercial_catalogos.EstadoCita")
+    usuario_creador = relationship("app.models.seguridad.Usuario", foreign_keys=[created_by])
+    usuario_modificador = relationship("app.models.seguridad.Usuario", foreign_keys=[updated_by])

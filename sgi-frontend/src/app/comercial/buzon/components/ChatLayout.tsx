@@ -99,10 +99,9 @@ export default function ChatLayout() {
                 isOpen={isModalClienteOpen}
                 onClose={() => setIsModalClienteOpen(false)}
                 onClienteCreado={handleClienteCreado}
+                isFromBuzon={true}
                 initialData={{
-                    razon_social: selectedConv?.nombre_whatsapp || '',
-                    nombre_comercial: selectedConv?.nombre_whatsapp || '',
-                    tipo_estado: 'CERRADA'
+                    razon_social: selectedConv?.nombre_whatsapp || ''
                 }}
             />
         </div>

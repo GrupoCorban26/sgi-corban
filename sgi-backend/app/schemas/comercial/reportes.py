@@ -37,10 +37,9 @@ class DetalleBaseDatos(BaseModel):
     razon_social: str
     ruc: Optional[str]
     estado: str
-    origen: Optional[str]
     fecha_ingreso: datetime
-    ultimo_contacto: Optional[datetime]
     comercial_nombre: Optional[str]
+    lote_nombre: Optional[str] = None
 
     model_config = ConfigDict(from_attributes=True)
 

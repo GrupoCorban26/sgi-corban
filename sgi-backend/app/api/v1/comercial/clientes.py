@@ -202,13 +202,117 @@ async def get_dashboard_buzon_detalle(
     )
 
 
+@router.get("/metricas/dashboard/base-datos/detalle", dependencies=[Depends(get_current_active_auth)])
+async def get_dashboard_base_datos_detalle(
+    fecha_inicio: date = Query(..., description="Fecha de inicio del reporte (YYYY-MM-DD)"),
+    fecha_fin: date = Query(..., description="Fecha de fin del reporte (YYYY-MM-DD)"),
+    comercial_id: Optional[int] = Query(None, description="Filtrar por comercial"),
+    empresa: Optional[str] = Query(None, description="Filtrar por empresa"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_token_payload),
+    comercial_ids_permitidos: list = Depends(resolver_comercial_ids)
+):
+    """Detalle individual de llamadas de Base de Datos para exportación Excel."""
+    roles = current_user.get("roles", [])
+    if not any(role in roles for role in ALLOWED_ALL):
+        raise HTTPException(status_code=403, detail="No tienes permisos para acceder al dashboard")
+    if fecha_inicio > fecha_fin:
+        raise HTTPException(status_code=400, detail="La fecha de inicio no puede ser posterior a la fecha de fin")
+        
+    filtro_comercial_ids = comercial_ids_permitidos
+    if comercial_id:
+        if comercial_ids_permitidos is None or comercial_id in comercial_ids_permitidos:
+            filtro_comercial_ids = [comercial_id]
+
+    service = AnalyticsService(db)
+    return await service.get_detalle_base_datos(
+        datetime.combine(fecha_inicio, datetime.min.time()),
+        datetime.combine(fecha_fin, datetime.max.time()),
+        comercial_ids=filtro_comercial_ids,
+        empresa=empresa
+    )
+
+
+@router.get("/metricas/dashboard/cartera/detalle", dependencies=[Depends(get_current_active_auth)])
+async def get_dashboard_cartera_detalle(
+    fecha_inicio: date = Query(..., description="Fecha de inicio del reporte (YYYY-MM-DD)"),
+    fecha_fin: date = Query(..., description="Fecha de fin del reporte (YYYY-MM-DD)"),
+    comercial_id: Optional[int] = Query(None, description="Filtrar por comercial"),
+    empresa: Optional[str] = Query(None, description="Filtrar por empresa"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_token_payload),
+    comercial_ids_permitidos: list = Depends(resolver_comercial_ids)
+):
+    """Detalle individual de gestiones de Cartera para exportación Excel."""
+    roles = current_user.get("roles", [])
+    if not any(role in roles for role in ALLOWED_ALL):
+        raise HTTPException(status_code=403, detail="No tienes permisos para acceder al dashboard")
+    if fecha_inicio > fecha_fin:
+        raise HTTPException(status_code=400, detail="La fecha de inicio no puede ser posterior a la fecha de fin")
+        
+    filtro_comercial_ids = comercial_ids_permitidos
+    if comercial_id:
+        if comercial_ids_permitidos is None or comercial_id in comercial_ids_permitidos:
+            filtro_comercial_ids = [comercial_id]
+
+    service = AnalyticsService(db)
+    return await service.get_detalle_cartera(
+        datetime.combine(fecha_inicio, datetime.min.time()),
+        datetime.combine(fecha_fin, datetime.max.time()),
+        comercial_ids=filtro_comercial_ids,
+        empresa=empresa
+    )
+
+@router.get("/exportar", dependencies=[Depends(get_current_active_auth)])
+async def exportar_clientes(
+    busqueda: Optional[str] = Query(None, description="Buscar por RUC o razón social"),
+    estado_id: Optional[int] = Query(None, description="Filtrar por estado (ID)"),
+    estado_nombre: Optional[str] = Query(None, description="Filtrar por estado (nombre, ej: PROSPECTO)"),
+    comercial_id: Optional[int] = Query(None, description="Filtrar por comercial"),
+    filtro_fecha: Optional[str] = Query(None, description="Filtrar por fecha de próximo contacto (hoy, vencidos, proximos_7_dias)"),
+    ordenar_por: Optional[str] = Query(None, description="Ordenar por: proxima_fecha_asc, proxima_fecha_desc"),
+    db: AsyncSession = Depends(get_db),
+    current_user: dict = Depends(get_current_token_payload),
+    comercial_ids: list = Depends(resolver_comercial_ids)
+):
+    """Exportar cartera de clientes. Solo para Jefe Comercial o superior."""
+    roles = current_user.get("roles", [])
+    if not any(role in roles for role in ALLOWED_ALL):
+        raise HTTPException(status_code=403, detail="No tienes permisos para exportar la cartera")
+        
+    service = ClientesService(db)
+    
+    if estado_nombre and not estado_id:
+        try:
+            estado_id = await service._get_estado_id(estado_nombre)
+        except Exception:
+            pass
+
+    if comercial_id:
+        if comercial_ids is None or comercial_id in comercial_ids:
+            comercial_ids = [comercial_id]
+
+    result = await service.get_all(
+        busqueda=busqueda,
+        estado_id=estado_id,
+        comercial_ids=comercial_ids,
+        filtro_fecha=filtro_fecha,
+        ordenar_por=ordenar_por,
+        page=1,
+        page_size=0
+    )
+    
+    return result.get("data", [])
+
+
 @router.get("", dependencies=[Depends(require_permission("clientes.listar"))])
 async def listar_clientes(
     busqueda: Optional[str] = Query(None, description="Buscar por RUC o razón social"),
-    tipo_estado: Optional[str] = Query(None, description="Filtrar por estado"),
+    estado_id: Optional[int] = Query(None, description="Filtrar por estado (ID)"),
+    estado_nombre: Optional[str] = Query(None, description="Filtrar por estado (nombre, ej: PROSPECTO)"),
     comercial_id: Optional[int] = Query(None, description="Filtrar por comercial"),
-    area_id: Optional[int] = Query(None, description="Filtrar por área"),
     filtro_fecha: Optional[str] = Query(None, description="Filtrar por fecha de próximo contacto (hoy, vencidos, proximos_7_dias)"),
+    ordenar_por: Optional[str] = Query(None, description="Ordenar por: proxima_fecha_asc, proxima_fecha_desc"),
     page: int = Query(1, ge=1),
     page_size: int = Query(15, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
@@ -217,6 +321,13 @@ async def listar_clientes(
     """Lista clientes con paginación. Filtrado por equipo automáticamente."""
     service = ClientesService(db)
     
+    # Resolver estado_nombre a estado_id si se proporcionó
+    if estado_nombre and not estado_id:
+        try:
+            estado_id = await service._get_estado_id(estado_nombre)
+        except Exception:
+            pass  # Si no se encuentra, no filtrar por estado
+
     # Si se especifica un comercial_id explícito Y el usuario puede verlo
     if comercial_id:
         if comercial_ids is None or comercial_id in comercial_ids:
@@ -224,13 +335,23 @@ async def listar_clientes(
 
     return await service.get_all(
         busqueda=busqueda,
-        tipo_estado=tipo_estado,
+        estado_id=estado_id,
         comercial_ids=comercial_ids,
-        area_id=area_id,
         filtro_fecha=filtro_fecha,
+        ordenar_por=ordenar_por,
         page=page,
         page_size=page_size
     )
+
+
+@router.get("/{id}/timeline", dependencies=[Depends(require_permission("clientes.listar"))])
+async def obtener_timeline(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+):
+    """Trazabilidad unificada de un cliente: llamadas de base, gestiones, buzón."""
+    service = ClientesService(db)
+    return await service.get_timeline(id)
 
 
 @router.get("/{id}", dependencies=[Depends(require_permission("clientes.listar"))])
@@ -307,7 +428,7 @@ async def cambiar_estado(
     service = ClientesService(db)
     result = await service.cambiar_estado(
         id, 
-        estado_data.nuevo_estado, 
+        estado_data.nuevo_estado_id, 
         updated_by=current_user_id,
         motivo=estado_data.motivo
     )
@@ -326,8 +447,8 @@ async def marcar_caido(
     service = ClientesService(db)
     result = await service.marcar_caido(
         id, 
-        motivo=data.motivo_caida, 
-        fecha_seguimiento=data.fecha_seguimiento_caida, 
+        motivo=data.motivo, 
+        fecha_seguimiento=data.fecha_seguimiento, 
         updated_by=current_user_id
     )
         

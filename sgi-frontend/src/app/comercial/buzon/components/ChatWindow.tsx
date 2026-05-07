@@ -183,18 +183,20 @@ export default function ChatWindow({ selectedConv, onBack, onToggleInfo, showInf
                     </div>
                 )
             ) : (
-                <div className="bg-white/95 backdrop-blur-sm px-4 py-3 text-center border-t border-slate-200 z-10 flex-shrink-0">
-                    <div className="flex items-center justify-center gap-2">
-                        <Bot size={16} className="text-blue-500" />
-                        <p className="text-sm text-slate-500">
-                            El chatbot gestiona esta conversación.
-                            <button
-                                onClick={handleTakeChat}
-                                className="text-emerald-600 font-semibold hover:underline ml-1"
-                            >
-                                Tomar chat
-                            </button>
-                        </p>
+                <div className="bg-white/95 backdrop-blur-sm px-4 py-3 border-t border-slate-200 z-10 flex-shrink-0">
+                    <div className="flex items-center justify-center gap-3">
+                        <div className="flex items-center gap-1.5 text-sm text-slate-400">
+                            <Bot size={15} className="text-blue-400" />
+                            <span>Gestionado por Bot</span>
+                        </div>
+                        <button
+                            onClick={handleTakeChat}
+                            disabled={takeChat.isPending}
+                            className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-lg shadow-sm hover:shadow-md transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                            <UserPlus size={14} />
+                            {takeChat.isPending ? 'Tomando...' : 'Tomar Chat'}
+                        </button>
                     </div>
                 </div>
             )}

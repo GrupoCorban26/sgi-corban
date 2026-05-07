@@ -61,8 +61,10 @@ export interface ActivoPaginationResponse {
 export interface ActivoHistorial {
     id: number;
     activo_id: number;
-    estado_anterior: string | null;
-    estado_nuevo: string;
+    estado_anterior_id: number | null;
+    estado_anterior_nombre: string | null;
+    estado_nuevo_id: number;
+    estado_nuevo_nombre: string | null;
     motivo: string;
     observaciones: string | null;
     empleado_activo_id: number | null;
@@ -100,7 +102,9 @@ export interface AsignacionResponse {
     empleado_nombre: string;
     fecha_entrega: string;
     fecha_devolucion?: string | null;
-    estado_al_entregar: string;
-    estado_al_devolver?: string | null;
+    estado_entrega_id: number | null;
+    estado_entrega_nombre: string | null;
+    estado_devolucion_id?: number | null;
+    estado_devolucion_nombre?: string | null;
     observaciones?: string | null;
 }

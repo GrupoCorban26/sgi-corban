@@ -100,15 +100,15 @@ export function useBaseComercial() {
 
     // Verificar si todos los contactos están guardados (tienen fecha_llamada)
     const todosGuardados = contactos.length > 0 &&
-        contactos.every((c: ContactoAsignado) => c.fecha_llamada !== null);
+        contactos.every((c: ContactoAsignado) => c.completado);
 
     // Verificar si hay contactos sin guardar
-    const tieneContactosSinGuardar = contactos.some((c: ContactoAsignado) => c.fecha_llamada === null);
+    const tieneContactosSinGuardar = contactos.some((c: ContactoAsignado) => !c.completado);
 
     return {
         // Data
         contactos,
-        filtros: filtros.data || { paises: [], partidas: [] },
+        filtros: filtros.data || { paises: [], sectores: [] },
         casos: casos.data || [],
 
         // States

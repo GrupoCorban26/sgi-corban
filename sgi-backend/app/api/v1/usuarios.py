@@ -8,7 +8,7 @@ from app.core.security import get_current_user_id, get_current_active_auth
 from app.core.dependencies import require_permission, require_any_role, get_current_user_obj, resolver_comercial_ids
 from app.services.usuarios import UsuarioService
 from app.models.seguridad import Usuario
-from app.schemas.usuario import (
+from app.schemas.seg.usuario import (
     UsuarioCreate,
     UsuarioUpdate,
     UsuarioChangePassword,

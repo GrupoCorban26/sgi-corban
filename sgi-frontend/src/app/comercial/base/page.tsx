@@ -152,7 +152,7 @@ export default function BaseComercialPage() {
             <div>
               <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">País de Origen</label>
               <MultiSelect
-                options={filtros.paises.map(p => ({ value: p.pais, label: p.pais, count: p.cantidad }))}
+                options={Array.isArray(filtros?.paises) ? filtros.paises.map(p => ({ value: p.pais, label: p.pais, count: p.cantidad })) : []}
                 selectedValues={paisSeleccionado}
                 onChange={setPaisSeleccionado}
                 placeholder="Seleccionar países..."
@@ -160,13 +160,13 @@ export default function BaseComercialPage() {
               />
             </div>
             <div>
-              <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Partida Arancelaria</label>
+              <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Sector</label>
               <MultiSelect
-                options={filtros.partidas.map(p => ({ value: p.partida, label: p.partida, count: p.cantidad }))}
+                options={filtros.sectores ? filtros.sectores.map((p: any) => ({ value: p.sector, label: p.sector, count: p.cantidad })) : []}
                 selectedValues={partidaSeleccionada}
                 onChange={setPartidaSeleccionada}
-                placeholder="Seleccionar partidas..."
-                searchPlaceholder="Buscar partida..."
+                placeholder="Seleccionar sectores..."
+                searchPlaceholder="Buscar sector..."
               />
             </div>
           </div>

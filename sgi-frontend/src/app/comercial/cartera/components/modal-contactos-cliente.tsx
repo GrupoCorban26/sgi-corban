@@ -55,7 +55,7 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
     const [savingId, setSavingId] = useState<number | null>(null);
     const [editedRows, setEditedRows] = useState<{ [key: number]: Partial<Contacto> }>({});
     const [showNewRow, setShowNewRow] = useState(false);
-    const [newContacto, setNewContacto] = useState({ nombre: '', cargo: '', telefono: '', correo: '' });
+    const [newContacto, setNewContacto] = useState({ nombre: '', cargo: '', telefono: '', correo: '', is_principal: false });
     const [isCreating, setIsCreating] = useState(false);
 
     // Cargar contactos
@@ -78,7 +78,7 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
             loadContactos();
             setEditedRows({});
             setShowNewRow(false);
-            setNewContacto({ nombre: '', cargo: '', telefono: '', correo: '' });
+            setNewContacto({ nombre: '', cargo: '', telefono: '', correo: '', is_principal: false });
         }
     }, [isOpen, ruc, loadContactos]);
 
@@ -192,12 +192,13 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
                 nombre: newContacto.nombre || null,
                 cargo: newContacto.cargo || null,
                 telefono: newContacto.telefono,
-                email: newContacto.correo || null
+                correo: newContacto.correo || null,
+                is_principal: newContacto.is_principal
             });
 
             toast.success('Contacto agregado');
             setShowNewRow(false);
-            setNewContacto({ nombre: '', cargo: '', telefono: '', correo: '' });
+            setNewContacto({ nombre: '', cargo: '', telefono: '', correo: '', is_principal: false });
             loadContactos();
         } catch (error) {
             console.error('Error creating contact:', error);
@@ -367,6 +368,15 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
                                     {/* Nueva fila para agregar */}
                                     {showNewRow && (
                                         <tr className="bg-green-50">
+                                            <td className="px-3 py-2 text-center">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={newContacto.is_principal}
+                                                    onChange={(e) => setNewContacto(prev => ({ ...prev, is_principal: e.target.checked }))}
+                                                    className="h-4 w-4 text-indigo-600 cursor-pointer rounded"
+                                                    title="Marcar como contacto principal"
+                                                />
+                                            </td>
                                             <td className="px-2 py-2">
                                                 <input
                                                     type="text"

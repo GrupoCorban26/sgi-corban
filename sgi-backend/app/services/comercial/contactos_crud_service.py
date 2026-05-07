@@ -4,8 +4,10 @@ Responsabilidad única: crear, leer, actualizar, eliminar y listar contactos.
 """
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, or_, case, update
-from app.models.comercial import ClienteContacto, Cliente, CasoLlamada, RegistroImportacion
+from sqlalchemy import func, or_, case, update, and_
+from app.models.comercial import ClienteContacto, Cliente, CasoLlamada, RegistroImportacion, LoteContactos
+from app.models.comercial_catalogos import EstadoContacto
+from app.models.historial_llamadas import HistorialLlamada
 
 
 class ContactosCrudService:
@@ -39,17 +41,22 @@ class ContactosCrudService:
              return True  # Already exists
 
         is_client_val = data.get('is_client', False)
+
+        # Resolver estado_id desde el catálogo EstadoContacto
+        estado_nombre = 'GESTIONADO' if is_client_val else 'DISPONIBLE'
+        stmt_estado = select(EstadoContacto).where(EstadoContacto.nombre == estado_nombre)
+        estado_obj = (await self.db.execute(stmt_estado)).scalars().first()
         
         nuevo_contacto = ClienteContacto(
             ruc=data['ruc'],
             nombre=data.get('nombre'),
             cargo=data.get('cargo'),
             telefono=data['telefono'],
-            correo=data.get('email'),
+            correo=data.get('correo') or data.get('email'),
             origen=data.get('origen', 'MANUAL'),
-            is_client=is_client_val,
+            is_principal=data.get('is_principal', False),
             is_active=True,
-            estado='GESTIONADO' if is_client_val else 'DISPONIBLE'
+            estado_id=estado_obj.id if estado_obj else None
         )
         self.db.add(nuevo_contacto)
         await self.db.commit()
@@ -109,24 +116,37 @@ class ContactosCrudService:
         # 1. Estadísticas Globales
         stmt_stats = select(
             func.count().label('total'),
-            func.sum(case((ClienteContacto.estado == 'DISPONIBLE', 1), else_=0)).label('disponibles'),
-            func.sum(case((ClienteContacto.estado == 'ASIGNADO', 1), else_=0)).label('asignados'),
-            func.sum(case((ClienteContacto.estado == 'EN_GESTION', 1), else_=0)).label('en_gestion')
+            func.sum(case((EstadoContacto.nombre == 'DISPONIBLE', 1), else_=0)).label('disponibles'),
+            func.sum(case((EstadoContacto.nombre == 'ASIGNADO', 1), else_=0)).label('asignados'),
+            func.sum(case((EstadoContacto.nombre == 'EN_GESTION', 1), else_=0)).label('en_gestion')
+        ).select_from(ClienteContacto).outerjoin(
+            EstadoContacto, ClienteContacto.estado_id == EstadoContacto.id
         ).where(ClienteContacto.is_active == True)
         
         stats_res = (await self.db.execute(stmt_stats)).first()
         
         # 2. Query Principal
         offset = (page - 1) * page_size
+        
+        # Subquery para obtener razon_social de importaciones sin multiplicar filas
+        import_rs_subq = (
+            select(RegistroImportacion.razon_social)
+            .where(RegistroImportacion.ruc == ClienteContacto.ruc)
+            .limit(1)
+            .correlate(ClienteContacto)
+            .scalar_subquery()
+            .label("import_rs")
+        )
+        
         stmt = select(
             ClienteContacto, 
             Cliente.razon_social.label("cliente_rs"), 
-            RegistroImportacion.razon_social.label("import_rs"),
-            CasoLlamada.nombre.label("caso_nombre"),
-            CasoLlamada.contestado.label("caso_contestado")
+            import_rs_subq,
+            EstadoContacto.nombre.label("estado_nombre"),
+            LoteContactos.nombre.label("lote_nombre")
         ).outerjoin(Cliente, ClienteContacto.ruc == Cliente.ruc) \
-         .outerjoin(RegistroImportacion, ClienteContacto.ruc == RegistroImportacion.ruc) \
-         .outerjoin(CasoLlamada, ClienteContacto.caso_id == CasoLlamada.id) \
+         .outerjoin(EstadoContacto, ClienteContacto.estado_id == EstadoContacto.id) \
+         .outerjoin(LoteContactos, ClienteContacto.lote_id == LoteContactos.id) \
          .where(ClienteContacto.is_active == True)
 
         if search:
@@ -137,7 +157,7 @@ class ContactosCrudService:
             ))
         
         if estado:
-            stmt = stmt.where(ClienteContacto.estado == estado)
+            stmt = stmt.where(EstadoContacto.nombre == estado)
             
         # Count filtered
         count_stmt = select(func.count()).select_from(stmt.subquery())
@@ -152,7 +172,9 @@ class ContactosCrudService:
         for row in rows:
             cc = row[0]
             razon_social = row[1] or row[2] or "Sin razón social"
-            contestado = 'Sí' if row[4] else 'No'
+            
+            # TODO: Add logic to fetch latest call if necessary, 
+            # for now returning defaults for removed columns
             data_list.append({
                 "id": cc.id,
                 "ruc": cc.ruc,
@@ -160,11 +182,12 @@ class ContactosCrudService:
                 "razon_social": razon_social,
                 "telefono": cc.telefono,
                 "correo": cc.correo,
-                "contestado": contestado,
-                "caso": row[3],
-                "estado": cc.estado,
-                "asignado_a": cc.asignado_a,
-                "fecha_asignacion": cc.fecha_asignacion,
+                "contestado": "N/A",
+                "caso": "N/A",
+                "estado": row[3], # estado_nombre
+                "lote_nombre": row[4],  # lote_nombre
+                "asignado_a": "N/A",
+                "fecha_asignacion": cc.created_at,
                 "created_at": cc.created_at
             })
             
@@ -185,9 +208,11 @@ class ContactosCrudService:
         """Retorna estadísticas de contactos."""
         stmt = select(
             func.count().label('total'),
-            func.sum(case((ClienteContacto.estado == 'DISPONIBLE', 1), else_=0)).label('disponibles'),
-            func.sum(case((ClienteContacto.estado == 'ASIGNADO', 1), else_=0)).label('asignados'),
-            func.sum(case((ClienteContacto.estado == 'EN_GESTION', 1), else_=0)).label('en_gestion')
+            func.sum(case((EstadoContacto.nombre == 'DISPONIBLE', 1), else_=0)).label('disponibles'),
+            func.sum(case((EstadoContacto.nombre == 'ASIGNADO', 1), else_=0)).label('asignados'),
+            func.sum(case((EstadoContacto.nombre == 'EN_GESTION', 1), else_=0)).label('en_gestion')
+        ).select_from(ClienteContacto).outerjoin(
+            EstadoContacto, ClienteContacto.estado_id == EstadoContacto.id
         ).where(ClienteContacto.is_active == True)
         
         row = (await self.db.execute(stmt)).first()
@@ -210,74 +235,74 @@ class ContactosCrudService:
             return query
 
         # 1. Total Repartido (ASIGNADO + GESTIONADO)
-        # Se filtra por FECHA DE ASIGNACIÓN
-        stmt_repartido = select(func.count()).select_from(ClienteContacto).where(
-            ClienteContacto.estado.in_(['ASIGNADO', 'GESTIONADO']),
+        stmt_repartido = select(func.count()).select_from(ClienteContacto).join(
+            EstadoContacto, ClienteContacto.estado_id == EstadoContacto.id
+        ).where(
+            EstadoContacto.nombre.in_(['ASIGNADO', 'GESTIONADO']),
             ClienteContacto.is_active == True
         )
-        stmt_repartido = aplicar_filtro_fecha(stmt_repartido, ClienteContacto.fecha_asignacion)
+        stmt_repartido = aplicar_filtro_fecha(stmt_repartido, ClienteContacto.created_at)
         total_repartido = (await self.db.execute(stmt_repartido)).scalar() or 0
         
-        # Para las siguientes métricas, usamos FECHA DE LLAMADA (gestión realizada)
+        # Para las siguientes métricas, usamos FECHA DE LLAMADA de la tabla HistorialLlamada
         
         # 2. Total Gestionados (Denominador estadístico general)
-        # El usuario cambió la lógica para filtrar por "contestado"
-        stmt_gestionados = select(func.count()).select_from(ClienteContacto).join(
-            CasoLlamada, ClienteContacto.caso_id == CasoLlamada.id
+        stmt_gestionados = select(func.count(func.distinct(HistorialLlamada.contacto_id))).select_from(HistorialLlamada).join(
+            CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id
         ).where(
-            CasoLlamada.contestado == True,
-            ClienteContacto.is_active == True
+            CasoLlamada.contestado == True
         )
-        stmt_gestionados = aplicar_filtro_fecha(stmt_gestionados, ClienteContacto.fecha_llamada)
+        stmt_gestionados = aplicar_filtro_fecha(stmt_gestionados, HistorialLlamada.created_at)
         total_gestionados = (await self.db.execute(stmt_gestionados)).scalar() or 0
 
         # [MODIFICADO] 2b. Total Gestionables (Denominador para Tasa de Contactabilidad)
-        # El usuario pidió: "todos los que tienen gestionable = 1"
-        stmt_gestionables = select(func.count()).select_from(ClienteContacto).join(
-            CasoLlamada, ClienteContacto.caso_id == CasoLlamada.id
+        stmt_gestionables = select(func.count(func.distinct(HistorialLlamada.contacto_id))).select_from(HistorialLlamada).join(
+            CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id
         ).where(
-            CasoLlamada.gestionable == True,
-            ClienteContacto.is_active == True
+            CasoLlamada.gestionable == True
         )
-        stmt_gestionables = aplicar_filtro_fecha(stmt_gestionables, ClienteContacto.fecha_llamada)
+        stmt_gestionables = aplicar_filtro_fecha(stmt_gestionables, HistorialLlamada.created_at)
         total_gestionables = (await self.db.execute(stmt_gestionables)).scalar() or 0
         
         # 3. Contestados (Numerador contactabilidad)
-        stmt_contestados = select(func.count()).select_from(ClienteContacto).join(
-            CasoLlamada, ClienteContacto.caso_id == CasoLlamada.id
+        stmt_contestados = select(func.count(func.distinct(HistorialLlamada.contacto_id))).select_from(HistorialLlamada).join(
+            CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id
+        ).join(
+            EstadoContacto, HistorialLlamada.estado_id == EstadoContacto.id
         ).where(
-            ClienteContacto.estado == 'GESTIONADO',
-            ClienteContacto.is_active == True,
+            EstadoContacto.nombre == 'GESTIONADO',
             CasoLlamada.contestado == True
         )
-        stmt_contestados = aplicar_filtro_fecha(stmt_contestados, ClienteContacto.fecha_llamada)
+        stmt_contestados = aplicar_filtro_fecha(stmt_contestados, HistorialLlamada.created_at)
         total_contestados = (await self.db.execute(stmt_contestados)).scalar() or 0
         
         # 4. Positivos (Numerador eficiencia)
         casos_positivos = ['Contestó - Interesado', 'Contestó - Solicita cotización']
-        stmt_positivos = select(func.count()).select_from(ClienteContacto).join(
-            CasoLlamada, ClienteContacto.caso_id == CasoLlamada.id
+        stmt_positivos = select(func.count(func.distinct(HistorialLlamada.contacto_id))).select_from(HistorialLlamada).join(
+            CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id
+        ).join(
+            EstadoContacto, HistorialLlamada.estado_id == EstadoContacto.id
         ).where(
-            ClienteContacto.estado == 'GESTIONADO',
-            ClienteContacto.is_active == True,
+            EstadoContacto.nombre == 'GESTIONADO',
             CasoLlamada.nombre.in_(casos_positivos)
         )
-        stmt_positivos = aplicar_filtro_fecha(stmt_positivos, ClienteContacto.fecha_llamada)
+        stmt_positivos = aplicar_filtro_fecha(stmt_positivos, HistorialLlamada.created_at)
         total_positivos = (await self.db.execute(stmt_positivos)).scalar() or 0
         
         # 5. Distribución de Casos (para gráfico de torta)
         stmt_casos = select(
             CasoLlamada.nombre,
             func.count()
-        ).select_from(ClienteContacto).join(
-            CasoLlamada, ClienteContacto.caso_id == CasoLlamada.id
+        ).select_from(HistorialLlamada).join(
+            CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id
+        ).join(
+            EstadoContacto, HistorialLlamada.estado_id == EstadoContacto.id
         ).where(
-            ClienteContacto.estado == 'GESTIONADO',
-            ClienteContacto.is_active == True,
+            EstadoContacto.nombre == 'GESTIONADO',
             CasoLlamada.nombre.isnot(None)
         ).group_by(CasoLlamada.nombre)
         
-        stmt_casos = aplicar_filtro_fecha(stmt_casos, ClienteContacto.fecha_llamada)
+        stmt_casos = aplicar_filtro_fecha(stmt_casos, HistorialLlamada.created_at)
         
         casos_result = await self.db.execute(stmt_casos)
         casos_distribucion = [{"name": row[0], "value": row[1]} for row in casos_result.all()]

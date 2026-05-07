@@ -11,7 +11,6 @@ class Token(BaseModel):
     access_token: str
     token_type: str
     nombre: str
-    debe_cambiar_pass: bool
     permisos: List[str]
 
 # Para errores o respuestas simples

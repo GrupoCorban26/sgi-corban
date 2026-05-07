@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 from app.models.comercial_inbox import Inbox
 from app.models.seguridad import Usuario, Rol, usuarios_roles
 from app.models.comercial import Cliente, ClienteContacto
+from app.models.comercial_catalogos import EstadoContacto
 from app.models.administrativo import Empleado, EmpleadoActivo, Activo, LineaCorporativa
 from app.schemas.comercial.inbox import InboxDistribute
 from app.utils.horario_laboral import calcular_segundos_horario_laboral
@@ -272,15 +273,9 @@ class InboxService:
         if lead:
             lead.estado = 'CIERRE'
             lead.modo = 'BOT'
-            lead.fecha_gestion = datetime.now()
-            
-            # Calcular y guardar tiempo de respuesta si existe fecha de asignación o recepción
-            base_date = lead.fecha_asignacion or lead.fecha_recepcion
-            if base_date and not lead.tiempo_respuesta_segundos:
-                base_date_naive = base_date.replace(tzinfo=None) if base_date.tzinfo else base_date
-                lead.tiempo_respuesta_segundos = calcular_segundos_horario_laboral(
-                    base_date_naive, datetime.now()
-                )
+            lead.fecha_cierre = datetime.now()
+            if not lead.fecha_gestion:
+                lead.fecha_gestion = datetime.now()
             
             # Trazabilidad: vincular el cliente con su lead de origen
             cliente = None
@@ -288,8 +283,10 @@ class InboxService:
                 cliente = await self.db.get(Cliente, client_id)
                 if cliente:
                     cliente.inbox_origen_id = lead_id
-                    if not cliente.origen:
-                        cliente.origen = "WHATSAPP"
+                    if getattr(cliente, 'origen_id', None) is None:
+                        from app.models.comercial_catalogos import OrigenCliente
+                        origen_res = await self.db.execute(select(OrigenCliente.id).where(OrigenCliente.nombre == 'WHATSAPP'))
+                        cliente.origen_id = origen_res.scalar()
                         
             # Crear ClienteContacto principal con el teléfono del lead
             if cliente and cliente.ruc and lead.telefono:
@@ -316,22 +313,19 @@ class InboxService:
                 )
                 
                 if contacto_existente:
-                    contacto_existente.is_client = True
                     contacto_existente.is_principal = True
                 else:
+                    estado_contacto_result = await self.db.execute(select(EstadoContacto.id).where(EstadoContacto.nombre == 'ASIGNADO'))
+                    estado_contacto_id = estado_contacto_result.scalar()
+
                     nuevo_contacto = ClienteContacto(
                         ruc=cliente.ruc,
                         nombre=lead.nombre_whatsapp or "Contacto WhatsApp",
                         telefono=phone,
                         origen='WHATSAPP',
-                        is_client=True,
                         is_active=True,
                         is_principal=True,
-                        estado='GESTIONADO',
-                        asignado_a=lead.asignado_a,
-                        fecha_asignacion=datetime.now(),
-                        fecha_llamada=datetime.now(),
-                        lote_asignacion=0
+                        estado_id=estado_contacto_id
                     )
                     self.db.add(nuevo_contacto)
             
@@ -344,7 +338,8 @@ class InboxService:
         if lead:
             lead.estado = 'DESCARTADO'
             lead.modo = 'BOT'
-            lead.fecha_gestion = datetime.now()
+            if not lead.fecha_gestion:
+                lead.fecha_gestion = datetime.now()
             
             if request_data:
                 lead.motivo_descarte = request_data.get('motivo_descarte')

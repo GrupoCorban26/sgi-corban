@@ -9,7 +9,7 @@ class ContactoBase(BaseModel):
     nombre: Optional[str] = Field(None, max_length=150)
     cargo: Optional[str] = Field(None, max_length=100)
     telefono: str = Field(..., max_length=20)
-    email: Optional[str] = Field(None, max_length=100)
+    correo: Optional[str] = Field(None, max_length=100)
     origen: Optional[str] = Field(None, max_length=30)
     is_client: bool = Field(False)
     is_principal: bool = Field(False)
@@ -30,7 +30,7 @@ class ContactoManualCreate(BaseModel):
     nombre: Optional[str] = Field(None, max_length=150)
     cargo: Optional[str] = Field(None, max_length=100)
     telefono: Optional[str] = Field(None, max_length=20)
-    email: Optional[str] = Field(None, max_length=100)
+    correo: Optional[str] = Field(None, max_length=100)
     crear_como_prospecto: bool = Field(False, description="Si True, crea Cliente y va directo a cartera")
 
     @field_validator('telefono', mode='before')
@@ -48,7 +48,7 @@ class ContactoUpdate(BaseModel):
     razon_social: Optional[str] = None
     cargo: Optional[str] = None
     telefono: Optional[str] = None
-    email: Optional[str] = None
+    correo: Optional[str] = None
     origen: Optional[str] = None
     is_client: Optional[bool] = None
 

@@ -176,7 +176,7 @@ export default function FeedbackRow({
       <td className="px-3 py-2">
         <div className="flex items-center gap-2 justify-center">
           {estado === 'completo' ? (
-            (contacto.fecha_llamada !== null && !isEdited) ? (
+            (contacto.completado && !isEdited) ? (
               <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-lg">
                 <CheckCircle2 size={12} />
                 Guardado

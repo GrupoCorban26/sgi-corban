@@ -5,9 +5,9 @@ export interface BaseContacto {
     telefono: string;
     correo?: string;
     estado: string;
-    fob_anual_usd?: number;
-    embarques_anuales?: number;
-    categoria_frecuencia?: string;
+    fob_promedio?: number;
+    total_embarques?: number;
+    sector?: string;
 }
 
 export interface BaseStats {

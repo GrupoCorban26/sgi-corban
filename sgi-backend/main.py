@@ -47,8 +47,10 @@ from app.api.v1.organizacion.lineas import router as lineas_router
 from app.api.v1.organizacion.dashboard import router as dashboard_router
 from app.api.v1.organizacion.productos_oficina import router as productos_oficina_router
 from app.api.v1.core.ubigeo import router as ubigeo_router
+from app.api.v1.core.configuraciones import router as configuraciones_router
 from app.api.v1.comercial.importaciones import router as importaciones_router
 from app.api.v1.comercial.contactos import router as contactos_router
+from app.api.v1.comercial.lotes import router as lotes_router
 from app.api.v1.comercial.casos_llamada import router as casos_llamada_router
 from app.api.v1.comercial.base import router as base_router
 from app.api.v1.comercial.clientes import router as clientes_router
@@ -65,11 +67,26 @@ from app.api.v1.comercial.leads_web import router as leads_web_router
 from app.api.v1.comercial.leads_web import router_publico as leads_web_publico_router
 from app.api.v1.comercial.ordenes import router as ordenes_router
 from app.api.v1.administracion.asistencia import router as asistencia_router
+from app.api.v1.seguridad.roles import router as roles_router
+from app.api.v1.buzon_config import router as buzon_config_router
 
 # Lifespan: tareas de inicio y cierre del servidor
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Levantando FastAPI Server... (El scheduler ahora corre en worker_tareas.py separado)")
+    
+    # -----------------------------------------------------------------
+    # Sincronización Automática de Permisos Base
+    # -----------------------------------------------------------------
+    from app.database.db_connection import AsyncSessionLocal
+    from app.services.seguridad.roles_permisos_service import RolesPermisosService
+    
+    try:
+        async with AsyncSessionLocal() as session:
+            service = RolesPermisosService(session)
+            await service.sync_permisos_from_code()
+    except Exception as e:
+        logger.error(f"Error sincronizando permisos: {e}")
     
     yield
     
@@ -121,7 +138,7 @@ async def global_exception_handler(request, exc):
     logger.error(f"Error no manejado en {request.method} {request.url.path}: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"detail": "Error interno del servidor", "code": "INTERNAL_ERROR"}
+        content={"detail": f"Error interno del servidor: {str(exc)}", "code": "INTERNAL_ERROR"}
     )
 
 # Registrar routers
@@ -135,8 +152,10 @@ app.include_router(activos_router, prefix="/api/v1")
 app.include_router(estado_activo_router, prefix="/api/v1")
 app.include_router(lineas_router, prefix="/api/v1")
 app.include_router(ubigeo_router, prefix="/api/v1")
+app.include_router(configuraciones_router, prefix="/api/v1")
 app.include_router(importaciones_router, prefix="/api/v1")
 app.include_router(contactos_router, prefix="/api/v1")
+app.include_router(lotes_router, prefix="/api/v1")
 app.include_router(casos_llamada_router, prefix="/api/v1")
 app.include_router(base_router, prefix="/api/v1")
 app.include_router(clientes_router, prefix="/api/v1")
@@ -155,6 +174,8 @@ app.include_router(asistencia_router, prefix="/api/v1")
 app.include_router(leads_web_router, prefix="/api/v1")
 app.include_router(leads_web_publico_router, prefix="/api/v1")
 app.include_router(ordenes_router, prefix="/api/v1")
+app.include_router(roles_router, prefix="/api/v1")
+app.include_router(buzon_config_router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():

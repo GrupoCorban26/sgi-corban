@@ -21,7 +21,7 @@ interface ContactsModalProps {
 export const ContactsModal: React.FC<ContactsModalProps> = ({ ruc, razonSocial, isOpen, onClose, onContactCreated }) => {
     const { contacts, loading, fetchByRuc, create, remove } = useContactos();
     const [showAddForm, setShowAddForm] = useState(false);
-    const [newContact, setNewContact] = useState({ telefono: '', email: '', cargo: '' });
+    const [newContact, setNewContact] = useState({ telefono: '', correo: '', cargo: '' });
 
     useEffect(() => {
         if (isOpen && ruc) {
@@ -45,12 +45,12 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ ruc, razonSocial, 
             await create({
                 ruc,
                 telefono: newContact.telefono,
-                email: newContact.email || undefined,
+                correo: newContact.correo || undefined,
                 cargo: newContact.cargo || undefined,
                 is_client: false,
                 origen: 'MANUAL'
             });
-            setNewContact({ telefono: '', email: '', cargo: '' });
+            setNewContact({ telefono: '', correo: '', cargo: '' });
             setShowAddForm(false);
             fetchByRuc(ruc);
             onContactCreated?.();
@@ -98,8 +98,8 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ ruc, razonSocial, 
                             <input
                                 className="border p-2 rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-sm"
                                 placeholder="Email"
-                                value={newContact.email}
-                                onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
+                                value={newContact.correo}
+                                onChange={(e) => setNewContact({ ...newContact, correo: e.target.value })}
                             />
                             <input
                                 className="border p-2 rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-sm"
@@ -139,7 +139,7 @@ export const ContactsModal: React.FC<ContactsModalProps> = ({ ruc, razonSocial, 
                                     <div>
                                         <p className="font-medium text-gray-900">{c.telefono}</p>
                                         <div className="flex items-center gap-3 text-sm text-gray-500">
-                                            {c.email && <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{c.email}</span>}
+                                            {c.correo && <span className="flex items-center gap-1"><Mail className="w-3 h-3" />{c.correo}</span>}
                                             {c.cargo && <span className="flex items-center gap-1"><Briefcase className="w-3 h-3" />{c.cargo}</span>}
                                         </div>
                                     </div>

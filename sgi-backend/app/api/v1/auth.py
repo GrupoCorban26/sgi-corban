@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Request
 import logging
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from app.schemas.auth import UserLoginSchema 
+from app.schemas.seg.auth import UserLoginSchema 
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database.db_connection import get_db 
 from app.core import security
@@ -72,7 +72,6 @@ async def login(
             "area": user_data['area_nombre'],
             "cargo": user_data['cargo_nombre'],
             "roles": user_data.get('roles', []),
-            "debe_cambiar_password": user_data['debe_cambiar_pass']
         }
     }
 

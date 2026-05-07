@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 import { toast } from 'sonner';
 
 import { useAnalyticsBaseDatos } from '@/hooks/comercial/useAnalyticsDesglosado';
+import { analyticsService } from '@/services/comercial/analytics';
 import { FiltrosSeccion } from './FiltrosSeccion';
 
 export function SectionBaseDatos() {
@@ -12,28 +13,29 @@ export function SectionBaseDatos() {
     const [fechaFin, setFechaFin] = useState(format(endOfMonth(new Date()), 'yyyy-MM-dd'));
     const [comercialId, setComercialId] = useState<string | undefined>();
     const [empresa, setEmpresa] = useState<string | undefined>();
+    const [isExporting, setIsExporting] = useState(false);
 
     const { data, isLoading, isError, isFetching } = useAnalyticsBaseDatos(fechaInicio, fechaFin, comercialId, empresa);
 
-    const exportarAExcel = () => {
-        if (!data || data.por_comercial.length === 0) {
-            toast.error('No hay datos para exportar');
-            return;
-        }
+    const exportarAExcel = async () => {
         try {
+            setIsExporting(true);
+            toast.info('Generando reporte...');
+            const detalle = await analyticsService.getDetalleBaseDatos(fechaInicio, fechaFin, comercialId, empresa);
+            if (!detalle || detalle.length === 0) {
+                toast.error('No hay datos para exportar');
+                return;
+            }
             const wb = XLSX.utils.book_new();
-            const wsData = XLSX.utils.json_to_sheet(data.por_comercial.map(c => ({
-                'Agente': c.nombre,
-                'Total de llamadas': c.total_llamadas,
-                'Llamadas contestadas': c.llamadas_contestadas,
-                'Llamadas efectivas': c.llamadas_efectivas
-            })));
+            const wsData = XLSX.utils.json_to_sheet(detalle);
             XLSX.utils.book_append_sheet(wb, wsData, "Base de Datos");
             XLSX.writeFile(wb, `Reporte_Base_Datos_${format(new Date(), 'yyyyMMdd')}.xlsx`);
             toast.success('Reporte exportado correctamente');
         } catch (error) {
             console.error('Error exporting to Excel:', error);
             toast.error('Error al generar el archivo Excel');
+        } finally {
+            setIsExporting(false);
         }
     };
 
@@ -54,7 +56,7 @@ export function SectionBaseDatos() {
                 empresa={empresa}
                 setEmpresa={setEmpresa}
                 onExport={exportarAExcel}
-                isExporting={false}
+                isExporting={isExporting}
                 hasData={!!data && data.por_comercial.length > 0}
             />
 

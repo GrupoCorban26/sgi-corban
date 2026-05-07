@@ -3,23 +3,26 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, case, or_, desc, update, and_, literal_column
-from sqlalchemy.orm import selectinload
 from app.schemas.comercial.cliente import ClienteCreate, ClienteUpdate
-from app.models.comercial import Cliente, ClienteContacto
+from app.models.comercial import Cliente, ClienteContacto, CasoLlamada
+from app.models.comercial_catalogos import EstadoCliente, OrigenCliente, MedioGestion, MotivoGestion
 from app.models.cliente_historial import ClienteHistorial
-from app.models.administrativo import Area, Empleado
+from app.models.cliente_gestion import ClienteGestion
+from app.models.historial_llamadas import HistorialLlamada
+from app.models.comercial_inbox import Inbox
+from app.models.administrativo import Empleado
 from app.models.seguridad import Usuario
 from datetime import datetime, timedelta, date
 
 logger = logging.getLogger(__name__)
 
-# Transiciones válidas del pipeline de ventas
+# Transiciones válidas del pipeline de ventas (nombre_estado → [destinos])
 TRANSICIONES_VALIDAS: dict[str, list[str]] = {
     "PROSPECTO":          ["EN_NEGOCIACION", "CAIDO", "INACTIVO"],
     "EN_NEGOCIACION":     ["CERRADA", "CAIDO", "PROSPECTO"],
     "CERRADA":            ["EN_OPERACION", "CAIDO"],
-    "EN_OPERACION":       ["CARGA_ENTREGADA"],  # No se cae, solo avanza
-    "CARGA_ENTREGADA":    ["PROSPECTO", "EN_NEGOCIACION"],  # Reinicia ciclo
+    "EN_OPERACION":       ["CARGA_ENTREGADA"],
+    "CARGA_ENTREGADA":    ["PROSPECTO", "EN_NEGOCIACION"],
     "CAIDO":              ["PROSPECTO", "INACTIVO"],
     "INACTIVO":           ["PROSPECTO"],
 }
@@ -29,20 +32,32 @@ class ClientesService:
     def __init__(self, db: AsyncSession):
         self.db = db
 
+    async def _get_estado_id(self, nombre: str) -> int:
+        """Obtiene el ID de un estado de cliente por nombre."""
+        result = await self.db.execute(select(EstadoCliente.id).where(EstadoCliente.nombre == nombre))
+        estado_id = result.scalar()
+        if not estado_id:
+            raise HTTPException(500, f"Estado '{nombre}' no encontrado en catálogo")
+        return estado_id
+
+    async def _get_estado_nombre(self, estado_id: int) -> str:
+        """Obtiene el nombre de un estado por ID."""
+        result = await self.db.execute(select(EstadoCliente.nombre).where(EstadoCliente.id == estado_id))
+        return result.scalar() or "DESCONOCIDO"
+
     async def get_all(
         self,
         busqueda: str = None,
-        tipo_estado: str = None,
+        estado_id: int = None,
         comercial_ids: list[int] = None,
-        area_id: int = None,
         filtro_fecha: str = None,
+        ordenar_por: str = None,
         page: int = 1,
         page_size: int = 15
     ) -> dict:
-        """Lista clientes con paginación y filtros. Filtra por lista de IDs (usuario o empleado)."""
-        offset = (page - 1) * page_size
-        
-        # Subqueries for telefono and correo using correlate to evaluate per-row
+        """Lista clientes con paginación y filtros. Si page_size=0, retorna todos los registros sin límite."""
+        offset = (page - 1) * page_size if page_size > 0 else 0
+
         subq_telefono_principal = (
             select(func.string_agg(ClienteContacto.telefono, literal_column("' - '")))
             .where(
@@ -60,36 +75,25 @@ class ClientesService:
                 ClienteContacto.ruc == Cliente.ruc,
                 ClienteContacto.is_active == True
             )
-            .order_by(
-                ClienteContacto.fecha_llamada.desc(), 
-                ClienteContacto.created_at.desc()
-            )
+            .order_by(ClienteContacto.created_at.desc())
             .limit(1)
             .correlate(Cliente)
             .scalar_subquery()
         )
-        
+
         subq_correo = (
             select(ClienteContacto.correo)
             .where(ClienteContacto.ruc == Cliente.ruc)
-            .order_by(
-                ClienteContacto.is_principal.desc(), 
-                ClienteContacto.fecha_llamada.desc(), 
-                ClienteContacto.created_at.desc()
-            )
+            .order_by(ClienteContacto.is_principal.desc(), ClienteContacto.created_at.desc())
             .limit(1)
             .correlate(Cliente)
             .scalar_subquery()
         )
-        
+
         subq_nombre_contacto = (
             select(ClienteContacto.nombre)
             .where(ClienteContacto.ruc == Cliente.ruc)
-            .order_by(
-                ClienteContacto.is_principal.desc(), 
-                ClienteContacto.fecha_llamada.desc(), 
-                ClienteContacto.created_at.desc()
-            )
+            .order_by(ClienteContacto.is_principal.desc(), ClienteContacto.created_at.desc())
             .limit(1)
             .correlate(Cliente)
             .scalar_subquery()
@@ -97,31 +101,30 @@ class ClientesService:
 
         stmt = select(
             Cliente,
-            Area.nombre.label("area_nombre"),
+            EstadoCliente.nombre.label("estado_nombre"),
+            OrigenCliente.nombre.label("origen_nombre"),
             func.concat(Empleado.nombres, ' ', Empleado.apellido_paterno).label("comercial_nombre"),
             func.coalesce(subq_telefono_principal, subq_telefono_fallback).label("telefono_contacto"),
             subq_correo.label("correo_contacto"),
             subq_nombre_contacto.label("nombre_contacto")
-        ).outerjoin(Area, Cliente.area_encargada_id == Area.id) \
+        ).outerjoin(EstadoCliente, Cliente.estado_id == EstadoCliente.id) \
+         .outerjoin(OrigenCliente, Cliente.origen_id == OrigenCliente.id) \
          .outerjoin(Usuario, Cliente.comercial_encargado_id == Usuario.id) \
          .outerjoin(Empleado, Usuario.empleado_id == Empleado.id) \
          .where(Cliente.is_active == True)
-        
+
         if busqueda:
             stmt = stmt.where(or_(
                 Cliente.ruc.ilike(f"%{busqueda}%"),
                 Cliente.razon_social.ilike(f"%{busqueda}%")
             ))
-        
-        if tipo_estado:
-            stmt = stmt.where(Cliente.tipo_estado == tipo_estado)
-        
+
+        if estado_id:
+            stmt = stmt.where(Cliente.estado_id == estado_id)
+
         if comercial_ids:
             stmt = stmt.where(Cliente.comercial_encargado_id.in_(comercial_ids))
-            
-        if area_id:
-            stmt = stmt.where(Cliente.area_encargada_id == area_id)
-            
+
         if filtro_fecha:
             today = datetime.now().date()
             if filtro_fecha == 'vencidos':
@@ -134,16 +137,25 @@ class ClientesService:
                     Cliente.proxima_fecha_contacto >= today,
                     Cliente.proxima_fecha_contacto <= limit_date
                 ))
-            
-        # Count
+
         count_stmt = select(func.count()).select_from(stmt.subquery())
         total = (await self.db.execute(count_stmt)).scalar() or 0
-        
-        # Paginated Data
-        stmt = stmt.order_by(Cliente.created_at.desc()).offset(offset).limit(page_size)
+
+        # Ordenamiento dinámico (SQL Server no soporta NULLS LAST, se usa CASE)
+        null_last = case((Cliente.proxima_fecha_contacto.is_(None), 1), else_=0)
+        if ordenar_por == 'proxima_fecha_asc':
+            stmt = stmt.order_by(null_last, Cliente.proxima_fecha_contacto.asc())
+        elif ordenar_por == 'proxima_fecha_desc':
+            stmt = stmt.order_by(null_last, Cliente.proxima_fecha_contacto.desc())
+        else:
+            stmt = stmt.order_by(Cliente.created_at.desc())
+
+        if page_size > 0:
+            stmt = stmt.offset(offset).limit(page_size)
+            
         result = await self.db.execute(stmt)
         rows = result.all()
-        
+
         data = []
         for row in rows:
             c = row[0]
@@ -151,79 +163,76 @@ class ClientesService:
                 "id": c.id,
                 "ruc": c.ruc,
                 "razon_social": c.razon_social,
-                "nombre_comercial": c.nombre_comercial,
                 "direccion_fiscal": c.direccion_fiscal,
                 "distrito_id": c.distrito_id,
-                "area_encargada_id": c.area_encargada_id,
-                "area_nombre": row[1],
                 "comercial_encargado_id": c.comercial_encargado_id,
-                "comercial_nombre": row[2],
-                "telefono": row[3], # Inyectando el teléfono
-                "correo": row[4], # Inyectando el correo
-                "nombre_contacto": row[5], # Nombre del contacto principal
-                "ultimo_contacto": c.ultimo_contacto,
-                "comentario_ultima_llamada": c.comentario_ultima_llamada,
+                "comercial_nombre": row.comercial_nombre,
+                "telefono": row.telefono_contacto,
+                "correo": row.correo_contacto,
+                "nombre_contacto": row.nombre_contacto,
                 "proxima_fecha_contacto": c.proxima_fecha_contacto,
-                "tipo_estado": c.tipo_estado,
-                "motivo_perdida": c.motivo_perdida,
-                "fecha_perdida": c.fecha_perdida,
-                "fecha_reactivacion": c.fecha_reactivacion,
-                "origen": c.origen,
+                "estado_id": c.estado_id,
+                "estado_nombre": row.estado_nombre,
+                "origen_id": c.origen_id,
+                "origen_nombre": row.origen_nombre,
                 "is_active": c.is_active,
                 "created_at": c.created_at
             })
-        
+
         return {
             "total": total,
             "page": page,
-            "page_size": page_size,
-            "total_pages": (total + page_size - 1) // page_size if total > 0 else 1,
+            "page_size": page_size if page_size > 0 else total,
+            "total_pages": (total + page_size - 1) // page_size if page_size > 0 and total > 0 else 1,
             "data": data
         }
 
     async def get_stats(self, comercial_ids: list[int] = None) -> dict:
-        """Estadísticas de clientes con desglose por origen."""
+        """Estadísticas de clientes por estado y origen."""
         base_filter = Cliente.is_active == True
-        
-        from datetime import datetime, timedelta
         hace_30_dias = datetime.now() - timedelta(days=30)
-        
-        # Stats por estado
+
+        # Obtener IDs de estados
+        estados = await self.db.execute(select(EstadoCliente.id, EstadoCliente.nombre))
+        estado_map = {row.nombre: row.id for row in estados.all()}
+
         stmt = select(
             func.count().label('total'),
-            func.sum(case((Cliente.tipo_estado == 'PROSPECTO', 1), else_=0)).label('prospectos'),
-            func.sum(case((Cliente.tipo_estado == 'EN_NEGOCIACION', 1), else_=0)).label('en_negociacion'),
-            func.sum(case((Cliente.tipo_estado == 'CERRADA', 1), else_=0)).label('cerradas'),
-            func.sum(case((Cliente.tipo_estado == 'EN_OPERACION', 1), else_=0)).label('en_operacion'),
-            func.sum(case((Cliente.tipo_estado == 'CARGA_ENTREGADA', 1), else_=0)).label('carga_entregada'),
-            func.sum(case((Cliente.tipo_estado == 'CAIDO', 1), else_=0)).label('caidos'),
-            func.sum(case((Cliente.tipo_estado == 'INACTIVO', 1), else_=0)).label('inactivos'),
-            func.sum(case((
-                and_(
-                    Cliente.tipo_estado.in_(['CERRADA', 'EN_OPERACION', 'CARGA_ENTREGADA']),
-                    Cliente.updated_at >= hace_30_dias
-                ), 1), else_=0)).label('nuevos_clientes')
+            *[func.sum(case((Cliente.estado_id == estado_map.get(nombre, 0), 1), else_=0)).label(label)
+              for nombre, label in [
+                  ("PROSPECTO", "prospectos"), ("EN_NEGOCIACION", "en_negociacion"),
+                  ("CERRADA", "cerradas"), ("EN_OPERACION", "en_operacion"),
+                  ("CARGA_ENTREGADA", "carga_entregada"), ("CAIDO", "caidos"),
+                  ("INACTIVO", "inactivos")
+              ]],
+            func.sum(case((and_(
+                Cliente.estado_id.in_([estado_map.get("CERRADA", 0), estado_map.get("EN_OPERACION", 0), estado_map.get("CARGA_ENTREGADA", 0)]),
+                Cliente.updated_at >= hace_30_dias
+            ), 1), else_=0)).label('nuevos_clientes')
         ).where(base_filter)
-        
+
         if comercial_ids:
             stmt = stmt.where(Cliente.comercial_encargado_id.in_(comercial_ids))
-            
+
         row = (await self.db.execute(stmt)).first()
-        
-        # Stats por origen — "convertidos" = CERRADA + EN_OPERACION
+
+        # Stats por origen
         stmt_origen = select(
-            Cliente.origen,
+            OrigenCliente.nombre,
             func.count().label('total'),
-            func.sum(case((Cliente.tipo_estado.in_(['CERRADA', 'EN_OPERACION', 'CARGA_ENTREGADA']), 1), else_=0)).label('convertidos')
-        ).where(base_filter).group_by(Cliente.origen)
-        
+            func.sum(case((Cliente.estado_id.in_([
+                estado_map.get("CERRADA", 0), estado_map.get("EN_OPERACION", 0), estado_map.get("CARGA_ENTREGADA", 0)
+            ]), 1), else_=0)).label('convertidos')
+        ).outerjoin(OrigenCliente, Cliente.origen_id == OrigenCliente.id) \
+         .where(base_filter).group_by(OrigenCliente.nombre)
+
         if comercial_ids:
             stmt_origen = stmt_origen.where(Cliente.comercial_encargado_id.in_(comercial_ids))
-        
+
         origenes_rows = (await self.db.execute(stmt_origen)).all()
         origenes = {}
         for o in origenes_rows:
-            nombre = o.origen or "SIN_ORIGEN"
+            nombre = o.nombre or "SIN_ORIGEN"
             total_o = o.total or 0
             convertidos_o = o.convertidos or 0
             origenes[nombre] = {
@@ -231,7 +240,7 @@ class ClientesService:
                 "convertidos": convertidos_o,
                 "tasa_conversion": round((convertidos_o / total_o * 100), 1) if total_o > 0 else 0
             }
-        
+
         return {
             "total": row.total or 0,
             "prospectos": row.prospectos or 0,
@@ -246,142 +255,119 @@ class ClientesService:
         }
 
     async def get_recordatorios(self, comercial_ids: list[int] = None, days: int = 5) -> list:
-        """
-        Obtiene clientes con próxima fecha de contacto en el rango [hoy, hoy + days].
-        Ordenados por fecha más cercana.
-        """
+        """Clientes con próxima fecha de contacto en el rango [hoy, hoy + days]."""
         today = datetime.now().date()
         limit_date = today + timedelta(days=days)
-        
+
         stmt = select(
             Cliente,
             func.concat(Empleado.nombres, ' ', Empleado.apellido_paterno).label("comercial_nombre")
         ).outerjoin(Usuario, Cliente.comercial_encargado_id == Usuario.id) \
          .outerjoin(Empleado, Usuario.empleado_id == Empleado.id) \
-         .where(
-            Cliente.is_active == True,
-            # Cliente.proxima_fecha_contacto >= today, # REMOVED to include overdue calls
-            Cliente.proxima_fecha_contacto <= limit_date
-        )
-        
+         .where(Cliente.is_active == True, Cliente.proxima_fecha_contacto <= limit_date)
+
         if comercial_ids:
             stmt = stmt.where(Cliente.comercial_encargado_id.in_(comercial_ids))
-            
         stmt = stmt.order_by(Cliente.proxima_fecha_contacto.asc())
-        
+
         result = await self.db.execute(stmt)
         rows = result.all()
-        
-        data = []
-        for row in rows:
-            c = row[0]
-            comercial_nombre = row[1]
-            days_remaining = (c.proxima_fecha_contacto - today).days
-            data.append({
+
+        return [
+            {
                 "id": c.id,
                 "razon_social": c.razon_social,
                 "ruc": c.ruc,
                 "proxima_fecha_contacto": c.proxima_fecha_contacto,
-                "days_remaining": days_remaining,
-                "telefono": "N/A", # Pendiente: obtener teléfono de contacto principal si es necesario
-                "comercial_nombre": comercial_nombre,
+                "days_remaining": (c.proxima_fecha_contacto - today).days,
+                "comercial_nombre": nombre,
                 "comercial_id": c.comercial_encargado_id
-            })
-            
-        return data
+            }
+            for c, nombre in rows
+        ]
 
     async def get_by_id(self, id: int):
         """Obtiene un cliente por su ID."""
         stmt = select(
             Cliente,
-            Area.nombre.label("area_nombre"),
+            EstadoCliente.nombre.label("estado_nombre"),
+            OrigenCliente.nombre.label("origen_nombre"),
             func.concat(Empleado.nombres, ' ', Empleado.apellido_paterno).label("comercial_nombre")
-        ).outerjoin(Area, Cliente.area_encargada_id == Area.id) \
+        ).outerjoin(EstadoCliente, Cliente.estado_id == EstadoCliente.id) \
+         .outerjoin(OrigenCliente, Cliente.origen_id == OrigenCliente.id) \
          .outerjoin(Usuario, Cliente.comercial_encargado_id == Usuario.id) \
          .outerjoin(Empleado, Usuario.empleado_id == Empleado.id) \
          .where(Cliente.id == id, Cliente.is_active == True)
-        
+
         result = await self.db.execute(stmt)
         row = result.first()
-        
+
         if not row:
             return None
-        
+
         c = row[0]
         return {
             "id": c.id,
             "ruc": c.ruc,
             "razon_social": c.razon_social,
-            "nombre_comercial": c.nombre_comercial,
             "direccion_fiscal": c.direccion_fiscal,
             "distrito_id": c.distrito_id,
-            "area_encargada_id": c.area_encargada_id,
-            "area_nombre": row[1],
             "comercial_encargado_id": c.comercial_encargado_id,
-            "comercial_nombre": row[2],
-            "ultimo_contacto": c.ultimo_contacto,
-            "comentario_ultima_llamada": c.comentario_ultima_llamada,
+            "comercial_nombre": row.comercial_nombre,
             "proxima_fecha_contacto": c.proxima_fecha_contacto,
-            "tipo_estado": c.tipo_estado,
-            "motivo_perdida": c.motivo_perdida,
-            "fecha_perdida": c.fecha_perdida,
-            "fecha_reactivacion": c.fecha_reactivacion,
-            "origen": c.origen,
+            "estado_id": c.estado_id,
+            "estado_nombre": row.estado_nombre,
+            "origen_id": c.origen_id,
+            "origen_nombre": row.origen_nombre,
             "is_active": c.is_active,
-            "created_at": c.created_at
+            "created_at": c.created_at,
+            "updated_at": c.updated_at
         }
 
     async def create(self, cliente: ClienteCreate, comercial_id: int, created_by: int) -> dict:
         """Crea un nuevo cliente y registra el evento inicial en el historial."""
         try:
-            # Verificar si ya existe un cliente con el mismo RUC
             if cliente.ruc:
                 existing = await self.db.execute(
                     select(Cliente).where(Cliente.ruc == cliente.ruc, Cliente.is_active == True)
                 )
                 if existing.scalar():
                     raise HTTPException(status_code=400, detail="Ya existe un cliente con ese RUC")
-            
+
+            # Si no se especifica estado, usar PROSPECTO
+            estado_id = cliente.estado_id
+            if not estado_id:
+                estado_id = await self._get_estado_id("PROSPECTO")
+
             nuevo_cliente = Cliente(
                 ruc=cliente.ruc,
                 razon_social=cliente.razon_social,
-                nombre_comercial=cliente.nombre_comercial,
                 direccion_fiscal=cliente.direccion_fiscal,
                 distrito_id=cliente.distrito_id,
-                area_encargada_id=getattr(cliente, 'area_encargada_id', None),
                 comercial_encargado_id=comercial_id,
-                tipo_estado=cliente.tipo_estado or "PROSPECTO",
-                origen=cliente.origen,
-                sub_origen=cliente.sub_origen,
-                ultimo_contacto=cliente.ultimo_contacto,
-                comentario_ultima_llamada=cliente.comentario_ultima_llamada,
+                estado_id=estado_id,
+                origen_id=cliente.origen_id,
                 proxima_fecha_contacto=cliente.proxima_fecha_contacto,
                 created_by=created_by
             )
-            
+
             self.db.add(nuevo_cliente)
             await self.db.flush()
-            
-            # Si se crea sin RUC (ej. lead convertido manual o prospecto persona natural),
-            # auto-generamos un pseudo-RUC para no romper la vinculación obligatoria
-            # que exige ClienteContacto (ruc = String(11), nullable=False)
+
             if not nuevo_cliente.ruc:
                 nuevo_cliente.ruc = f"ID-{nuevo_cliente.id:08d}"
                 await self.db.flush()
-            
-            # Registrar evento inicial en historial
+
             await self._registrar_historial(
                 cliente_id=nuevo_cliente.id,
-                estado_anterior=None,
-                estado_nuevo=nuevo_cliente.tipo_estado,
+                estado_anterior_id=None,
+                estado_nuevo_id=estado_id,
                 motivo="Creación del cliente",
-                origen_cambio="MANUAL",
                 registrado_por=created_by
             )
-            
+
             await self.db.commit()
             await self.db.refresh(nuevo_cliente)
-            
             return {"success": 1, "message": "Cliente creado exitosamente", "id": nuevo_cliente.id}
         except Exception as e:
             await self.db.rollback()
@@ -390,19 +376,15 @@ class ClientesService:
     async def update(self, id: int, cliente: ClienteUpdate, updated_by: int) -> dict:
         """Actualiza un cliente existente."""
         try:
-            result = await self.db.execute(
-                select(Cliente).where(Cliente.id == id, Cliente.is_active == True)
-            )
+            result = await self.db.execute(select(Cliente).where(Cliente.id == id, Cliente.is_active == True))
             db_cliente = result.scalar()
-            
+
             if not db_cliente:
                 raise HTTPException(status_code=400, detail="Cliente no encontrado")
-            
-            # Actualizar solo los campos proporcionados
+
             update_data = cliente.model_dump(exclude_unset=True)
             for field, value in update_data.items():
                 if field == "ruc" and value != db_cliente.ruc:
-                    # Cascadear el cambio de RUC a todos los contactos para no perder la vinculación
                     await self.db.execute(
                         update(ClienteContacto)
                         .where(ClienteContacto.ruc == db_cliente.ruc)
@@ -410,13 +392,12 @@ class ClientesService:
                     )
                 if hasattr(db_cliente, field):
                     setattr(db_cliente, field, value)
-            
+
             db_cliente.updated_by = updated_by
             db_cliente.updated_at = datetime.now()
-            
+
             await self.db.commit()
             await self.db.refresh(db_cliente)
-            
             return {"success": 1, "message": "Cliente actualizado exitosamente", "id": db_cliente.id}
         except Exception as e:
             await self.db.rollback()
@@ -427,57 +408,50 @@ class ClientesService:
         return await self.archivar(id, updated_by)
 
     # =========================================================================
-    # NUEVOS MÉTODOS PIPELINE DE VENTAS
+    # PIPELINE DE VENTAS
     # =========================================================================
 
-    async def cambiar_estado(self, id: int, nuevo_estado: str, updated_by: int, motivo: str = None) -> dict:
-        """Cambia el estado del cliente con validación de máquina de estados y registro en historial."""
+    async def cambiar_estado(self, id: int, nuevo_estado_id: int, updated_by: int, motivo: str = None) -> dict:
+        """Cambia el estado del cliente con validación de máquina de estados."""
         try:
             result = await self.db.execute(select(Cliente).where(Cliente.id == id, Cliente.is_active == True))
             cliente = result.scalar()
-            
+
             if not cliente:
                 raise HTTPException(status_code=400, detail="Cliente no encontrado")
-            
-            estado_actual = cliente.tipo_estado
-            
-            # Validar transición
-            transiciones_permitidas = TRANSICIONES_VALIDAS.get(estado_actual, [])
-            if nuevo_estado not in transiciones_permitidas:
+
+            estado_actual_nombre = await self._get_estado_nombre(cliente.estado_id) if cliente.estado_id else "PROSPECTO"
+            nuevo_estado_nombre = await self._get_estado_nombre(nuevo_estado_id)
+
+            transiciones_permitidas = TRANSICIONES_VALIDAS.get(estado_actual_nombre, [])
+            if nuevo_estado_nombre not in transiciones_permitidas:
                 return {
-                    "success": 0, 
-                    "message": f"Transición inválida: {estado_actual} → {nuevo_estado}. "
-                               f"Transiciones permitidas: {', '.join(transiciones_permitidas)}"
+                    "success": 0,
+                    "message": f"Transición inválida: {estado_actual_nombre} → {nuevo_estado_nombre}. "
+                               f"Permitidas: {', '.join(transiciones_permitidas)}"
                 }
-            
-            # Calcular tiempo en estado anterior
+
             tiempo_en_estado = None
             if cliente.updated_at:
                 updated_naive = cliente.updated_at.replace(tzinfo=None)
                 tiempo_en_estado = int((datetime.now() - updated_naive).total_seconds() / 60)
-            
-            # Aplicar cambio
-            cliente.tipo_estado = nuevo_estado
+
+            estado_anterior_id = cliente.estado_id
+            cliente.estado_id = nuevo_estado_id
             cliente.updated_by = updated_by
             cliente.updated_at = datetime.now()
-            
-            # Auto-poblar fecha_conversion_cliente cuando pasa a CERRADA
-            if nuevo_estado == "CERRADA" and not cliente.fecha_conversion_cliente:
-                cliente.fecha_conversion_cliente = datetime.now()
-            
-            # Registrar en historial
+
             await self._registrar_historial(
                 cliente_id=id,
-                estado_anterior=estado_actual,
-                estado_nuevo=nuevo_estado,
+                estado_anterior_id=estado_anterior_id,
+                estado_nuevo_id=nuevo_estado_id,
                 motivo=motivo,
-                origen_cambio="MANUAL",
                 tiempo_en_estado_anterior=tiempo_en_estado,
                 registrado_por=updated_by
             )
-            
+
             await self.db.commit()
-            return {"success": 1, "message": f"Estado actualizado: {estado_actual} → {nuevo_estado}"}
+            return {"success": 1, "message": f"Estado actualizado: {estado_actual_nombre} → {nuevo_estado_nombre}"}
         except Exception as e:
             logger.error(f"Error cambiar estado cliente {id}: {e}")
             await self.db.rollback()
@@ -488,37 +462,34 @@ class ClientesService:
         try:
             result = await self.db.execute(select(Cliente).where(Cliente.id == id, Cliente.is_active == True))
             cliente = result.scalar()
-            
+
             if not cliente:
                 raise HTTPException(status_code=400, detail="Cliente no encontrado")
-            
+
             if not fecha_seguimiento:
                 return await self.archivar(id, updated_by)
-            
-            estado_anterior = cliente.tipo_estado
+
+            estado_anterior_id = cliente.estado_id
             tiempo_en_estado = None
             if cliente.updated_at:
                 updated_naive = cliente.updated_at.replace(tzinfo=None)
                 tiempo_en_estado = int((datetime.now() - updated_naive).total_seconds() / 60)
-            
-            cliente.tipo_estado = "CAIDO"
-            cliente.motivo_caida = motivo
-            cliente.fecha_caida = datetime.now().date()
-            cliente.fecha_seguimiento_caida = fecha_seguimiento
+
+            estado_caido_id = await self._get_estado_id("CAIDO")
+            cliente.estado_id = estado_caido_id
             cliente.proxima_fecha_contacto = fecha_seguimiento
             cliente.updated_by = updated_by
             cliente.updated_at = datetime.now()
-            
+
             await self._registrar_historial(
                 cliente_id=id,
-                estado_anterior=estado_anterior,
-                estado_nuevo="CAIDO",
+                estado_anterior_id=estado_anterior_id,
+                estado_nuevo_id=estado_caido_id,
                 motivo=motivo,
-                origen_cambio="MANUAL",
                 tiempo_en_estado_anterior=tiempo_en_estado,
                 registrado_por=updated_by
             )
-            
+
             await self.db.commit()
             return {"success": 1, "message": "Cliente marcado como caído (recuperable)"}
         except Exception as e:
@@ -526,41 +497,38 @@ class ClientesService:
             raise HTTPException(status_code=400, detail=f"Error al marcar caído: {str(e)}")
 
     async def reactivar(self, id: int, updated_by: int) -> dict:
-        """Reactiva un cliente CAIDO o INACTIVO a EN_NEGOCIACION (si caído) o PROSPECTO (si inactivo)."""
+        """Reactiva un cliente CAIDO o INACTIVO a PROSPECTO."""
         try:
             result = await self.db.execute(select(Cliente).where(Cliente.id == id))
             cliente = result.scalar()
-            
+
             if not cliente:
                 raise HTTPException(status_code=400, detail="Cliente no encontrado")
-            
-            estado_anterior = cliente.tipo_estado
+
+            estado_anterior_id = cliente.estado_id
             tiempo_en_estado = None
             if cliente.updated_at:
                 updated_naive = cliente.updated_at.replace(tzinfo=None)
                 tiempo_en_estado = int((datetime.now() - updated_naive).total_seconds() / 60)
-            
-            cliente.tipo_estado = "PROSPECTO"
+
+            estado_prospecto_id = await self._get_estado_id("PROSPECTO")
+            cliente.estado_id = estado_prospecto_id
             cliente.is_active = True
-            cliente.motivo_perdida = None
-            cliente.fecha_perdida = None
-            cliente.fecha_reactivacion = None
             cliente.updated_by = updated_by
             cliente.updated_at = datetime.now()
-            
+
             if cliente.ruc:
                 await self._cascade_contactos(cliente.ruc, activate=True)
-            
+
             await self._registrar_historial(
                 cliente_id=id,
-                estado_anterior=estado_anterior,
-                estado_nuevo="PROSPECTO",
+                estado_anterior_id=estado_anterior_id,
+                estado_nuevo_id=estado_prospecto_id,
                 motivo="Reactivación del cliente",
-                origen_cambio="REACTIVACION",
                 tiempo_en_estado_anterior=tiempo_en_estado,
                 registrado_por=updated_by
             )
-            
+
             await self.db.commit()
             return {"success": 1, "message": "Cliente reactivado a PROSPECTO"}
         except Exception as e:
@@ -572,34 +540,34 @@ class ClientesService:
         try:
             result = await self.db.execute(select(Cliente).where(Cliente.id == id))
             cliente = result.scalar()
-            
+
             if not cliente:
                 raise HTTPException(status_code=400, detail="Cliente no encontrado")
-            
-            estado_anterior = cliente.tipo_estado
+
+            estado_anterior_id = cliente.estado_id
             tiempo_en_estado = None
             if cliente.updated_at:
                 updated_naive = cliente.updated_at.replace(tzinfo=None)
                 tiempo_en_estado = int((datetime.now() - updated_naive).total_seconds() / 60)
-            
-            cliente.tipo_estado = "INACTIVO"
+
+            estado_inactivo_id = await self._get_estado_id("INACTIVO")
+            cliente.estado_id = estado_inactivo_id
             cliente.is_active = False
             cliente.updated_by = updated_by
             cliente.updated_at = datetime.now()
-            
+
             if cliente.ruc:
                 await self._cascade_contactos(cliente.ruc, activate=False)
-            
+
             await self._registrar_historial(
                 cliente_id=id,
-                estado_anterior=estado_anterior,
-                estado_nuevo="INACTIVO",
+                estado_anterior_id=estado_anterior_id,
+                estado_nuevo_id=estado_inactivo_id,
                 motivo="Cliente archivado",
-                origen_cambio="MANUAL",
                 tiempo_en_estado_anterior=tiempo_en_estado,
                 registrado_por=updated_by
             )
-            
+
             await self.db.commit()
             return {"success": 1, "message": "Cliente archivado (INACTIVO)"}
         except Exception as e:
@@ -608,17 +576,21 @@ class ClientesService:
             raise HTTPException(status_code=400, detail=f"Error al archivar: {str(e)}")
 
     async def _cascade_contactos(self, ruc: str, activate: bool):
-        """Activa o desactiva contactos según el RUC.
-        Al desactivar, protege contactos ASIGNADO a un comercial para no afectar su bandeja."""
+        """Activa o desactiva contactos según el RUC."""
+        from app.models.comercial_catalogos import EstadoContacto
         stmt = select(ClienteContacto).where(ClienteContacto.ruc == ruc)
         result = await self.db.execute(stmt)
         contactos = result.scalars().all()
+
+        # Obtener ID de estado ASIGNADO para proteger contactos en bandeja
+        asignado_result = await self.db.execute(
+            select(EstadoContacto.id).where(EstadoContacto.nombre == "ASIGNADO")
+        )
+        estado_asignado_id = asignado_result.scalar()
+
         for c in contactos:
-            if not activate and c.estado == 'ASIGNADO':
-                # No desactivar contactos que están en la bandeja de un comercial
-                logger.warning(
-                    f"Contacto {c.id} (RUC: {ruc}) no desactivado: está ASIGNADO al comercial {c.asignado_a}"
-                )
+            if not activate and c.estado_id == estado_asignado_id:
+                logger.warning(f"Contacto {c.id} (RUC: {ruc}) no desactivado: está ASIGNADO")
                 continue
             c.is_active = activate
 
@@ -629,20 +601,18 @@ class ClientesService:
     async def _registrar_historial(
         self,
         cliente_id: int,
-        estado_anterior: str | None,
-        estado_nuevo: str,
+        estado_anterior_id: int | None,
+        estado_nuevo_id: int,
         motivo: str | None = None,
-        origen_cambio: str = "MANUAL",
         tiempo_en_estado_anterior: int | None = None,
         registrado_por: int | None = None
     ):
         """Registra un cambio de estado en la tabla de historial."""
         historial = ClienteHistorial(
             cliente_id=cliente_id,
-            estado_anterior=estado_anterior,
-            estado_nuevo=estado_nuevo,
+            estado_anterior_id=estado_anterior_id,
+            estado_nuevo_id=estado_nuevo_id,
             motivo=motivo,
-            origen_cambio=origen_cambio,
             tiempo_en_estado_anterior=tiempo_en_estado_anterior,
             registrado_por=registrado_por
         )
@@ -650,11 +620,18 @@ class ClientesService:
 
     async def get_historial(self, cliente_id: int) -> list[dict]:
         """Devuelve la línea de tiempo completa de transiciones del cliente."""
+        ea = EstadoCliente.__table__.alias("ea")
+        en = EstadoCliente.__table__.alias("en")
+
         stmt = (
             select(
                 ClienteHistorial,
+                ea.c.nombre.label("estado_anterior_nombre"),
+                en.c.nombre.label("estado_nuevo_nombre"),
                 func.concat(Empleado.nombres, ' ', Empleado.apellido_paterno).label("nombre_registrador")
             )
+            .outerjoin(ea, ClienteHistorial.estado_anterior_id == ea.c.id)
+            .outerjoin(en, ClienteHistorial.estado_nuevo_id == en.c.id)
             .outerjoin(Usuario, ClienteHistorial.registrado_por == Usuario.id)
             .outerjoin(Empleado, Usuario.empleado_id == Empleado.id)
             .where(ClienteHistorial.cliente_id == cliente_id)
@@ -662,19 +639,182 @@ class ClientesService:
         )
         result = await self.db.execute(stmt)
         rows = result.all()
-        
+
         return [
             {
                 "id": h.id,
                 "cliente_id": h.cliente_id,
-                "estado_anterior": h.estado_anterior,
-                "estado_nuevo": h.estado_nuevo,
+                "estado_anterior_nombre": ea_nombre,
+                "estado_nuevo_nombre": en_nombre,
                 "motivo": h.motivo,
-                "origen_cambio": h.origen_cambio,
                 "tiempo_en_estado_anterior": h.tiempo_en_estado_anterior,
                 "registrado_por": h.registrado_por,
                 "nombre_registrador": nombre,
                 "created_at": h.created_at
             }
-            for h, nombre in rows
+            for h, ea_nombre, en_nombre, nombre in rows
         ]
+
+    async def get_timeline(self, cliente_id: int) -> dict:
+        """Construye la trazabilidad unificada de un cliente.
+        Fuentes: historial_llamadas (base), cliente_gestiones (cartera), inbox (buzón).
+        """
+        # 1. Info del cliente
+        stmt_cliente = (
+            select(
+                Cliente.id, Cliente.ruc, Cliente.razon_social, Cliente.estado_id,
+                Cliente.origen_id, Cliente.created_at,
+                OrigenCliente.nombre.label("origen_nombre"),
+                EstadoCliente.nombre.label("estado_actual"),
+            )
+            .outerjoin(OrigenCliente, Cliente.origen_id == OrigenCliente.id)
+            .outerjoin(EstadoCliente, Cliente.estado_id == EstadoCliente.id)
+            .where(Cliente.id == cliente_id)
+        )
+        result_cli = await self.db.execute(stmt_cliente)
+        cli = result_cli.first()
+        if not cli:
+            return {"error": "Cliente no encontrado"}
+
+        # 2. Obtener transiciones de estado para calcular estado en cada momento
+        stmt_hist = (
+            select(
+                ClienteHistorial.created_at,
+                EstadoCliente.nombre.label("estado_nuevo"),
+            )
+            .outerjoin(EstadoCliente, ClienteHistorial.estado_nuevo_id == EstadoCliente.id)
+            .where(ClienteHistorial.cliente_id == cliente_id)
+            .order_by(ClienteHistorial.created_at.asc())
+        )
+        result_hist = await self.db.execute(stmt_hist)
+        transiciones = result_hist.all()
+
+        # Función: dado un datetime, devuelve el estado vigente
+        def estado_en_fecha(fecha) -> str:
+            estado = "PROSPECTO"  # default
+            for t in transiciones:
+                t_dt = t.created_at
+                if t_dt and fecha and t_dt <= fecha:
+                    estado = t.estado_nuevo or estado
+                else:
+                    break
+            return estado
+
+        eventos: list[dict] = []
+
+        # 3. Fuente: Llamadas de base (historial_llamadas vía RUC)
+        if cli.ruc:
+            stmt_llamadas = (
+                select(
+                    HistorialLlamada.updated_at,
+                    HistorialLlamada.created_at.label("hl_created"),
+                    HistorialLlamada.comentario,
+                    CasoLlamada.nombre.label("caso_nombre"),
+                    ClienteContacto.telefono.label("contacto_telefono"),
+                    ClienteContacto.nombre.label("contacto_nombre"),
+                )
+                .join(ClienteContacto, HistorialLlamada.contacto_id == ClienteContacto.id)
+                .outerjoin(CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id)
+                .where(
+                    and_(
+                        ClienteContacto.ruc == cli.ruc,
+                        HistorialLlamada.caso_id.isnot(None),  # solo gestionados
+                    )
+                )
+                .order_by(HistorialLlamada.created_at.asc())
+            )
+            result_ll = await self.db.execute(stmt_llamadas)
+            for row in result_ll.all():
+                fecha = row.updated_at or row.hl_created
+                eventos.append({
+                    "fecha": fecha,
+                    "accion": "Llamada",
+                    "motivo": row.caso_nombre or "-",
+                    "estado": estado_en_fecha(fecha),
+                    "comentario": row.comentario or "-",
+                    "contacto": row.contacto_telefono or None,
+                })
+
+        # 4. Fuente: Gestiones de cartera (cliente_gestiones)
+        stmt_gestiones = (
+            select(
+                ClienteGestion.created_at,
+                ClienteGestion.comentario,
+                MedioGestion.nombre.label("medio_nombre"),
+                MotivoGestion.nombre.label("motivo_nombre"),
+            )
+            .outerjoin(MedioGestion, ClienteGestion.medio_id == MedioGestion.id)
+            .outerjoin(MotivoGestion, ClienteGestion.motivo_id == MotivoGestion.id)
+            .where(ClienteGestion.cliente_id == cliente_id)
+            .order_by(ClienteGestion.created_at.asc())
+        )
+        result_gest = await self.db.execute(stmt_gestiones)
+        for row in result_gest.all():
+            # Usar buffer de 5s: la gestión y el cambio de estado ocurren en la
+            # misma transacción, pero el historial se registra milisegundos después.
+            from datetime import timedelta
+            fecha_con_buffer = row.created_at + timedelta(seconds=5) if row.created_at else None
+            estado_post = estado_en_fecha(fecha_con_buffer)
+            estado_pre = estado_en_fecha(row.created_at - timedelta(seconds=1)) if row.created_at else "PROSPECTO"
+            eventos.append({
+                "fecha": row.created_at,
+                "accion": row.medio_nombre or "-",
+                "motivo": row.motivo_nombre or "-",
+                "estado": estado_post,
+                "estado_anterior": estado_pre if estado_pre != estado_post else None,
+                "comentario": row.comentario or "-",
+            })
+
+        # 5. Fuente: Buzón (inbox) — si el cliente tiene inbox_origen_id o teléfono vinculado
+        if cli.ruc:
+            # Buscar teléfonos del cliente
+            stmt_tel = select(ClienteContacto.telefono).where(
+                and_(ClienteContacto.ruc == cli.ruc, ClienteContacto.is_active == True)
+            )
+            result_tel = await self.db.execute(stmt_tel)
+            telefonos = [r.telefono for r in result_tel.all() if r.telefono]
+
+            if telefonos:
+                # Buscar inbox entries que coincidan con esos teléfonos
+                stmt_inbox = select(
+                    Inbox.fecha_recepcion,
+                    Inbox.mensaje_inicial,
+                    Inbox.nombre_whatsapp,
+                    Inbox.estado,
+                ).where(
+                    and_(
+                        Inbox.telefono.in_(telefonos),
+                        Inbox.estado.in_(['CIERRE', 'CONVERTIDO']),
+                    )
+                ).order_by(Inbox.fecha_recepcion.asc())
+                result_inbox = await self.db.execute(stmt_inbox)
+                for row in result_inbox.all():
+                    eventos.append({
+                        "fecha": row.fecha_recepcion,
+                        "accion": "WhatsApp",
+                        "motivo": "Lead recibido",
+                        "estado": estado_en_fecha(row.fecha_recepcion),
+                        "comentario": row.mensaje_inicial or row.nombre_whatsapp or "-",
+                    })
+
+        # 6. Ordenar cronológicamente
+        eventos.sort(key=lambda e: e["fecha"] or datetime.min)
+
+        # Formatear fechas para JSON
+        for e in eventos:
+            if e["fecha"]:
+                e["fecha"] = e["fecha"].isoformat()
+            else:
+                e["fecha"] = None
+
+        return {
+            "cliente": {
+                "id": cli.id,
+                "ruc": cli.ruc,
+                "razon_social": cli.razon_social,
+                "origen": cli.origen_nombre or "Manual",
+                "estado_actual": cli.estado_actual or "PROSPECTO",
+                "created_at": cli.created_at.isoformat() if cli.created_at else None,
+            },
+            "eventos": eventos,
+        }

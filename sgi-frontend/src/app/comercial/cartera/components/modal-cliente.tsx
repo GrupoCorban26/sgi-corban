@@ -19,6 +19,7 @@ interface ModalProps {
     initialData?: Partial<ClienteUpdate>;
     onClienteCreado?: (ruc: string, razonSocial: string, id?: number) => void;
     showAdminFields?: boolean;
+    isFromBuzon?: boolean;
 }
 
 interface ModalContentProps {
@@ -27,9 +28,10 @@ interface ModalContentProps {
     isOpen: boolean;
     onClienteCreado?: (ruc: string, razonSocial: string, id?: number) => void;
     showAdminFields?: boolean;
+    isFromBuzon?: boolean;
 }
 
-function ModalContent({ clienteToEdit, initialData, isOpen, onClienteCreado, showAdminFields }: ModalContentProps) {
+function ModalContent({ clienteToEdit, initialData, isOpen, onClienteCreado, showAdminFields, isFromBuzon }: ModalContentProps) {
     const { handleClose } = useModalContext();
     const {
         formState,
@@ -43,7 +45,8 @@ function ModalContent({ clienteToEdit, initialData, isOpen, onClienteCreado, sho
         clienteToEdit,
         initialData,
         onSuccess: onClienteCreado,
-        onClose: handleClose
+        onClose: handleClose,
+        isFromBuzon
     });
 
     // Hooks para admin fields
@@ -72,22 +75,7 @@ function ModalContent({ clienteToEdit, initialData, isOpen, onClienteCreado, sho
                             </h3>
                         </div>
 
-                        {/* Área Encargada */}
-                        <div className="space-y-1.5">
-                            <label htmlFor="area" className="text-xs font-bold text-gray-500 uppercase tracking-wider">Área Encargada</label>
-                            <select
-                                id="area"
-                                value={formState.areaEncargadaId || ''}
-                                onChange={(e) => formState.setAreaEncargadaId(e.target.value ? Number(e.target.value) : null)}
-                                className="w-full px-3 py-2.5 rounded-xl border border-gray-200 outline-none bg-white text-sm cursor-pointer focus:ring-2 focus:ring-indigo-500/50 disabled:opacity-50"
-                                disabled={isLoading || loadingAreas}
-                            >
-                                <option value="">Sin asignar</option>
-                                {areas.map(area => (
-                                    <option key={area.id} value={area.id}>{area.nombre}</option>
-                                ))}
-                            </select>
-                        </div>
+                        {/* Área Encargada eliminada */}
 
                         {/* Comercial Asignado */}
                         <div className="space-y-1.5">
@@ -173,19 +161,7 @@ function ModalContent({ clienteToEdit, initialData, isOpen, onClienteCreado, sho
                     )}
                 </div>
 
-                {/* Nombre Comercial */}
-                <div className="space-y-1.5">
-                    <label htmlFor="nombre_comercial" className="text-xs font-bold text-gray-500 uppercase tracking-wider">Nombre Comercial</label>
-                    <input
-                        id="nombre_comercial"
-                        type="text"
-                        value={formState.nombreComercial}
-                        onChange={(e) => formState.setNombreComercial(e.target.value)}
-                        placeholder="Nombre de marca (opcional)"
-                        className="w-full px-3 py-2.5 rounded-xl border border-gray-200 outline-none text-sm focus:ring-2 focus:ring-indigo-500/50"
-                        disabled={isLoading}
-                    />
-                </div>
+                {/* Nombre Comercial Eliminado */}
 
                 {/* Dirección Fiscal */}
                 <div className="space-y-1.5">
@@ -206,41 +182,25 @@ function ModalContent({ clienteToEdit, initialData, isOpen, onClienteCreado, sho
                     <label htmlFor="estado" className="text-xs font-bold text-gray-500 uppercase tracking-wider">Estado</label>
                     <select
                         id="estado"
-                        value={formState.tipoEstado}
-                        onChange={(e) => formState.setTipoEstado(e.target.value)}
-                        className="w-full px-3 py-2.5 rounded-xl border border-gray-200 outline-none bg-white text-sm cursor-pointer focus:ring-2 focus:ring-indigo-500/50"
-                        disabled={isLoading}
+                        value={isFromBuzon ? 3 : (formState.estadoId || 1)}
+                        onChange={(e) => formState.setEstadoId(Number(e.target.value))}
+                        className={`w-full px-3 py-2.5 rounded-xl border border-gray-200 outline-none text-sm focus:ring-2 focus:ring-indigo-500/50 ${isFromBuzon ? 'bg-gray-100 cursor-not-allowed opacity-70' : 'bg-white cursor-pointer'}`}
+                        disabled={isLoading || isFromBuzon}
                     >
-                        <option value="PROSPECTO">Prospecto</option>
-                        <option value="EN_NEGOCIACION">En Negociación</option>
-                        <option value="CERRADA">Cerrada</option>
-                        <option value="EN_OPERACION">En Operación</option>
+                        {isFromBuzon ? (
+                            <option value={3}>Cerrada</option>
+                        ) : (
+                            <>
+                                <option value={1}>Prospecto</option>
+                                <option value={2}>En Negociación</option>
+                                <option value={3}>Cerrada</option>
+                                <option value={4}>En Operación</option>
+                            </>
+                        )}
                     </select>
                 </div>
 
-                {/* Fecha de Último Contacto */}
-                <div className="space-y-1.5">
-                    <label htmlFor="ultimo_contacto" className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                        Fecha de Último Contacto <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                        id="ultimo_contacto"
-                        type="date"
-                        value={formState.ultimoContacto}
-                        onChange={(e) => formState.setUltimoContacto(e.target.value)}
-                        onBlur={() => handleBlur('ultimo_contacto', formState.ultimoContacto)}
-                        className={`w-full px-3 py-2.5 rounded-xl border outline-none text-sm transition-colors ${touched.has('ultimo_contacto') && errors.ultimo_contacto
-                            ? 'border-red-300 focus:ring-2 focus:ring-red-500/50 bg-red-50'
-                            : 'border-gray-200 focus:ring-2 focus:ring-indigo-500/50'
-                            }`}
-                        disabled={isLoading}
-                    />
-                    {touched.has('ultimo_contacto') && errors.ultimo_contacto && (
-                        <p className="text-xs text-red-500 flex items-center gap-1">
-                            <AlertCircle size={12} />{errors.ultimo_contacto}
-                        </p>
-                    )}
-                </div>
+                {/* Último Contacto Eliminado */}
 
                 {/* Próxima Fecha de Contacto */}
                 <div className="space-y-1.5">
@@ -266,30 +226,7 @@ function ModalContent({ clienteToEdit, initialData, isOpen, onClienteCreado, sho
                     )}
                 </div>
 
-                {/* Comentario */}
-                <div className="space-y-1.5">
-                    <label htmlFor="comentario" className="text-xs font-bold text-gray-500 uppercase tracking-wider">
-                        Comentario <span className="text-red-500">*</span>
-                    </label>
-                    <textarea
-                        id="comentario"
-                        rows={2}
-                        value={formState.comentario}
-                        onChange={(e) => formState.setComentario(e.target.value)}
-                        onBlur={() => handleBlur('comentario', formState.comentario)}
-                        placeholder="Notas sobre el cliente..."
-                        className={`w-full px-3 py-2.5 rounded-xl border outline-none resize-none text-sm transition-colors ${touched.has('comentario') && errors.comentario
-                            ? 'border-red-300 focus:ring-2 focus:ring-red-500/50 bg-red-50'
-                            : 'border-gray-200 focus:ring-2 focus:ring-indigo-500/50'
-                            }`}
-                        disabled={isLoading}
-                    />
-                    {touched.has('comentario') && errors.comentario && (
-                        <p className="text-xs text-red-500 flex items-center gap-1">
-                            <AlertCircle size={12} />{errors.comentario}
-                        </p>
-                    )}
-                </div>
+                {/* Comentario Eliminado */}
             </form>
 
             <ModalFooter>
@@ -317,7 +254,7 @@ function ModalContent({ clienteToEdit, initialData, isOpen, onClienteCreado, sho
 // ============================================
 // COMPONENTE PRINCIPAL
 // ============================================
-export default function ModalCliente({ isOpen, onClose, clienteToEdit = null, initialData, onClienteCreado, showAdminFields = false }: ModalProps) {
+export default function ModalCliente({ isOpen, onClose, clienteToEdit = null, initialData, onClienteCreado, showAdminFields = false, isFromBuzon = false }: ModalProps) {
     return (
         <ModalBase isOpen={isOpen} onClose={onClose}>
             <ModalContent
@@ -326,6 +263,7 @@ export default function ModalCliente({ isOpen, onClose, clienteToEdit = null, in
                 isOpen={isOpen}
                 onClienteCreado={onClienteCreado}
                 showAdminFields={showAdminFields}
+                isFromBuzon={isFromBuzon}
             />
         </ModalBase>
     );

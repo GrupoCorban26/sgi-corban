@@ -45,11 +45,11 @@ const ESTADOS_PERMITIDOS: Record<string, string[]> = {
 };
 
 const MOTIVOS_DESCARTE = [
-    'Solo consulta',
-    'No realizamos su requerimiento',
-    'No responde',
-    'Spam / Bot',
-    'Duplicado',
+    { value: 2, label: 'Solo consulta' },
+    { value: 3, label: 'No realizamos su requerimiento' },
+    { value: 1, label: 'No responde' },
+    { value: 4, label: 'Spam / Bot' },
+    { value: 5, label: 'Duplicado' },
 ];
 
 export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClick, onClose }: Props) {
@@ -57,7 +57,7 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
     const { asignarManualMutation } = useInbox();
     const { data: comerciales = [] } = useComerciales();
     const [showDiscardModal, setShowDiscardModal] = useState(false);
-    const [discardData, setDiscardData] = useState({ motivo_descarte: '', comentario_descarte: '', enviar_mensaje: true });
+    const [discardData, setDiscardData] = useState({ motivo_descarte_id: 0, comentario_descarte: '', enviar_mensaje: true });
     const [isDiscarding, setIsDiscarding] = useState(false);
     const [isMounted, setIsMounted] = useState(false);
     const [selectedComercialId, setSelectedComercialId] = useState<number | ''>('');
@@ -151,7 +151,7 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
     };
 
     const confirmDescartar = async () => {
-        if (!discardData.motivo_descarte) {
+        if (!discardData.motivo_descarte_id) {
             toast.error('Selecciona un motivo de descarte');
             return;
         }
@@ -164,7 +164,7 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
             await descartarLead.mutateAsync({ inboxId: selectedConv.inbox_id, request: discardData });
             toast.success('Lead descartado');
             setShowDiscardModal(false);
-            setDiscardData({ motivo_descarte: '', comentario_descarte: '', enviar_mensaje: true });
+            setDiscardData({ motivo_descarte_id: 0, comentario_descarte: '', enviar_mensaje: true });
             onChangeConv(null);
         } catch {
             toast.error('Error al descartar');
@@ -431,12 +431,12 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
                                 </label>
                                 <select
                                     className="w-full border-slate-200 rounded-xl shadow-sm focus:border-red-400 focus:ring-red-200 text-sm py-2.5 px-3"
-                                    value={discardData.motivo_descarte}
-                                    onChange={(e) => setDiscardData({ ...discardData, motivo_descarte: e.target.value })}
+                                    value={discardData.motivo_descarte_id}
+                                    onChange={(e) => setDiscardData({ ...discardData, motivo_descarte_id: Number(e.target.value) })}
                                 >
-                                    <option value="">-- Selecciona un motivo --</option>
+                                    <option value={0}>-- Selecciona un motivo --</option>
                                     {MOTIVOS_DESCARTE.map(m => (
-                                        <option key={m} value={m}>{m}</option>
+                                        <option key={m.value} value={m.value}>{m.label}</option>
                                     ))}
                                 </select>
                             </div>
@@ -473,7 +473,7 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
                             <button
                                 onClick={() => {
                                     setShowDiscardModal(false);
-                                    setDiscardData({ motivo_descarte: '', comentario_descarte: '', enviar_mensaje: true });
+                                    setDiscardData({ motivo_descarte_id: 0, comentario_descarte: '', enviar_mensaje: true });
                                 }}
                                 disabled={isDiscarding}
                                 className="flex-1 px-4 py-2.5 text-sm font-medium text-slate-600 bg-slate-100 rounded-xl hover:bg-slate-200 disabled:opacity-50 transition-colors"

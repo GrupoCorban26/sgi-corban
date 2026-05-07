@@ -53,10 +53,3 @@ class LeadWeb(Base):
     usuario_asignado = relationship("app.models.seguridad.Usuario", foreign_keys=[asignado_a])
     cliente_convertido = relationship("app.models.comercial.Cliente", foreign_keys=[cliente_convertido_id])
 
-    @property
-    def nombre_asignado(self):
-        if self.usuario_asignado:
-            if self.usuario_asignado.empleado:
-                return f"{self.usuario_asignado.empleado.nombres} {self.usuario_asignado.empleado.apellido_paterno}"
-            return self.usuario_asignado.correo_corp
-        return None

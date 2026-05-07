@@ -2,18 +2,16 @@ export interface Importacion {
     id?: number;
     ruc?: string;
     razon_social?: string;
-    fob_anual_usd?: number;
-    flete_anual_usd?: number;
-    flete_x_kg_usd?: number;
-    peso_anual_kg?: number;
-    embarques_anuales?: number;
+    sector?: string;
+    score?: number;
     agentes_distintos?: number;
-    meses_distintos?: number;
-    categoria_frecuencia?: string;
-    prox_embarque_estimado?: string;
-    paises_origen?: string;
-    aduanas?: string;
-    partidas_arancelarias?: string;
+    total_embarques?: number;
+    meses_activos?: number;
+    fob_promedio?: number;
+    via_predominante?: string;
+    paises_principales?: string;
+    ultima_importacion?: string;
+    dias_desde_ultima?: number;
 }
 
 export interface ImportacionResponse {

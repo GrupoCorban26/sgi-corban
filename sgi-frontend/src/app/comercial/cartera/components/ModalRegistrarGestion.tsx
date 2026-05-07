@@ -20,16 +20,16 @@ interface Props {
 }
 
 const TIPOS_GESTION = [
-    { value: 'LLAMADA', label: 'Llamada', icon: Phone },
-    { value: 'EMAIL', label: 'Email', icon: Mail },
-    { value: 'WHATSAPP', label: 'WhatsApp', icon: MessageSquare },
+    { value: 1, label: 'Llamada', icon: Phone },
+    { value: 3, label: 'Email', icon: Mail },
+    { value: 2, label: 'WhatsApp', icon: MessageSquare },
 ];
 
 const RESULTADOS = [
-    { value: 'SEGUIMIENTO_CARGA', label: '📦 Seguimiento de carga' },
-    { value: 'FIDELIZACION', label: '🤝 Fidelización' },
-    { value: 'DUDAS_CLIENTE', label: '❓ Dudas del cliente' },
-    { value: 'QUIERE_COTIZACION', label: '📄 Quiere cotización' },
+    { value: 4, label: '📦 Seguimiento de carga' },
+    { value: 2, label: '🤝 Fidelización' },
+    { value: 1, label: '❓ Dudas del cliente' },
+    { value: 3, label: '📄 Quiere cotización' },
 ];
 
 // Estados del pipeline con etiquetas legibles, colores y tipo (positivo/negativo)
@@ -51,6 +51,12 @@ const MOTIVOS_CAIDA = [
 ];
 
 // Transiciones válidas (debe coincidir con el backend)
+// Mapeo nombre estado -> ID
+const ESTADO_ID_MAP: Record<string, number> = {
+    PROSPECTO: 1, EN_NEGOCIACION: 2, CERRADA: 3, EN_OPERACION: 4,
+    CARGA_ENTREGADA: 5, CAIDO: 6, INACTIVO: 7,
+};
+
 const TRANSICIONES: Record<string, string[]> = {
     PROSPECTO:        ['EN_NEGOCIACION', 'CAIDO', 'INACTIVO'],
     EN_NEGOCIACION:   ['CERRADA', 'CAIDO', 'PROSPECTO'],
@@ -67,8 +73,8 @@ export default function ModalRegistrarGestion({
     const { registrarMutation } = useGestiones(clienteId);
     const { marcarCaidoMutation, archivarMutation } = useClientes();
 
-    const [tipo, setTipo] = useState('LLAMADA');
-    const [resultado, setResultado] = useState('');
+    const [medioId, setMedioId] = useState(1); // 1=Llamada
+    const [motivoId, setMotivoId] = useState<number | null>(null);
     const [comentario, setComentario] = useState('');
     const [proximaFecha, setProximaFecha] = useState('');
     const [nuevoEstado, setNuevoEstado] = useState('');
@@ -90,8 +96,8 @@ export default function ModalRegistrarGestion({
     const transicionesNegativas = transicionesPosibles.filter(e => ESTADOS_PIPELINE[e]?.tipo === 'negativo');
 
     const resetForm = () => {
-        setTipo('LLAMADA');
-        setResultado('');
+        setMedioId(1);
+        setMotivoId(null);
         setComentario('');
         setProximaFecha('');
         setNuevoEstado('');
@@ -102,7 +108,7 @@ export default function ModalRegistrarGestion({
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!resultado) return;
+        if (!motivoId) return;
 
         // Si marcó Caído, validar motivo
         if (nuevoEstado === 'CAIDO' && !motivoCaida) {
@@ -119,15 +125,15 @@ export default function ModalRegistrarGestion({
             if (nuevoEstado === 'CAIDO') {
                 const motivoFinal = motivoCaida === 'Otro' ? motivoCaidaOtro.trim() : motivoCaida;
                 const caido: ClienteMarcarCaido = {
-                    motivo_caida: motivoFinal,
-                    fecha_seguimiento_caida: fechaSeguimientoCaida || undefined,
+                    motivo: motivoFinal,
+                    fecha_seguimiento: fechaSeguimientoCaida || undefined,
                 };
                 await marcarCaidoMutation.mutateAsync({ id: clienteId, data: caido });
 
                 // También registrar la gestión
                 const gestion: GestionCreate = {
-                    tipo,
-                    resultado,
+                    medio_id: medioId,
+                    motivo_id: motivoId!,
                     comentario: comentario || undefined,
                     proxima_fecha_contacto: proximaFecha || undefined,
                 };
@@ -140,8 +146,8 @@ export default function ModalRegistrarGestion({
 
                 // También registrar la gestión
                 const gestion: GestionCreate = {
-                    tipo,
-                    resultado,
+                    medio_id: medioId,
+                    motivo_id: motivoId!,
                     comentario: comentario || undefined,
                     proxima_fecha_contacto: proximaFecha || undefined,
                 };
@@ -151,11 +157,11 @@ export default function ModalRegistrarGestion({
             // Caso normal: registrar gestión con cambio de estado opcional
             else {
                 const gestion: GestionCreate = {
-                    tipo,
-                    resultado,
+                    medio_id: medioId,
+                    motivo_id: motivoId!,
                     comentario: comentario || undefined,
                     proxima_fecha_contacto: proximaFecha || undefined,
-                    nuevo_estado: nuevoEstado || undefined,
+                    nuevo_estado_id: nuevoEstado ? ESTADO_ID_MAP[nuevoEstado] : undefined,
                 };
                 await registrarMutation.mutateAsync({ clienteId, gestion });
                 toast.success('Gestión registrada correctamente');
@@ -201,9 +207,9 @@ export default function ModalRegistrarGestion({
                                     <button
                                         key={t.value}
                                         type="button"
-                                        onClick={() => setTipo(t.value)}
+                                        onClick={() => setMedioId(t.value)}
                                         className={`flex flex-col items-center gap-1 p-2 rounded-lg border-2 transition-all text-xs cursor-pointer
-                                            ${tipo === t.value
+                                            ${medioId === t.value
                                                 ? 'border-blue-500 bg-blue-50 text-blue-700'
                                                 : 'border-gray-200 hover:border-gray-300 text-gray-500'
                                             }`}
@@ -224,9 +230,9 @@ export default function ModalRegistrarGestion({
                                 <button
                                     key={r.value}
                                     type="button"
-                                    onClick={() => setResultado(r.value)}
+                                    onClick={() => setMotivoId(r.value)}
                                     className={`p-2 rounded-lg border-2 text-left text-sm transition-all cursor-pointer
-                                        ${resultado === r.value
+                                        ${motivoId === r.value
                                             ? 'border-blue-500 bg-blue-50 font-medium'
                                             : 'border-gray-200 hover:border-gray-300'
                                         }`}
@@ -410,7 +416,7 @@ export default function ModalRegistrarGestion({
                         </button>
                         <button
                             type="submit"
-                            disabled={!resultado || isPending}
+                            disabled={!motivoId || isPending}
                             className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white font-semibold py-2.5 px-5 rounded-xl transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-200 cursor-pointer disabled:cursor-not-allowed"
                         >
                             {isPending ? (

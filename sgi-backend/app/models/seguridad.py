@@ -58,7 +58,6 @@ class Usuario(Base):
     reset_token = Column(String(255))
     reset_token_expira = Column(DateTime(timezone=True))
     ultimo_acceso = Column(DateTime(timezone=True))
-    debe_cambiar_pass = Column(Boolean, default=False, nullable=False)
     disponible_buzon = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -81,3 +80,18 @@ class Sesion(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
+class AuditoriaSeguridad(Base):
+    """Bitácora inmutable de eventos críticos de seguridad (cambio de roles, bloqueos)"""
+    __tablename__ = "auditoria_seguridad"
+    __table_args__ = {"schema": "seg"}
+
+    id = Column(Integer, primary_key=True, index=True)
+    usuario_afectado_id = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=True)
+    accion = Column(String(100), nullable=False) # 'ASIGNAR_ROL', 'REVOCAR_ROL', 'BLOQUEAR_USUARIO', 'DESBLOQUEAR_USUARIO'
+    detalle = Column(String(500)) # Ej: "Se asignó el rol SUPER_ADMIN"
+    realizado_por = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=False)
+    ip_address = Column(String(45))
+    fecha_evento = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+    usuario_afectado = relationship("Usuario", foreign_keys=[usuario_afectado_id])
+    usuario_responsable = relationship("Usuario", foreign_keys=[realizado_por])

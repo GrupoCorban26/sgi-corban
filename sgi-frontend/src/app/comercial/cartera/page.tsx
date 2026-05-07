@@ -13,30 +13,39 @@ import {
   AlertCircle,
   ChevronLeft,
   ChevronRight,
-  Filter,
-  Phone,
   Truck,
   UserPlus,
   ClipboardList,
   MoreHorizontal,
   Archive,
-  PackageCheck
+  PackageCheck,
+  User,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+  X,
+  Eye,
+  Download
 } from 'lucide-react';
 import { toast } from 'sonner';
+import * as XLSX from 'xlsx';
 import { useClientes, useClientesStats } from '@/hooks/comercial/useClientes';
 import { Cliente } from '@/types/cliente';
 import { ConfirmModal } from '@/components/ui/ConfirmModal';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useComerciales } from '@/hooks/organizacion/useComerciales';
 import ModalCliente from './components/modal-cliente';
 import ModalRegistrarGestion from './components/ModalRegistrarGestion';
+import ModalTimeline from './components/ModalTimeline';
 
 const ESTADO_COLORS: Record<string, string> = {
-  'PROSPECTO': 'bg-sky-100 text-sky-700',
-  'EN_NEGOCIACION': 'bg-amber-100 text-amber-700',
-  'CERRADA': 'bg-green-100 text-green-700',
-  'EN_OPERACION': 'bg-indigo-100 text-indigo-700',
-  'CARGA_ENTREGADA': 'bg-emerald-100 text-emerald-700',
-  'CAIDO': 'bg-red-100 text-red-700',
-  'INACTIVO': 'bg-gray-100 text-gray-500',
+  'PROSPECTO': 'bg-sky-50 text-sky-700 ring-sky-200',
+  'EN_NEGOCIACION': 'bg-amber-50 text-amber-700 ring-amber-200',
+  'CERRADA': 'bg-green-50 text-green-700 ring-green-200',
+  'EN_OPERACION': 'bg-indigo-50 text-indigo-700 ring-indigo-200',
+  'CARGA_ENTREGADA': 'bg-emerald-50 text-emerald-700 ring-emerald-200',
+  'CAIDO': 'bg-red-50 text-red-700 ring-red-200',
+  'INACTIVO': 'bg-gray-50 text-gray-500 ring-gray-200',
 };
 
 const ESTADO_LABELS: Record<string, string> = {
@@ -49,20 +58,18 @@ const ESTADO_LABELS: Record<string, string> = {
   'INACTIVO': 'Inactivo',
 };
 
-// Helper para semáforo de próxima fecha de contacto
-const getSemaforoColor = (fechaStr: string | null) => {
-  if (!fechaStr) return '';
+const getSemaforoStyle = (fechaStr: string | null) => {
+  if (!fechaStr) return 'text-gray-400';
   const hoy = new Date();
   hoy.setHours(0, 0, 0, 0);
   const [year, month, day] = fechaStr.substring(0, 10).split('-').map(Number);
   const fecha = new Date(year, month - 1, day);
   const diff = Math.ceil((fecha.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
-  if (diff < 0) return 'bg-red-100 text-red-700 font-semibold'; // Vencido
-  if (diff <= 3) return 'bg-yellow-100 text-yellow-700 font-semibold'; // Próximo
-  return 'bg-green-50 text-green-700'; // Al día
+  if (diff < 0) return 'text-red-700 bg-red-50 font-semibold';
+  if (diff <= 3) return 'text-amber-700 bg-amber-50 font-semibold';
+  return 'text-emerald-700 bg-emerald-50';
 };
 
-// Helper para formatear fechas evitando problemas de zona horaria
 const formatDate = (dateStr: string | null) => {
   if (!dateStr) return '-';
   if (dateStr.length === 10) {
@@ -70,15 +77,13 @@ const formatDate = (dateStr: string | null) => {
     return `${day}/${month}/${year}`;
   }
   return new Date(dateStr).toLocaleDateString('es-PE', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
+    year: 'numeric', month: '2-digit', day: '2-digit'
   });
 };
 
-// Componente de menú contextual
-function ActionMenu({ cliente, onEdit, onArchive }: {
-  cliente: Cliente;
+/* ─── Action Menu ──────────────────────────────────────── */
+function ActionMenu({ onView, onEdit, onArchive }: {
+  onView: () => void;
   onEdit: () => void;
   onArchive: () => void;
 }) {
@@ -87,9 +92,7 @@ function ActionMenu({ cliente, onEdit, onArchive }: {
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
-      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setOpen(false);
     };
     if (open) document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -97,25 +100,18 @@ function ActionMenu({ cliente, onEdit, onArchive }: {
 
   return (
     <div className="relative" ref={menuRef}>
-      <button
-        onClick={() => setOpen(!open)}
-        className="p-2 hover:bg-gray-100 text-gray-500 rounded-lg transition-colors cursor-pointer"
-        title="Más opciones"
-      >
+      <button onClick={() => setOpen(!open)} className="p-1.5 hover:bg-gray-100 text-gray-400 hover:text-gray-600 rounded-lg transition-colors cursor-pointer">
         <MoreHorizontal size={16} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-lg z-50 py-1 min-w-[140px]">
-          <button
-            onClick={() => { onEdit(); setOpen(false); }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer"
-          >
+        <div className="absolute right-0 top-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 min-w-[160px] animate-in fade-in slide-in-from-top-1 duration-150">
+          <button onClick={() => { onView(); setOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
+            <Eye size={14} /> Ver historial
+          </button>
+          <button onClick={() => { onEdit(); setOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 cursor-pointer">
             <Edit2 size={14} /> Editar
           </button>
-          <button
-            onClick={() => { onArchive(); setOpen(false); }}
-            className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 cursor-pointer"
-          >
+          <button onClick={() => { onArchive(); setOpen(false); }} className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 cursor-pointer">
             <Archive size={14} /> Archivar
           </button>
         </div>
@@ -124,20 +120,43 @@ function ActionMenu({ cliente, onEdit, onArchive }: {
   );
 }
 
+/* ─── Mini Stat ────────────────────────────────────────── */
+function MiniStat({ icon, label, value, color }: {
+  icon: React.ReactNode; label: string; value: number; color: string;
+}) {
+  return (
+    <div className={`flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-br ${color} text-white shadow-sm`}>
+      <div className="opacity-80">{icon}</div>
+      <div className="min-w-0">
+        <p className="text-[10px] uppercase tracking-wider opacity-80 leading-tight">{label}</p>
+        <p className="text-lg font-bold leading-tight tabular-nums">{value.toLocaleString()}</p>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Sort ─────────────────────────────────────────────── */
+type SortState = null | 'proxima_fecha_asc' | 'proxima_fecha_desc';
+const SORT_CYCLE: SortState[] = [null, 'proxima_fecha_asc', 'proxima_fecha_desc'];
+
+/* ═══════════════════════════════════════════════════════════ */
 export default function CarteraPage() {
+  const { user, isJefeComercial, isAdmin } = useCurrentUser();
+  const isBoss = isJefeComercial() || isAdmin();
+
   const [busqueda, setBusqueda] = useState('');
   const [tipoEstado, setTipoEstado] = useState<string | null>(null);
   const [filtroFecha, setFiltroFecha] = useState<string | null>(null);
+  const [comercialId, setComercialId] = useState<number | null>(null);
+  const [ordenarPor, setOrdenarPor] = useState<SortState>(null);
   const [page, setPage] = useState(1);
   const pageSize = 15;
 
-  // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [clienteToEdit, setClienteToEdit] = useState<Cliente | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [clienteToDelete, setClienteToDelete] = useState<Cliente | null>(null);
 
-  // Modal de gestión
   const [isGestionModalOpen, setIsGestionModalOpen] = useState(false);
   const [gestionClienteId, setGestionClienteId] = useState<number | null>(null);
   const [gestionClienteNombre, setGestionClienteNombre] = useState('');
@@ -145,153 +164,154 @@ export default function CarteraPage() {
   const [gestionClienteRazonSocial, setGestionClienteRazonSocial] = useState('');
   const [gestionEstadoActual, setGestionEstadoActual] = useState('');
 
-  // Data
+  // Timeline modal
+  const [isTimelineOpen, setIsTimelineOpen] = useState(false);
+  const [timelineClienteId, setTimelineClienteId] = useState<number | null>(null);
+
+  const { data: comerciales = [], isLoading: loadingComerciales } = useComerciales();
+
   const {
-    clientes,
-    totalPages,
-    totalRegistros,
-    isLoading,
-    isError,
-    isFetching,
-    deleteMutation,
-  } = useClientes(busqueda, tipoEstado, null, filtroFecha, page, pageSize);
+    clientes, totalPages, totalRegistros, isLoading, isError, isFetching, deleteMutation, exportMutation
+  } = useClientes(busqueda, tipoEstado, comercialId, filtroFecha, page, pageSize, ordenarPor);
 
-  const { data: stats } = useClientesStats();
+  const { data: stats } = useClientesStats(isBoss ? null : undefined);
 
-  // Handlers
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setBusqueda(e.target.value);
-    setPage(1);
-  };
-
-  const handleOpenCreate = () => {
-    setClienteToEdit(null);
-    setIsModalOpen(true);
-  };
-
-  const handleOpenEdit = (cliente: Cliente) => {
-    setClienteToEdit(cliente);
-    setIsModalOpen(true);
-  };
-
-  const handleOpenDelete = (cliente: Cliente) => {
-    setClienteToDelete(cliente);
-    setIsConfirmOpen(true);
-  };
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => { setBusqueda(e.target.value); setPage(1); };
+  const handleOpenCreate = () => { setClienteToEdit(null); setIsModalOpen(true); };
+  const handleOpenEdit = (c: Cliente) => { setClienteToEdit(c); setIsModalOpen(true); };
+  const handleOpenDelete = (c: Cliente) => { setClienteToDelete(c); setIsConfirmOpen(true); };
 
   const handleConfirmDelete = async () => {
     if (!clienteToDelete) return;
+    try { await deleteMutation.mutateAsync(clienteToDelete.id); toast.success('Cliente desactivado'); setIsConfirmOpen(false); setClienteToDelete(null); }
+    catch { toast.error('Error al desactivar cliente'); }
+  };
+
+  const handleOpenGestion = (c: Cliente) => {
+    setGestionClienteId(c.id); setGestionClienteNombre(c.razon_social);
+    setGestionClienteRuc(c.ruc || ''); setGestionClienteRazonSocial(c.razon_social || '');
+    setGestionEstadoActual(c.estado_nombre || ''); setIsGestionModalOpen(true);
+  };
+
+  const handleClearFilters = () => { setBusqueda(''); setTipoEstado(null); setComercialId(null); setFiltroFecha(null); setOrdenarPor(null); setPage(1); };
+
+  const handleToggleSort = () => {
+    const i = SORT_CYCLE.indexOf(ordenarPor);
+    setOrdenarPor(SORT_CYCLE[(i + 1) % SORT_CYCLE.length]);
+    setPage(1);
+  };
+
+  const sortIcon = ordenarPor === 'proxima_fecha_asc'
+    ? <ArrowUp size={13} /> : ordenarPor === 'proxima_fecha_desc'
+    ? <ArrowDown size={13} /> : <ArrowUpDown size={13} />;
+
+  const sortLabel = ordenarPor === 'proxima_fecha_asc'
+    ? 'Próximos primero' : ordenarPor === 'proxima_fecha_desc'
+    ? 'Lejanos primero' : 'Próx. contacto';
+
+  const hasFilters = busqueda || tipoEstado || comercialId || filtroFecha || ordenarPor;
+
+  const handleExport = async () => {
     try {
-      await deleteMutation.mutateAsync(clienteToDelete.id);
-      toast.success('Cliente desactivado correctamente');
-      setIsConfirmOpen(false);
-      setClienteToDelete(null);
-    } catch {
-      toast.error('Error al desactivar cliente');
+      const dataToExport = await exportMutation.mutateAsync();
+      if (!dataToExport || dataToExport.length === 0) {
+        toast.info('No hay datos para exportar con los filtros actuales');
+        return;
+      }
+
+      const rows = dataToExport.map((c: Cliente) => ({
+        'RUC': c.ruc || '-',
+        'Razón Social': c.razon_social,
+        'Dirección Fiscal': c.direccion_fiscal || '-',
+        'Comercial': c.comercial_nombre || 'Sin asignar',
+        'Estado': ESTADO_LABELS[c.estado_nombre || ''] || c.estado_nombre || '-',
+        'Origen': c.origen_nombre || '-',
+        'Contacto Principal': c.nombre_contacto || '-',
+        'Teléfono': c.telefono || '-',
+        'Correo': c.correo || '-',
+        'Próximo Contacto': c.proxima_fecha_contacto ? formatDate(c.proxima_fecha_contacto) : '-',
+        'Fecha Creación': c.created_at ? formatDate(c.created_at) : '-'
+      }));
+
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.json_to_sheet(rows);
+      XLSX.utils.book_append_sheet(wb, ws, "Cartera");
+      XLSX.writeFile(wb, `cartera_clientes_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success('Reporte exportado correctamente');
+    } catch (error) {
+      toast.error('Error al exportar los datos');
+      console.error('Error exportando cartera:', error);
     }
   };
 
-  const handleOpenGestion = (cliente: Cliente) => {
-    setGestionClienteId(cliente.id);
-    setGestionClienteNombre(cliente.razon_social);
-    setGestionClienteRuc(cliente.ruc || '');
-    setGestionClienteRazonSocial(cliente.razon_social || '');
-    setGestionEstadoActual(cliente.tipo_estado);
-    setIsGestionModalOpen(true);
-  };
-
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6 bg-gray-50 min-h-screen">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Mi Cartera de Clientes</h1>
-          <p className="text-sm text-gray-500">Gestiona tus prospectos y clientes</p>
-        </div>
-        <button
-          onClick={handleOpenCreate}
-          className="cursor-pointer flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-md shadow-indigo-200 transition-all"
-        >
-          <Plus size={18} /> Nuevo Cliente
-        </button>
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-indigo-50/30">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 py-6 space-y-5">
 
-      {/* Stats Cards */}
-      {stats && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-          <div className="bg-gradient-to-br from-indigo-500 to-indigo-600 p-3.5 rounded-xl text-white shadow-lg shadow-indigo-200">
-            <div className="flex items-center gap-2 mb-1">
-              <Truck className="w-4 h-4 opacity-80" />
-              <span className="text-xs opacity-80">En operación</span>
-            </div>
-            <span className="text-xl font-bold">{(stats.en_operacion ?? 0).toLocaleString()}</span>
+        {/* ── Header ─────────────────────────────────────── */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+              {isBoss ? 'Cartera de Clientes' : 'Mi Cartera'}
+            </h1>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {isBoss ? 'Vista global · Todos los comerciales' : 'Gestiona tus prospectos y clientes'}
+            </p>
           </div>
-          <div className="bg-gradient-to-br from-emerald-500 to-emerald-600 p-3.5 rounded-xl text-white shadow-lg shadow-emerald-200">
-            <div className="flex items-center gap-2 mb-1">
-              <PackageCheck className="w-4 h-4 opacity-80" />
-              <span className="text-xs opacity-80">Carga entregada</span>
-            </div>
-            <span className="text-xl font-bold">{(stats.carga_entregada ?? 0).toLocaleString()}</span>
-          </div>
-          <div className="bg-gradient-to-br from-green-500 to-green-600 p-3.5 rounded-xl text-white shadow-lg shadow-green-200">
-            <div className="flex items-center gap-2 mb-1">
-              <UserCheck className="w-4 h-4 opacity-80" />
-              <span className="text-xs opacity-80">Cerradas</span>
-            </div>
-            <span className="text-xl font-bold">{(stats.cerradas ?? 0).toLocaleString()}</span>
-          </div>
-          <div className="bg-gradient-to-br from-teal-500 to-teal-600 p-3.5 rounded-xl text-white shadow-lg shadow-teal-200">
-            <div className="flex items-center gap-2 mb-1">
-              <UserPlus className="w-4 h-4 opacity-80" />
-              <span className="text-xs opacity-80">Nuevos clientes</span>
-            </div>
-            <span className="text-xl font-bold">{(stats.nuevos_clientes ?? 0).toLocaleString()}</span>
-          </div>
-          <div className="bg-gradient-to-br from-blue-500 to-blue-600 p-3.5 rounded-xl text-white shadow-lg shadow-blue-200">
-            <div className="flex items-center gap-2 mb-1">
-              <Building2 className="w-4 h-4 opacity-80" />
-              <span className="text-xs opacity-80">Total cartera</span>
-            </div>
-            <span className="text-xl font-bold">{(stats.total ?? 0).toLocaleString()}</span>
-          </div>
-          <div className="bg-gradient-to-br from-yellow-500 to-yellow-600 p-3.5 rounded-xl text-white shadow-lg shadow-yellow-200">
-            <div className="flex items-center gap-2 mb-1">
-              <Users className="w-4 h-4 opacity-80" />
-              <span className="text-xs opacity-80">Prospectos</span>
-            </div>
-            <span className="text-xl font-bold">{(stats.prospectos ?? 0).toLocaleString()}</span>
-          </div>
-          <div className="bg-gradient-to-br from-red-500 to-red-600 p-3.5 rounded-xl text-white shadow-lg shadow-red-200">
-            <div className="flex items-center gap-2 mb-1">
-              <UserMinus className="w-4 h-4 opacity-80" />
-              <span className="text-xs opacity-80">Caídos</span>
-            </div>
-            <span className="text-xl font-bold">{(stats.caidos ?? 0).toLocaleString()}</span>
-          </div>
-        </div>
-      )}
-
-      {/* Filters & Search */}
-      <div className="bg-white rounded-xl border border-gray-200 shadow-sm">
-        <div className="p-4 border-b flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="relative w-full md:w-96">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-            <input
-              type="text"
-              placeholder="Buscar por RUC o razón social..."
-              value={busqueda}
-              onChange={handleSearch}
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-gray-200 outline-none focus:ring-2 focus:ring-indigo-500/50 text-sm"
-            />
-            {isFetching && (
-              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" size={16} />
+          <div className="flex items-center gap-2">
+            {isBoss && (
+              <button
+                onClick={handleExport}
+                disabled={exportMutation.isPending || isLoading}
+                className="flex items-center gap-2 bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 px-4 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-all hover:shadow active:scale-[0.98] cursor-pointer disabled:opacity-50"
+              >
+                {exportMutation.isPending ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                Exportar
+              </button>
             )}
+            <button
+              onClick={handleOpenCreate}
+              className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-lg shadow-indigo-200/50 transition-all hover:shadow-xl hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+            >
+              <Plus size={18} /> Nuevo Cliente
+            </button>
           </div>
-          <div className="flex gap-2 w-full md:w-auto">
+        </div>
+
+        {/* ── Stats ──────────────────────────────────────── */}
+        {stats && (
+          <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+            <MiniStat icon={<Truck size={16} />} label="En operación" value={stats.en_operacion ?? 0} color="from-indigo-500 to-indigo-600" />
+            <MiniStat icon={<PackageCheck size={16} />} label="Carga entregada" value={stats.carga_entregada ?? 0} color="from-emerald-500 to-emerald-600" />
+            <MiniStat icon={<UserCheck size={16} />} label="Cerradas" value={stats.cerradas ?? 0} color="from-green-500 to-green-600" />
+            <MiniStat icon={<UserPlus size={16} />} label="Nuevos" value={stats.nuevos_clientes ?? 0} color="from-teal-500 to-teal-600" />
+            <MiniStat icon={<Building2 size={16} />} label="Total" value={stats.total ?? 0} color="from-blue-500 to-blue-600" />
+            <MiniStat icon={<Users size={16} />} label="Prospectos" value={stats.prospectos ?? 0} color="from-amber-500 to-amber-600" />
+            <MiniStat icon={<UserMinus size={16} />} label="Caídos" value={stats.caidos ?? 0} color="from-red-500 to-red-600" />
+          </div>
+        )}
+
+        {/* ── Filters (single row) ──────────────────────── */}
+        <div className="bg-white rounded-2xl border border-gray-200/80 shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 flex flex-wrap items-center gap-2.5">
+            {/* Search */}
+            <div className="relative flex-1 min-w-[220px] max-w-sm">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <input
+                type="text"
+                placeholder="Buscar RUC o razón social..."
+                value={busqueda}
+                onChange={handleSearch}
+                className="w-full pl-9 pr-4 py-2 rounded-lg border border-gray-200 outline-none focus:ring-2 focus:ring-indigo-500/40 focus:border-indigo-300 text-sm transition-all"
+              />
+              {isFetching && <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-spin" size={14} />}
+            </div>
+
+            {/* Estado */}
             <select
               value={tipoEstado || ''}
               onChange={(e) => { setTipoEstado(e.target.value || null); setPage(1); }}
-              className="px-3 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer"
+              className="px-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-indigo-500/40 cursor-pointer bg-white"
             >
               <option value="">Todos los estados</option>
               <option value="PROSPECTO">Prospectos</option>
@@ -302,166 +322,191 @@ export default function CarteraPage() {
               <option value="CAIDO">Caídos</option>
               <option value="INACTIVO">Inactivos</option>
             </select>
-            <select
-              value={filtroFecha || ''}
-              onChange={(e) => { setFiltroFecha(e.target.value || null); setPage(1); }}
-              className="px-3 py-2.5 rounded-xl border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-indigo-500/50 cursor-pointer"
+
+            {/* Sort toggle */}
+            <button
+              onClick={handleToggleSort}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-lg border text-sm font-medium transition-all cursor-pointer whitespace-nowrap ${
+                ordenarPor
+                  ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
+                  : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+              title="Ordenar por próxima fecha de contacto"
             >
-              <option value="">Todas las fechas</option>
-              <option value="hoy">Hoy</option>
-              <option value="proximos_7_dias">Próximos 7 días</option>
-              <option value="vencidos">Vencidos</option>
-            </select>
-            <button className="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors text-gray-600">
-              <Filter size={16} /> Más Filtros
+              {sortIcon}
+              {sortLabel}
             </button>
+
+            {/* Comercial filter (boss only) */}
+            {isBoss && (
+              <div className="relative">
+                <User className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                <select
+                  value={comercialId || ''}
+                  onChange={(e) => { setComercialId(e.target.value ? parseInt(e.target.value) : null); setPage(1); }}
+                  disabled={loadingComerciales}
+                  className="pl-8 pr-3 py-2 rounded-lg border border-gray-200 text-sm outline-none focus:ring-2 focus:ring-indigo-500/40 cursor-pointer bg-white min-w-[180px] disabled:opacity-50"
+                >
+                  <option value="">Todos los comerciales</option>
+                  {comerciales.map((c) => (
+                    <option key={c.id} value={c.id}>{c.nombre}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {/* Clear */}
+            {hasFilters && (
+              <button
+                onClick={handleClearFilters}
+                className="flex items-center gap-1 px-2.5 py-2 text-red-500 hover:bg-red-50 rounded-lg text-sm transition-colors cursor-pointer"
+                title="Limpiar filtros"
+              >
+                <X size={14} />
+              </button>
+            )}
+
+            {/* Count badge */}
+            <div className="ml-auto text-xs text-gray-400 font-medium tabular-nums">
+              {totalRegistros.toLocaleString()} registros
+            </div>
           </div>
-        </div>
 
-        {/* Table */}
-        <div className="overflow-auto max-h-[calc(100vh-280px)] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar]:h-2.5 [&::-webkit-scrollbar-track]:bg-gray-50 [&::-webkit-scrollbar-track]:rounded-lg [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-lg hover:[&::-webkit-scrollbar-thumb]:bg-gray-400">
-          {isLoading ? (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-              <Loader2 size={40} className="animate-spin mb-3" />
-              <p className="text-sm">Cargando clientes...</p>
-            </div>
-          ) : isError ? (
-            <div className="flex flex-col items-center justify-center h-64 text-red-400">
-              <AlertCircle size={40} className="mb-3" />
-              <p className="text-sm">Error al cargar clientes</p>
-            </div>
-          ) : clientes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-              <Building2 size={40} className="mb-3" />
-              <p className="text-sm font-medium">No hay clientes</p>
-              <p className="text-xs">Agrega tu primer cliente haciendo clic en "Nuevo Cliente"</p>
-            </div>
-          ) : (
-            <table className="w-full text-left relative">
-              <thead className="bg-gray-50 border-b sticky top-0 z-20 shadow-sm">
-                <tr className="text-gray-500 text-[11px] uppercase tracking-wider">
-                  <th className="px-6 py-4 font-semibold whitespace-nowrap">RUC</th>
-                  <th className="px-6 py-4 font-semibold">Razón Social</th>
-                  <th className="px-6 py-4 font-semibold">Nombre Contacto</th>
-                  <th className="px-6 py-4 font-semibold">Teléfono</th>
-                  <th className="px-6 py-4 font-semibold">Correo</th>
-                  <th className="px-6 py-4 font-semibold">Estado</th>
-                  <th className="px-6 py-4 font-semibold">Últ. Contacto</th>
-                  <th className="px-6 py-4 font-semibold">Próx. Contacto</th>
-                  <th className="px-6 py-4 font-semibold min-w-[200px]">Comentario</th>
-                  <th className="px-6 py-4 font-semibold text-center">Acciones</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {clientes.map((cliente) => (
-                  <tr key={cliente.id} className="hover:bg-indigo-50/30 transition-colors group">
-                    <td className="px-6 py-4">
-                      <span className="text-sm font-mono text-gray-700">{cliente.ruc || '-'}</span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm font-semibold text-gray-800">{cliente.razon_social}</div>
-                      {cliente.nombre_comercial && (
-                        <div className="text-xs text-gray-500">{cliente.nombre_comercial}</div>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-600">
-                        {cliente.nombre_contacto || '-'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-600">
-                        {cliente.telefono || '-'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-600 max-w-[150px] truncate" title={cliente.correo || ''}>
-                        {cliente.correo || '-'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium ${ESTADO_COLORS[cliente.tipo_estado] || 'bg-gray-100 text-gray-500'}`}>
-                        {ESTADO_LABELS[cliente.tipo_estado] || cliente.tipo_estado}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-sm text-gray-600">
-                        {formatDate(cliente.ultimo_contacto)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-xs ${getSemaforoColor(cliente.proxima_fecha_contacto)}`}>
-                        {formatDate(cliente.proxima_fecha_contacto)}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span
-                        className="text-xs text-gray-500 block max-w-[250px] truncate"
-                        title={cliente.comentario_ultima_llamada || ''}
+          {/* ── Table ─────────────────────────────────────── */}
+          <div className="overflow-auto max-h-[calc(100vh-340px)] [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-thumb]:rounded-full">
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                <Loader2 size={36} className="animate-spin mb-3" />
+                <p className="text-sm">Cargando clientes...</p>
+              </div>
+            ) : isError ? (
+              <div className="flex flex-col items-center justify-center h-64 text-red-400">
+                <AlertCircle size={36} className="mb-3" />
+                <p className="text-sm">Error al cargar clientes</p>
+              </div>
+            ) : clientes.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                <Building2 size={36} className="mb-3 opacity-60" />
+                <p className="text-sm font-medium">No hay clientes</p>
+                <p className="text-xs mt-1">{hasFilters ? 'Ajusta los filtros' : 'Crea tu primer cliente'}</p>
+              </div>
+            ) : (
+              <table className="w-full text-left">
+                <thead className="bg-gray-50/80 border-b border-gray-100 sticky top-0 z-20">
+                  <tr className="text-gray-500 text-[11px] uppercase tracking-wider">
+                    <th className="pl-5 pr-3 py-3 font-semibold w-[120px]">RUC</th>
+                    <th className="px-3 py-3 font-semibold">Razón Social</th>
+                    {isBoss && <th className="px-3 py-3 font-semibold">Comercial</th>}
+                    <th className="px-3 py-3 font-semibold">Contacto</th>
+                    <th className="px-3 py-3 font-semibold">Teléfono</th>
+                    <th className="px-3 py-3 font-semibold">Estado</th>
+                    <th className="px-3 py-3 font-semibold">Últ. Contacto</th>
+                    <th className="px-3 py-3 font-semibold">
+                      <button
+                        onClick={handleToggleSort}
+                        className="flex items-center gap-1 cursor-pointer hover:text-indigo-600 transition-colors"
                       >
-                        {cliente.comentario_ultima_llamada || '-'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        {/* Acción principal: Registrar Gestión */}
-                        <button
-                          onClick={() => handleOpenGestion(cliente)}
-                          className="p-2 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors cursor-pointer"
-                          title="Registrar Gestión"
-                        >
-                          <ClipboardList size={16} />
-                        </button>
-
-                        {/* Menú contextual: Editar + Archivar */}
-                        <ActionMenu
-                          cliente={cliente}
-                          onEdit={() => handleOpenEdit(cliente)}
-                          onArchive={() => handleOpenDelete(cliente)}
-                        />
-                      </div>
-                    </td>
+                        Próx. Contacto {sortIcon}
+                      </button>
+                    </th>
+                    <th className="px-3 py-3 font-semibold text-center w-[80px]">Acc.</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {clientes.map((cliente, idx) => (
+                    <tr
+                      key={cliente.id}
+                      className={`group transition-colors hover:bg-indigo-50/40 ${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/30'}`}
+                    >
+                      <td className="pl-5 pr-3 py-3">
+                        <span className="text-xs font-mono text-gray-500">{cliente.ruc || '-'}</span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className="text-sm font-semibold text-gray-800 line-clamp-1">{cliente.razon_social}</span>
+                      </td>
+                      {isBoss && (
+                        <td className="px-3 py-3">
+                          <span className="text-xs text-gray-600">
+                            {cliente.comercial_nombre || <span className="text-gray-400 italic">Sin asignar</span>}
+                          </span>
+                        </td>
+                      )}
+                      <td className="px-3 py-3">
+                        <span className="text-xs text-gray-600">{cliente.nombre_contacto || '-'}</span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className="text-xs text-gray-600 font-mono">{cliente.telefono || '-'}</span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className={`inline-flex px-2 py-0.5 rounded-md text-[11px] font-semibold ring-1 ${ESTADO_COLORS[cliente.estado_nombre || ''] || 'bg-gray-50 text-gray-500 ring-gray-200'}`}>
+                          {ESTADO_LABELS[cliente.estado_nombre || ''] || 'Desconocido'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className="text-xs text-gray-500">{formatDate(cliente.updated_at || cliente.created_at)}</span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <span className={`inline-flex px-2 py-0.5 rounded-md text-[11px] ${getSemaforoStyle(cliente.proxima_fecha_contacto)}`}>
+                          {formatDate(cliente.proxima_fecha_contacto)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex items-center justify-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => handleOpenGestion(cliente)}
+                            className="p-1.5 hover:bg-blue-100 text-blue-600 rounded-lg transition-colors cursor-pointer"
+                            title="Registrar Gestión"
+                          >
+                            <ClipboardList size={15} />
+                          </button>
+                          <ActionMenu
+                            onView={() => { setTimelineClienteId(cliente.id); setIsTimelineOpen(true); }}
+                            onEdit={() => handleOpenEdit(cliente)}
+                            onArchive={() => handleOpenDelete(cliente)}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* ── Pagination ────────────────────────────────── */}
+          {!isLoading && clientes.length > 0 && (
+            <div className="px-5 py-3 border-t border-gray-100 bg-gray-50/50 flex items-center justify-between">
+              <p className="text-xs text-gray-400">
+                {clientes.length} de {totalRegistros.toLocaleString()}
+              </p>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="p-1.5 rounded-lg border border-gray-200 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <span className="text-xs text-gray-500 px-2 tabular-nums">{page} / {totalPages}</span>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="p-1.5 rounded-lg border border-gray-200 hover:bg-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              </div>
+            </div>
           )}
         </div>
-
-        {/* Pagination */}
-        {!isLoading && clientes.length > 0 && (
-          <div className="p-4 border-t bg-gray-50 flex items-center justify-between">
-            <div className="text-sm text-gray-500">
-              Mostrando {clientes.length} de {totalRegistros} clientes
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setPage(p => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="p-2 rounded-lg border border-gray-200 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft size={16} />
-              </button>
-              <span className="text-sm text-gray-600 px-3">
-                Página {page} de {totalPages}
-              </span>
-              <button
-                onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-                disabled={page === totalPages}
-                className="p-2 rounded-lg border border-gray-200 hover:bg-white disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight size={16} />
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* Modals */}
+      {/* ── Modals ──────────────────────────────────────── */}
       <ModalCliente
         isOpen={isModalOpen}
         onClose={() => { setIsModalOpen(false); setClienteToEdit(null); }}
         clienteToEdit={clienteToEdit}
+        showAdminFields={isBoss}
       />
 
       <ConfirmModal
@@ -486,6 +531,12 @@ export default function CarteraPage() {
           onClose={() => { setIsGestionModalOpen(false); setGestionClienteId(null); }}
         />
       )}
+
+      <ModalTimeline
+        clienteId={timelineClienteId}
+        isOpen={isTimelineOpen}
+        onClose={() => { setIsTimelineOpen(false); setTimelineClienteId(null); }}
+      />
     </div>
   );
 }

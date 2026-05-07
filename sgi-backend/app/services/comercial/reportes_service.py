@@ -25,24 +25,24 @@ class ReportesLlamadasService:
         stmt = (
             select(
                 HistorialLlamada.id,
-                HistorialLlamada.ruc,
+                ClienteContacto.ruc.label("ruc"),
                 RegistroImportacion.razon_social,
                 ClienteContacto.telefono,
                 CasoLlamada.contestado.label("contesto"),
                 CasoLlamada.nombre.label("caso_nombre"),
                 HistorialLlamada.comentario,
                 func.concat(Empleado.nombres, ' ', Empleado.apellido_paterno).label("comercial_nombre"),
-                HistorialLlamada.fecha_llamada
+                HistorialLlamada.created_at.label("fecha_llamada")
             )
             .join(ClienteContacto, HistorialLlamada.contacto_id == ClienteContacto.id)
-            .outerjoin(RegistroImportacion, HistorialLlamada.ruc == RegistroImportacion.ruc)
+            .outerjoin(RegistroImportacion, ClienteContacto.ruc == RegistroImportacion.ruc)
             .join(CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id)
             .join(Usuario, HistorialLlamada.comercial_id == Usuario.id)
             .join(Empleado, Usuario.empleado_id == Empleado.id)
             .where(
                 and_(
-                    HistorialLlamada.fecha_llamada >= dt_inicio,
-                    HistorialLlamada.fecha_llamada <= dt_fin
+                    HistorialLlamada.created_at >= dt_inicio,
+                    HistorialLlamada.created_at <= dt_fin
                 )
             )
         )
@@ -58,7 +58,7 @@ class ReportesLlamadasService:
         total = (await self.db.execute(count_stmt)).scalar() or 0
 
         # Obtener datos paginados
-        stmt = stmt.order_by(desc(HistorialLlamada.fecha_llamada)).offset(offset).limit(page_size)
+        stmt = stmt.order_by(desc(HistorialLlamada.created_at)).offset(offset).limit(page_size)
         result = await self.db.execute(stmt)
         
         filas = []
@@ -89,27 +89,27 @@ class ReportesLlamadasService:
         # Mismo query pero sin paginación
         stmt = (
             select(
-                HistorialLlamada.ruc.label("RUC"),
+                ClienteContacto.ruc.label("RUC"),
                 RegistroImportacion.razon_social.label("Razón Social"),
                 ClienteContacto.telefono.label("Teléfono"),
                 CasoLlamada.contestado.label("Contestó"),
                 CasoLlamada.nombre.label("Caso"),
                 HistorialLlamada.comentario.label("Comentario"),
                 func.concat(Empleado.nombres, ' ', Empleado.apellido_paterno).label("Comercial"),
-                HistorialLlamada.fecha_llamada.label("Fecha y Hora")
+                HistorialLlamada.created_at.label("Fecha y Hora")
             )
             .join(ClienteContacto, HistorialLlamada.contacto_id == ClienteContacto.id)
-            .outerjoin(RegistroImportacion, HistorialLlamada.ruc == RegistroImportacion.ruc)
+            .outerjoin(RegistroImportacion, ClienteContacto.ruc == RegistroImportacion.ruc)
             .join(CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id)
             .join(Usuario, HistorialLlamada.comercial_id == Usuario.id)
             .join(Empleado, Usuario.empleado_id == Empleado.id)
             .where(
                 and_(
-                    HistorialLlamada.fecha_llamada >= dt_inicio,
-                    HistorialLlamada.fecha_llamada <= dt_fin
+                    HistorialLlamada.created_at >= dt_inicio,
+                    HistorialLlamada.created_at <= dt_fin
                 )
             )
-            .order_by(desc(HistorialLlamada.fecha_llamada))
+            .order_by(desc(HistorialLlamada.created_at))
         )
 
         # Filtros de equipo y comercial individual
@@ -167,6 +167,7 @@ class ReportesLlamadasService:
     async def get_bot_analytics(self, fecha_inicio: date, fecha_fin: date, comercial_ids: list = None) -> dict:
         """KPIs del bot para decisiones de Sistemas: tipo de interés, leads por hora, motivos de descarte."""
         from sqlalchemy import extract, or_, Date
+        from app.models.comercial_catalogos import MotivoDescarteInbox
         import os
         
         dt_inicio = datetime.combine(fecha_inicio, datetime.min.time())
@@ -215,22 +216,30 @@ class ReportesLlamadasService:
         result_hora = await self.db.execute(stmt_hora)
         por_hora = [{"hora": int(row.hora), "total": row.total} for row in result_hora.all()]
 
-        # 3. Motivos de descarte
-        stmt_descarte = select(
-            Inbox.motivo_descarte, func.count().label('total')
-        ).where(
-            and_(condicion_base, Inbox.estado == 'DESCARTADO', Inbox.motivo_descarte != None)
-        ).group_by(Inbox.motivo_descarte).order_by(func.count().desc())
+        # 3. Motivos de descarte — JOIN con catálogo para obtener el nombre
+        stmt_descarte = (
+            select(
+                MotivoDescarteInbox.nombre.label('motivo_nombre'),
+                func.count().label('total')
+            )
+            .select_from(Inbox)
+            .join(MotivoDescarteInbox, Inbox.motivo_descarte_id == MotivoDescarteInbox.id)
+            .where(
+                and_(condicion_base, Inbox.estado == 'DESCARTADO', Inbox.motivo_descarte_id != None)
+            )
+            .group_by(MotivoDescarteInbox.nombre)
+            .order_by(func.count().desc())
+        )
         result_descarte = await self.db.execute(stmt_descarte)
-        motivos_descarte = [{"motivo": row.motivo_descarte, "total": row.total} for row in result_descarte.all()]
+        motivos_descarte = [{"motivo": row.motivo_nombre, "total": row.total} for row in result_descarte.all()]
 
         # 4. Leads por día (tendencia)
         stmt_dia = select(
-            func.cast(Inbox.fecha_recepcion, Date()).label('fecha'),
+            func.cast(Inbox.fecha_recepcion, Date).label('fecha'),
             func.count().label('total')
         ).where(condicion_base).group_by(
-            func.cast(Inbox.fecha_recepcion, Date())
-        ).order_by(func.cast(Inbox.fecha_recepcion, Date()))
+            func.cast(Inbox.fecha_recepcion, Date)
+        ).order_by(func.cast(Inbox.fecha_recepcion, Date))
         result_dia = await self.db.execute(stmt_dia)
         por_dia = [{"fecha": row.fecha.isoformat() if row.fecha else None, "total": row.total} for row in result_dia.all()]
 
@@ -240,3 +249,4 @@ class ReportesLlamadasService:
             "motivos_descarte": motivos_descarte,
             "por_dia": por_dia
         }
+

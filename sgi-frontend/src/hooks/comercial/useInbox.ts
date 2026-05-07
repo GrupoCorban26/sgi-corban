@@ -33,14 +33,16 @@ export const useInbox = (role?: string, filtroComercialId?: number | '') => {
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['inbox-leads'] });
             queryClient.invalidateQueries({ queryKey: ['inbox', 'count'] });
+            queryClient.invalidateQueries({ queryKey: ['clientes'] });
+            queryClient.invalidateQueries({ queryKey: ['clientes-stats'] });
         },
     });
 
     // 3. Discard Lead
     const discardMutation = useMutation({
-        mutationFn: async (id: number) => {
-            const { data } = await api.post(`${INBOX_URL}/${id}/descartar`);
-            return data;
+        mutationFn: async ({ id, data }: { id: number; data: { motivo_descarte_id: number; comentario_descarte: string; enviar_mensaje?: boolean } }) => {
+            const { data: res } = await api.post(`${INBOX_URL}/${id}/descartar`, data);
+            return res;
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['inbox-leads'] });

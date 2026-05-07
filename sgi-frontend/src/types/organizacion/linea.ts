@@ -59,12 +59,7 @@ export interface CambiarCelularRequest {
     observaciones?: string | null;
 }
 
-export interface AsignarEmpleadoRequest {
-    empleado_id: number;
-    observaciones?: string | null;
-}
-
-export interface LineaHistorial {
+export interface LineaHistorialResponse {
     id: number;
     tipo_cambio: string;
     activo_anterior_nombre?: string | null;

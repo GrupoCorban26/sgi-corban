@@ -54,5 +54,27 @@ export const analyticsService = {
             }
         });
         return response.data;
+    },
+    getDetalleBaseDatos: async (fechaInicio: string, fechaFin: string, comercialId?: string, empresa?: string): Promise<Record<string, string>[]> => {
+        const response = await api.get('/clientes/metricas/dashboard/base-datos/detalle', {
+            params: {
+                fecha_inicio: fechaInicio,
+                fecha_fin: fechaFin,
+                comercial_id: comercialId || undefined,
+                empresa: empresa || undefined
+            }
+        });
+        return response.data;
+    },
+    getDetalleCartera: async (fechaInicio: string, fechaFin: string, comercialId?: string, empresa?: string): Promise<Record<string, string>[]> => {
+        const response = await api.get('/clientes/metricas/dashboard/cartera/detalle', {
+            params: {
+                fecha_inicio: fechaInicio,
+                fecha_fin: fechaFin,
+                comercial_id: comercialId || undefined,
+                empresa: empresa || undefined
+            }
+        });
+        return response.data;
     }
 };

@@ -3,7 +3,7 @@ from sqlalchemy.future import select
 from sqlalchemy import text
 from fastapi import HTTPException
 from app.models.comercial import CasoLlamada
-from app.models.comercial import ClienteContacto
+from app.models.historial_llamadas import HistorialLlamada
 
 class CasosLlamadaService:
 
@@ -56,10 +56,10 @@ class CasosLlamadaService:
     @staticmethod
     async def delete(db: AsyncSession, id: int):
         # Verificar uso
-        stmt_check = select(ClienteContacto).where(ClienteContacto.caso_id == id).limit(1)
+        stmt_check = select(HistorialLlamada).where(HistorialLlamada.caso_id == id).limit(1)
         res_check = await db.execute(stmt_check)
         if res_check.scalars().first():
-             raise HTTPException(status_code=400, detail="No se puede eliminar: el caso está en uso por contactos.")
+             raise HTTPException(status_code=400, detail="No se puede eliminar: el caso está en uso.")
         
         stmt = select(CasoLlamada).where(CasoLlamada.id == id)
         result = await db.execute(stmt)

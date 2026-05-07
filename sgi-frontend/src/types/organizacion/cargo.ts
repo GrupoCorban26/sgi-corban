@@ -20,7 +20,7 @@ export interface CargoPaginationResponse {
 }
 
 export interface CargoOperationResult {
-    success: number;
+    success: boolean;
     message: string;
     id?: number;
 }

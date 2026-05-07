@@ -3,6 +3,7 @@ from . import inbox
 from . import importaciones
 from . import base
 from . import contactos
+from . import lotes
 from . import casos_llamada
 from . import clientes
 from . import gestiones
@@ -18,6 +19,7 @@ api_router.include_router(inbox.router)
 api_router.include_router(importaciones.router)
 api_router.include_router(base.router)
 api_router.include_router(contactos.router)
+api_router.include_router(lotes.router)
 api_router.include_router(casos_llamada.router)
 api_router.include_router(clientes.router)
 api_router.include_router(gestiones.router)

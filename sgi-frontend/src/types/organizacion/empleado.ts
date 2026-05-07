@@ -14,7 +14,7 @@ export interface Empleado {
     distrito?: string | null;
     provincia?: string | null;
     provincia_id?: number | null;
-    departamento?: string | null; // Departamento geográfico (ubigeo)
+    departamento_ubigeo?: string | null; // Departamento geográfico (ubigeo)
     departamento_ubigeo_id?: number | null;
     direccion?: string | null;
     fecha_ingreso?: string | null;

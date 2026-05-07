@@ -5,7 +5,7 @@ export interface Departamento {
   nombre: string;
   descripcion?: string | null;
   responsable_id?: number | null;
-  responsable_nombre?: EmpleadoOption;
+  responsable_nombre?: string | null;
   is_active?: boolean;
   created_at?: string | null;
   updated_at?: string | null;
@@ -16,7 +16,7 @@ export interface DepartamentoPaginationResponse {
   data: Departamento[];
   total: number;
   page: number;
-  registro_por_pagina: number;
+  page_size: number;
   total_pages: number;
 }
 

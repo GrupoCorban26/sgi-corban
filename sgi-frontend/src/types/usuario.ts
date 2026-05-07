@@ -15,8 +15,8 @@ export interface Usuario {
     is_active: boolean;
     is_bloqueado: boolean;
     ultimo_acceso: string | null;
-    debe_cambiar_pass: boolean;
     roles: string | null;
+    roles_ids: number[];
     total_registros?: number;
 }
 
@@ -58,14 +58,20 @@ export interface UsuarioCreate {
 export interface UsuarioUpdate {
     correo_corp?: string | null;
     is_active?: boolean | null;
-    debe_cambiar_pass?: boolean | null;
     is_bloqueado?: boolean | null;
     roles?: number[] | null;
 }
 
-export interface UsuarioDetail extends Usuario {
+export interface UsuarioDetail {
+    id: number;
+    empleado_id: number | null;
+    empleado_nombre: string | null;
+    correo_corp: string;
+    is_active: boolean;
+    is_bloqueado: boolean;
+    ultimo_acceso: string | null;
     intentos_fallidos: number;
     created_at: string | null;
     updated_at: string | null;
-    roles_list: RolOption[];
+    roles: RolOption[];
 }

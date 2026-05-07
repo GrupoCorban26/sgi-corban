@@ -2,13 +2,13 @@ import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, and_
-from sqlalchemy.orm import selectinload
 from app.models.cliente_gestion import ClienteGestion
 from app.models.comercial import Cliente
+from app.models.comercial_catalogos import EstadoCliente, MedioGestion, MotivoGestion
 from app.models.seguridad import Usuario
 from app.models.administrativo import Empleado
 from app.schemas.comercial.gestion import GestionCreate
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 
 logger = logging.getLogger(__name__)
 
@@ -20,25 +20,19 @@ class GestionService:
     async def registrar_gestion(self, cliente_id: int, data: GestionCreate, comercial_id: int) -> dict:
         """Registra una gestión y actualiza los campos del cliente. Opcionalmente cambia el estado."""
         try:
-            # Verificar que el cliente existe
             cliente = await self.db.get(Cliente, cliente_id)
             if not cliente:
                 return {"success": 0, "message": "Cliente no encontrado"}
 
-            # Crear registro de gestión
             gestion = ClienteGestion(
                 cliente_id=cliente_id,
-                comercial_id=comercial_id,
-                tipo=data.tipo,
-                resultado=data.resultado,
+                medio_id=data.medio_id,
+                motivo_id=data.motivo_id,
                 comentario=data.comentario,
-                proxima_fecha_contacto=data.proxima_fecha_contacto
             )
             self.db.add(gestion)
 
-            # Actualizar campos del cliente
-            cliente.ultimo_contacto = datetime.now()
-            cliente.comentario_ultima_llamada = data.comentario
+            # Actualizar próxima fecha de contacto
             if data.proxima_fecha_contacto:
                 cliente.proxima_fecha_contacto = data.proxima_fecha_contacto
             cliente.updated_at = datetime.now()
@@ -46,23 +40,33 @@ class GestionService:
 
             # Cambiar estado del cliente si se solicita
             estado_cambiado = None
-            if data.nuevo_estado and data.nuevo_estado != cliente.tipo_estado:
+            if data.nuevo_estado_id and data.nuevo_estado_id != cliente.estado_id:
                 from app.services.comercial.clientes_service import ClientesService
                 clientes_svc = ClientesService(self.db)
+                # Obtener nombre del estado para el motivo
+                estado_result = await self.db.execute(
+                    select(EstadoCliente.nombre).where(EstadoCliente.id == data.nuevo_estado_id)
+                )
+                nombre_estado = estado_result.scalar()
+                motivo_result = await self.db.execute(
+                    select(MotivoGestion.nombre).where(MotivoGestion.id == data.motivo_id)
+                )
+                nombre_motivo = motivo_result.scalar()
+
                 result_estado = await clientes_svc.cambiar_estado(
-                    cliente_id, data.nuevo_estado, updated_by=comercial_id,
-                    motivo=f"Cambio desde gestión: {data.resultado}"
+                    cliente_id, data.nuevo_estado_id, updated_by=comercial_id,
+                    motivo=f"Cambio desde gestión: {nombre_motivo}"
                 )
                 if result_estado.get("success") == 0:
-                    return result_estado  # Retorna error si la transición no es válida
-                estado_cambiado = data.nuevo_estado
+                    return result_estado
+                estado_cambiado = nombre_estado
 
             await self.db.commit()
             await self.db.refresh(gestion)
 
             mensaje = "Gestión registrada exitosamente"
             if estado_cambiado:
-                mensaje += f" • Estado: {cliente.tipo_estado} → {estado_cambiado}"
+                mensaje += f" • Estado cambiado a: {estado_cambiado}"
 
             return {"success": 1, "message": mensaje, "id": gestion.id}
         except Exception as e:
@@ -75,10 +79,11 @@ class GestionService:
         stmt = (
             select(
                 ClienteGestion,
-                func.concat(Empleado.nombres, ' ', Empleado.apellido_paterno).label("comercial_nombre")
+                MedioGestion.nombre.label("medio_nombre"),
+                MotivoGestion.nombre.label("motivo_nombre"),
             )
-            .outerjoin(Usuario, ClienteGestion.comercial_id == Usuario.id)
-            .outerjoin(Empleado, Usuario.empleado_id == Empleado.id)
+            .outerjoin(MedioGestion, ClienteGestion.medio_id == MedioGestion.id)
+            .outerjoin(MotivoGestion, ClienteGestion.motivo_id == MotivoGestion.id)
             .where(ClienteGestion.cliente_id == cliente_id)
             .order_by(ClienteGestion.created_at.desc())
         )
@@ -89,15 +94,12 @@ class GestionService:
             {
                 "id": g.id,
                 "cliente_id": g.cliente_id,
-                "comercial_id": g.comercial_id,
-                "comercial_nombre": nombre,
-                "tipo": g.tipo,
-                "resultado": g.resultado,
+                "medio_nombre": medio,
+                "motivo_nombre": motivo,
                 "comentario": g.comentario,
-                "proxima_fecha_contacto": g.proxima_fecha_contacto,
                 "created_at": g.created_at
             }
-            for g, nombre in rows
+            for g, medio, motivo in rows
         ]
 
     async def get_productividad(self, comercial_id: int, fecha_inicio: date, fecha_fin: date) -> dict:
@@ -105,52 +107,54 @@ class GestionService:
         dt_inicio = datetime.combine(fecha_inicio, datetime.min.time())
         dt_fin = datetime.combine(fecha_fin, datetime.max.time())
 
-        # Total gestiones
-        stmt_total = select(func.count()).select_from(ClienteGestion).where(
-            and_(
-                ClienteGestion.comercial_id == comercial_id,
+        # Total gestiones — ya no hay comercial_id en la tabla,
+        # así que filtramos por los clientes asignados al comercial
+        stmt_total = (
+            select(func.count())
+            .select_from(ClienteGestion)
+            .join(Cliente, ClienteGestion.cliente_id == Cliente.id)
+            .where(and_(
+                Cliente.comercial_encargado_id == comercial_id,
                 ClienteGestion.created_at >= dt_inicio,
                 ClienteGestion.created_at <= dt_fin
-            )
+            ))
         )
         total = (await self.db.execute(stmt_total)).scalar() or 0
 
-        # Por tipo
-        stmt_tipo = select(
-            ClienteGestion.tipo,
-            func.count().label("total")
-        ).where(
-            and_(
-                ClienteGestion.comercial_id == comercial_id,
+        # Por medio
+        stmt_medio = (
+            select(MedioGestion.nombre, func.count().label("total"))
+            .select_from(ClienteGestion)
+            .join(MedioGestion, ClienteGestion.medio_id == MedioGestion.id)
+            .join(Cliente, ClienteGestion.cliente_id == Cliente.id)
+            .where(and_(
+                Cliente.comercial_encargado_id == comercial_id,
                 ClienteGestion.created_at >= dt_inicio,
                 ClienteGestion.created_at <= dt_fin
-            )
-        ).group_by(ClienteGestion.tipo)
-        result_tipo = await self.db.execute(stmt_tipo)
-        por_tipo = {row.tipo: row.total for row in result_tipo.all()}
+            ))
+            .group_by(MedioGestion.nombre)
+        )
+        result_medio = await self.db.execute(stmt_medio)
+        por_medio = {row.nombre: row.total for row in result_medio.all()}
 
-        # Por resultado
-        stmt_resultado = select(
-            ClienteGestion.resultado,
-            func.count().label("total")
-        ).where(
-            and_(
-                ClienteGestion.comercial_id == comercial_id,
+        # Por motivo
+        stmt_motivo = (
+            select(MotivoGestion.nombre, func.count().label("total"))
+            .select_from(ClienteGestion)
+            .join(MotivoGestion, ClienteGestion.motivo_id == MotivoGestion.id)
+            .join(Cliente, ClienteGestion.cliente_id == Cliente.id)
+            .where(and_(
+                Cliente.comercial_encargado_id == comercial_id,
                 ClienteGestion.created_at >= dt_inicio,
                 ClienteGestion.created_at <= dt_fin
-            )
-        ).group_by(ClienteGestion.resultado)
-        result_resultado = await self.db.execute(stmt_resultado)
-        por_resultado = {row.resultado: row.total for row in result_resultado.all()}
-
-        # Tasa de contactabilidad
-        llamadas_total = por_tipo.get("LLAMADA", 0)
-        contesto = por_resultado.get("CONTESTO", 0) + por_resultado.get("INTERESADO", 0) + por_resultado.get("COTIZACION_ENVIADA", 0)
-        tasa_contactabilidad = round((contesto / llamadas_total * 100), 1) if llamadas_total > 0 else 0
+            ))
+            .group_by(MotivoGestion.nombre)
+        )
+        result_motivo = await self.db.execute(stmt_motivo)
+        por_motivo = {row.nombre: row.total for row in result_motivo.all()}
 
         return {
             "total_gestiones": total,
-            "por_tipo": por_tipo,
-            "por_resultado": por_resultado,
-            "tasa_contactabilidad": tasa_contactabilidad
+            "por_medio": por_medio,
+            "por_motivo": por_motivo,
         }

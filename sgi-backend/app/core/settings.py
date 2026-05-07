@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     DB_USER: str
     DB_PASS: str
     DB_DRIVER: str = "ODBC Driver 18 for SQL Server"
+    DB_TRUSTED: bool = False
     DB_ECHO: bool = False
 
     # ========================

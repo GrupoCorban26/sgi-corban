@@ -1,4 +1,7 @@
-import { Search, ArrowDownWideNarrow, Loader2 } from 'lucide-react';
+import {
+  Search, ArrowDownWideNarrow, Loader2, Filter,
+  ChevronDown, PhoneOff
+} from 'lucide-react';
 
 interface TransaccionesToolbarProps {
   search: string;
@@ -33,66 +36,105 @@ export default function TransaccionesToolbar({
   total,
   onPageReset,
 }: TransaccionesToolbarProps) {
+  const hasActiveFilters = sortByRuc || paisOrigen || cantAgentes || sinTelefono;
+
   return (
-    <div className="p-4 border-b border-gray-200 flex justify-between items-center">
-      <div className="flex items-center gap-4">
-        <div className="relative w-64">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+    <div className="border-b border-gray-100 bg-gray-50/50 px-5 py-4">
+      {/* Top row: Search + Stats */}
+      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        {/* Search */}
+        <div className="relative max-w-sm flex-1">
+          <Search className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
           <input
             type="text"
             placeholder="Buscar por RUC o Razón Social..."
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-9 pr-4 py-2 border rounded-lg text-sm w-full focus:ring-2 focus:ring-blue-500 outline-none"
+            className="w-full rounded-xl border border-gray-200 bg-white py-2.5 pl-10 pr-4 text-sm shadow-sm transition-all duration-200 placeholder:text-gray-400 focus:border-azul-400 focus:outline-none focus:ring-2 focus:ring-azul-500/20"
           />
         </div>
 
+        {/* Stats badge */}
+        <div className="flex items-center gap-3">
+          {loading && (
+            <Loader2 className="h-4 w-4 animate-spin text-azul-500" />
+          )}
+          <div className="flex items-center gap-1.5 rounded-full bg-azul-500/10 px-3.5 py-1.5 text-xs font-semibold text-azul-700">
+            <span className="inline-flex h-1.5 w-1.5 rounded-full bg-azul-500" />
+            {total.toLocaleString()} registros
+          </div>
+          {hasActiveFilters && (
+            <div className="flex items-center gap-1.5 rounded-full bg-naranja-100 px-3 py-1.5 text-xs font-semibold text-naranja-700">
+              <Filter className="h-3 w-3" />
+              Filtros activos
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Bottom row: Filters */}
+      <div className="mt-3 flex flex-wrap items-center gap-2.5">
+        {/* Sort by RUC */}
         <button
           onClick={onToggleSortRuc}
-          className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 border ${
+          className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all duration-200 ${
             sortByRuc === 'desc'
-              ? 'bg-indigo-50 border-indigo-300 text-indigo-700'
-              : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+              ? 'border-azul-300 bg-azul-50 text-azul-700 shadow-sm ring-1 ring-azul-200'
+              : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
           }`}
           title="Ordenar RUC de mayor a menor"
         >
-          <ArrowDownWideNarrow className="w-4 h-4" />
+          <ArrowDownWideNarrow className="h-3.5 w-3.5" />
           RUC {sortByRuc === 'desc' ? '↓' : ''}
         </button>
 
-        <select
-          value={paisOrigen}
-          onChange={(e) => { onPaisOrigenChange(e.target.value); onPageReset(); }}
-          className="px-3 py-2 border rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none w-40"
-        >
-          <option value="">Todos los países</option>
-          {paisesDropdown.map(pais => (
-            <option key={pais} value={pais}>{pais}</option>
-          ))}
-        </select>
+        {/* Country filter */}
+        <div className="relative">
+          <select
+            value={paisOrigen}
+            onChange={(e) => { onPaisOrigenChange(e.target.value); onPageReset(); }}
+            className={`appearance-none rounded-lg border py-2 pl-3 pr-8 text-xs font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-azul-500/20 ${
+              paisOrigen
+                ? 'border-azul-300 bg-azul-50 text-azul-700 shadow-sm ring-1 ring-azul-200'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+            }`}
+          >
+            <option value="">🌍 Todos los países</option>
+            {paisesDropdown.map(pais => (
+              <option key={pais} value={pais}>{pais}</option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+        </div>
 
-        <input
-          type="number"
-          min={0}
-          placeholder="Cant. agentes..."
-          value={cantAgentes}
-          onChange={(e) => { onCantAgentesChange(e.target.value); onPageReset(); }}
-          className="px-3 py-2 border rounded-lg text-sm w-36 focus:ring-2 focus:ring-blue-500 outline-none"
-        />
-
-        <label className="flex items-center gap-2 cursor-pointer ml-2">
+        {/* Agents filter */}
+        <div className="relative">
           <input
-            type="checkbox"
-            checked={sinTelefono}
-            onChange={(e) => { onSinTelefonoChange(e.target.checked); onPageReset(); }}
-            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+            type="number"
+            min={0}
+            placeholder="Cant. agentes"
+            value={cantAgentes}
+            onChange={(e) => { onCantAgentesChange(e.target.value); onPageReset(); }}
+            className={`w-32 rounded-lg border py-2 pl-3 pr-3 text-xs font-medium transition-all duration-200 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-azul-500/20 ${
+              cantAgentes
+                ? 'border-azul-300 bg-azul-50 text-azul-700 shadow-sm ring-1 ring-azul-200'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+            }`}
           />
-          <span className="text-sm text-gray-600 whitespace-nowrap">Solo sin teléfono</span>
-        </label>
-      </div>
-      <div className="flex items-center gap-3">
-        {loading && <Loader2 className="w-4 h-4 animate-spin text-blue-500" />}
-        <span className="text-sm text-gray-500">{total.toLocaleString()} registros</span>
+        </div>
+
+        {/* Sin teléfono toggle */}
+        <button
+          onClick={() => { onSinTelefonoChange(!sinTelefono); onPageReset(); }}
+          className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-medium transition-all duration-200 ${
+            sinTelefono
+              ? 'border-naranja-300 bg-naranja-50 text-naranja-700 shadow-sm ring-1 ring-naranja-200'
+              : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300 hover:bg-gray-50'
+          }`}
+        >
+          <PhoneOff className="h-3.5 w-3.5" />
+          Sin teléfono
+        </button>
       </div>
     </div>
   );

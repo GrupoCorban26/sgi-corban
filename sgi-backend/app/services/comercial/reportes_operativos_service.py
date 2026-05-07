@@ -5,10 +5,13 @@ from datetime import datetime, timedelta
 import calendar
 
 from app.models.comercial import Cliente
+from app.models.comercial import ClienteContacto, LoteContactos
+from app.models.comercial_catalogos import EstadoCliente
 from app.models.comercial_inbox import Inbox
 from app.models.lead_web import LeadWeb
 from app.models.seguridad import Usuario
 from app.models.administrativo import Empleado
+from app.utils.horario_laboral import calcular_segundos_horario_laboral
 
 from app.schemas.comercial.reportes import (
     ReporteBaseDatos, KPIBaseDatos, DetalleBaseDatos,
@@ -44,11 +47,27 @@ class ReportesOperativosService:
         if comercial_id:
             filters.append(Cliente.comercial_encargado_id == comercial_id)
 
+        # Subquery para obtener el nombre del lote del contacto principal del cliente
+        lote_subq = (
+            select(LoteContactos.nombre)
+            .select_from(ClienteContacto)
+            .join(LoteContactos, ClienteContacto.lote_id == LoteContactos.id)
+            .where(ClienteContacto.ruc == Cliente.ruc, ClienteContacto.is_active == True)
+            .limit(1)
+            .correlate(Cliente)
+            .scalar_subquery()
+            .label('lote_nombre')
+        )
+
         # Consulta principal
         query = select(
             Cliente,
+            EstadoCliente.nombre.label('estado_nombre'),
             Usuario.correo_corp,
-            Empleado.nombres, Empleado.apellido_paterno
+            Empleado.nombres, Empleado.apellido_paterno,
+            lote_subq
+        ).outerjoin(
+            EstadoCliente, Cliente.estado_id == EstadoCliente.id
         ).outerjoin(
             Usuario, Cliente.comercial_encargado_id == Usuario.id
         ).outerjoin(
@@ -57,6 +76,12 @@ class ReportesOperativosService:
 
         result: Result = await self.db.execute(query)
         rows = result.all()
+
+        # Obtener IDs de estados "convertidos"
+        estados_conv = await self.db.execute(
+            select(EstadoCliente.id).where(EstadoCliente.nombre.notin_(['PROSPECTO', 'CAIDO', 'INACTIVO']))
+        )
+        ids_convertidos = {r.id for r in estados_conv.all()}
 
         total_leads = len(rows)
         leads_contactados = 0
@@ -67,21 +92,19 @@ class ReportesOperativosService:
             cliente = row.Cliente
             comercial_nombre = f"{row.nombres or ''} {row.apellido_paterno or ''}".strip() or row.correo_corp
             
-            # KPIs
-            if cliente.ultimo_contacto is not None:
+            if cliente.updated_at is not None:
                 leads_contactados += 1
-            if cliente.tipo_estado not in ("PROSPECTO", "CAIDO", "INACTIVO"):
+            if cliente.estado_id in ids_convertidos:
                 leads_convertidos += 1
 
             detalle.append(DetalleBaseDatos(
                 id=cliente.id,
                 razon_social=cliente.razon_social,
                 ruc=cliente.ruc,
-                estado=cliente.tipo_estado,
-                origen=cliente.origen,
+                estado=row.estado_nombre,
                 fecha_ingreso=cliente.created_at,
-                ultimo_contacto=cliente.ultimo_contacto,
-                comercial_nombre=comercial_nombre
+                comercial_nombre=comercial_nombre,
+                lote_nombre=row.lote_nombre
             ))
 
         porc_contactabilidad = (leads_contactados / total_leads * 100) if total_leads > 0 else 0.0
@@ -101,15 +124,23 @@ class ReportesOperativosService:
     async def get_reporte_mantenimiento_cartera(self, periodo: str, comercial_id: Optional[int] = None) -> ReporteMantenimientoCartera:
         start_date, end_date = self._get_fechas_periodo(periodo)
         
-        # Filtro base: clientes activos que no estén caidos ni inactivos ni prospectos sin contacto
-        filters = [Cliente.tipo_estado.notin_(["CAIDO", "INACTIVO", "PROSPECTO", "BASE_DATOS"])]
+        # Obtener IDs de estados excluidos
+        estados_excl = await self.db.execute(
+            select(EstadoCliente.id).where(EstadoCliente.nombre.in_(['CAIDO', 'INACTIVO', 'PROSPECTO']))
+        )
+        ids_excluidos = [r.id for r in estados_excl.all()]
+        
+        filters = [Cliente.estado_id.notin_(ids_excluidos)]
         if comercial_id:
             filters.append(Cliente.comercial_encargado_id == comercial_id)
 
         query = select(
             Cliente,
+            EstadoCliente.nombre.label('estado_nombre'),
             Usuario.correo_corp,
             Empleado.nombres, Empleado.apellido_paterno
+        ).outerjoin(
+            EstadoCliente, Cliente.estado_id == EstadoCliente.id
         ).outerjoin(
             Usuario, Cliente.comercial_encargado_id == Usuario.id
         ).outerjoin(
@@ -135,13 +166,12 @@ class ReportesOperativosService:
             comercial_nombre = f"{row.nombres or ''} {row.apellido_paterno or ''}".strip() or row.correo_corp
             
             dias_sin_contacto = 0
-            if cliente.ultimo_contacto:
-                dias_sin_contacto = (now.date() - cliente.ultimo_contacto.date()).days
-                # Si el último contacto fue en este periodo
-                if start_date.replace(tzinfo=None) <= cliente.ultimo_contacto.replace(tzinfo=None) <= end_date.replace(tzinfo=None):
+            if cliente.updated_at:
+                updated_naive = cliente.updated_at.replace(tzinfo=None) if cliente.updated_at.tzinfo else cliente.updated_at
+                dias_sin_contacto = (now.date() - updated_naive.date()).days
+                if start_date <= updated_naive <= end_date:
                     clientes_recontactados += 1
-                
-                if cliente.ultimo_contacto.replace(tzinfo=None) < thirty_days_ago:
+                if updated_naive < thirty_days_ago:
                     clientes_en_riesgo += 1
             else:
                 dias_sin_contacto = (now.date() - (cliente.created_at.date() if cliente.created_at else now.date())).days
@@ -150,8 +180,7 @@ class ReportesOperativosService:
             detalle.append(DetalleMantenimientoCartera(
                 id=cliente.id,
                 razon_social=cliente.razon_social,
-                estado=cliente.tipo_estado,
-                ultimo_contacto=cliente.ultimo_contacto,
+                estado=row.estado_nombre,
                 proxima_fecha_contacto=cliente.proxima_fecha_contacto,
                 dias_sin_contacto=dias_sin_contacto,
                 comercial_nombre=comercial_nombre
@@ -210,10 +239,12 @@ class ReportesOperativosService:
                 leads_descartados += 1
                 
             tiempo_minutos = None
-            if lead.tiempo_respuesta_segundos is not None:
-                tiempo_minutos = int(lead.tiempo_respuesta_segundos / 60)
-                total_tiempo_segundos += lead.tiempo_respuesta_segundos
-                conteo_tiempo += 1
+            if lead.fecha_gestion is not None and lead.fecha_recepcion is not None:
+                diff_segundos = calcular_segundos_horario_laboral(lead.fecha_recepcion, lead.fecha_gestion)
+                if diff_segundos >= 0:
+                    tiempo_minutos = int(diff_segundos / 60)
+                    total_tiempo_segundos += diff_segundos
+                    conteo_tiempo += 1
 
             detalle.append(DetalleGestionLeads(
                 id=lead.id,

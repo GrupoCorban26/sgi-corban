@@ -7,8 +7,7 @@ import {
     LineaCreate,
     LineaUpdate,
     CambiarCelularRequest,
-    AsignarEmpleadoRequest,
-    LineaHistorial,
+    LineaHistorialResponse,
     LineaDropdown
 } from '@/types/organizacion/linea';
 
@@ -77,7 +76,7 @@ export const useLineas = (
 
     // Asignar empleado
     const asignarEmpleadoMutation = useMutation({
-        mutationFn: async ({ id, data }: { id: number; data: AsignarEmpleadoRequest }) => {
+        mutationFn: async ({ id, data }: { id: number; data: { empleado_id: number; observaciones?: string | null } }) => {
             const response = await api.post<LineaOperationResult>(`${LINEAS_URL}/${id}/asignar`, data);
             return response.data;
         },
@@ -154,7 +153,7 @@ export const useLineaHistorial = (lineaId: number | null) => {
         queryKey: ['linea-historial', lineaId],
         queryFn: async () => {
             if (!lineaId) return [];
-            const { data } = await api.get<LineaHistorial[]>(`${LINEAS_URL}/${lineaId}/historial`);
+            const { data } = await api.get<LineaHistorialResponse[]>(`${LINEAS_URL}/${lineaId}/historial`);
             return data;
         },
         enabled: !!lineaId,

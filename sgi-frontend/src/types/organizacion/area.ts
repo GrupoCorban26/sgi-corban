@@ -6,7 +6,7 @@ export interface Area {
     descripcion?: string | null;
     departamento_id: number;
     departamento_nombre?: string | null;
-    area_parent_id?: number | null;
+    area_padre_id?: number | null;
     area_padre_nombre?: string | null;
     responsable_id?: number | null;
     responsable_nombre?: string | null;

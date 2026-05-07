@@ -41,8 +41,8 @@ async def listar_citas(
             
     return await service.get_all(
         comercial_id=None, # Ya se delega la lógica a comercial_ids
-        estado=estado, 
-        tipo_agenda=tipo_agenda, 
+        estado_id=estado, 
+        tipo_cita=tipo_agenda, 
         page=page, 
         page_size=page_size,
         comercial_ids=comercial_ids

@@ -2,53 +2,42 @@ export interface Cliente {
     id: number;
     ruc: string | null;
     razon_social: string;
-    nombre_comercial: string | null;
     direccion_fiscal: string | null;
     distrito_id: number | null;
-    area_encargada_id: number | null;
-    area_nombre: string | null;
+    estado_id: number | null;
+    origen_id: number | null;
+    proxima_fecha_contacto: string | null;
     comercial_encargado_id: number | null;
     comercial_nombre: string | null;
-    ultimo_contacto: string | null;
-    comentario_ultima_llamada: string | null;
-    proxima_fecha_contacto: string | null;
-    tipo_estado: 'PROSPECTO' | 'EN_NEGOCIACION' | 'CERRADA' | 'EN_OPERACION' | 'CARGA_ENTREGADA' | 'CAIDO' | 'INACTIVO';
-    motivo_perdida?: string | null;
-    fecha_perdida?: string | null;
-    fecha_reactivacion?: string | null;
-    origen: string | null;
+    estado_nombre: string | null;
+    origen_nombre: string | null;
+    // Campos de contacto principal (resueltos por el service)
+    telefono: string | null;
+    correo: string | null;
+    nombre_contacto: string | null;
     is_active: boolean;
     created_at: string | null;
-    telefono?: string | null;
-    correo?: string | null;
-    nombre_contacto?: string | null;
+    updated_at: string | null;
 }
 
 export interface ClienteCreate {
     ruc?: string | null;
     razon_social: string;
-    nombre_comercial?: string | null;
     direccion_fiscal?: string | null;
     distrito_id?: number | null;
-    tipo_estado?: string;
-    origen?: string | null;
-    ultimo_contacto: string;
-    comentario_ultima_llamada: string;
-    proxima_fecha_contacto: string;
+    estado_id?: number | null;
+    origen_id?: number | null;
+    proxima_fecha_contacto?: string | null;
 }
 
 export interface ClienteUpdate {
     ruc?: string | null;
     razon_social?: string;
-    nombre_comercial?: string | null;
     direccion_fiscal?: string | null;
     distrito_id?: number | null;
-    tipo_estado?: string;
-    origen?: string | null;
-    ultimo_contacto?: string;
-    comentario_ultima_llamada?: string;
-    proxima_fecha_contacto?: string;
-    area_encargada_id?: number | null;
+    estado_id?: number | null;
+    origen_id?: number | null;
+    proxima_fecha_contacto?: string | null;
     comercial_encargado_id?: number | null;
 }
 
@@ -65,13 +54,13 @@ export interface ClienteStats {
 }
 
 export interface ClienteMarcarCaido {
-    motivo_caida: string;
-    fecha_seguimiento_caida?: string | null;
+    motivo: string;
+    fecha_seguimiento?: string | null;
 }
 
 export interface ClienteCambiarEstado {
-    nuevo_estado: string;
-    motivo?: string;
+    nuevo_estado_id: number;
+    motivo?: string | null;
 }
 
 export interface ClientePaginationResponse {

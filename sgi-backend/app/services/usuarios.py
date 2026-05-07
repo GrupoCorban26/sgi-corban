@@ -1,11 +1,15 @@
+import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import text, func, or_
 from sqlalchemy.orm import selectinload
-from app.schemas.usuario import UsuarioCreate, UsuarioUpdate
+from app.schemas.seg.usuario import UsuarioCreate, UsuarioUpdate
 from app.core.security import hashear_password
-from app.models.seguridad import Usuario, Rol, usuarios_roles
+from app.models.seguridad import Usuario, Rol, usuarios_roles, AuditoriaSeguridad
 from app.models.administrativo import Empleado, Cargo
+
+logger = logging.getLogger(__name__)
+
 
 class UsuarioService:
     def __init__(self, db: AsyncSession):
@@ -61,6 +65,7 @@ class UsuarioService:
         data_list = []
         for u in usuarios:
             roles_str = ", ".join([r.nombre for r in u.roles])
+            roles_ids = [r.id for r in u.roles]
             empleado_nombre = f"{u.empleado.nombres} {u.empleado.apellido_paterno}" if u.empleado else "Sin Empleado"
             data_list.append({
                 "id": u.id,
@@ -69,7 +74,8 @@ class UsuarioService:
                 "is_bloqueado": u.is_bloqueado,
                 "ultimo_acceso": u.ultimo_acceso,
                 "empleado_nombre": empleado_nombre,
-                "roles": roles_str
+                "roles": roles_str,
+                "roles_ids": roles_ids
             })
 
         return {
@@ -99,7 +105,6 @@ class UsuarioService:
             "correo_corp": usuario.correo_corp,
             "is_active": usuario.is_active,
             "is_bloqueado": usuario.is_bloqueado,
-            "debe_cambiar_pass": usuario.debe_cambiar_pass,
             "ultimo_acceso": usuario.ultimo_acceso,
             "created_at": usuario.created_at,
             "empleado_nombre": f"{usuario.empleado.nombres} {usuario.empleado.apellido_paterno}" if usuario.empleado else None,
@@ -123,7 +128,6 @@ class UsuarioService:
             correo_corp=usuario.correo_corp,
             password_hash=password_hash,
             is_active=True,
-            debe_cambiar_pass=True
         )
         self.db.add(nuevo_usuario)
         await self.db.commit()
@@ -148,8 +152,6 @@ class UsuarioService:
              user_db.correo_corp = usuario.correo_corp
         if usuario.is_active is not None:
              user_db.is_active = usuario.is_active
-        if usuario.debe_cambiar_pass is not None:
-             user_db.debe_cambiar_pass = usuario.debe_cambiar_pass
         if usuario.is_bloqueado is not None:
              user_db.is_bloqueado = usuario.is_bloqueado
              if not usuario.is_bloqueado:
@@ -257,14 +259,28 @@ class UsuarioService:
         
         if not usuario:
              return {"success": 0, "message": "Usuario no encontrado"}
+        
+        # Guardar roles anteriores para auditoría
+        roles_anteriores = [r.nombre for r in usuario.roles]
              
         # Obtener objetos Rol
         stmt_roles = select(Rol).where(Rol.id.in_(roles_ids))
         res_roles = await self.db.execute(stmt_roles)
         nuevos_roles = res_roles.scalars().all()
+        roles_nuevos_nombres = [r.nombre for r in nuevos_roles]
         
         # SQLAlchemy maneja la tabla intermedia automáticamente
         usuario.roles = nuevos_roles
+        
+        # Registrar en auditoría de seguridad
+        if created_by:
+            await self._registrar_auditoria(
+                usuario_afectado_id=usuario_id,
+                accion="ASIGNAR_ROLES",
+                detalle=f"Roles cambiados de [{', '.join(roles_anteriores)}] a [{', '.join(roles_nuevos_nombres)}]",
+                realizado_por=created_by
+            )
+        
         await self.db.commit()
         
         return {"success": 1, "message": "Roles asignados correctamente"}
@@ -356,7 +372,42 @@ class UsuarioService:
             return {"success": 0, "message": "Usuario no encontrado"}
             
         user_db.password_hash = hashear_password(password)
-        user_db.debe_cambiar_pass = False # Asumimos que si la cambia admin, o usuario, ya cumplió
+        
+        # Registrar en auditoría
+        if updated_by:
+            await self._registrar_auditoria(
+                usuario_afectado_id=id,
+                accion="CAMBIAR_PASSWORD",
+                detalle="Contraseña actualizada por administrador",
+                realizado_por=updated_by
+            )
+        
         await self.db.commit()
         
         return {"success": 1, "message": "Contraseña actualizada correctamente"}
+
+    # =========================================================================
+    # AUDITORÍA DE SEGURIDAD
+    # =========================================================================
+
+    async def _registrar_auditoria(
+        self,
+        usuario_afectado_id: int,
+        accion: str,
+        detalle: str,
+        realizado_por: int,
+        ip_address: str = None
+    ):
+        """Registra un evento en la bitácora de auditoría de seguridad."""
+        try:
+            registro = AuditoriaSeguridad(
+                usuario_afectado_id=usuario_afectado_id,
+                accion=accion,
+                detalle=detalle,
+                realizado_por=realizado_por,
+                ip_address=ip_address
+            )
+            self.db.add(registro)
+            logger.info(f"[AUDITORIA] {accion} - Usuario {usuario_afectado_id} por {realizado_por}: {detalle}")
+        except Exception as e:
+            logger.error(f"Error registrando auditoría: {e}")

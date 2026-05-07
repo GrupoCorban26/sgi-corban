@@ -6,7 +6,8 @@ from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import selectinload
 from app.models.lead_web import LeadWeb
 from app.models.seguridad import Usuario, Rol
-from app.models.comercial import Cliente
+from app.models.comercial import Cliente, ClienteContacto
+from app.models.comercial_catalogos import EstadoCliente, OrigenCliente, EstadoContacto
 from app.models.administrativo import Empleado
 from app.schemas.comercial.lead_web import LeadWebCreate
 from app.core.query_helpers import aplicar_filtro_comercial
@@ -273,19 +274,52 @@ class LeadWebService:
             raise ValueError("Lead no encontrado")
 
         if crear_prospecto and not cliente_id:
+            # Obtener catalogos
+            estado_result = await self.db.execute(select(EstadoCliente.id).where(EstadoCliente.nombre == 'PROSPECTO'))
+            estado_id = estado_result.scalar()
+            
+            origen_result = await self.db.execute(select(OrigenCliente.id).where(OrigenCliente.nombre == 'FORMULARIO_WEB'))
+            origen_id = origen_result.scalar()
+
             # Crear prospecto nuevo
             nuevo_cliente = Cliente(
                 razon_social=lead.nombre,
-                tipo_estado="PROSPECTO",
-                origen="FORMULARIO_WEB",
-                sub_origen=lead.pagina_origen,
+                estado_id=estado_id,
+                origen_id=origen_id,
                 comercial_encargado_id=lead.asignado_a,
-                fecha_primer_contacto=lead.fecha_recepcion,
-                fecha_conversion_cliente=datetime.now(),
+                created_at=datetime.now(),
             )
             self.db.add(nuevo_cliente)
             await self.db.flush()
             cliente_id = nuevo_cliente.id
+
+        # Insertar ClienteContacto asociado al cliente creado
+        if cliente_id:
+            cliente = await self.db.get(Cliente, cliente_id)
+            if cliente and cliente.ruc:
+                # Obtener estado de contacto por defecto
+                estado_contacto_result = await self.db.execute(select(EstadoContacto.id).where(EstadoContacto.nombre == 'ASIGNADO'))
+                estado_contacto_id = estado_contacto_result.scalar()
+
+                # Verificar si ya existe un contacto con este RUC y teléfono
+                stmt_dup = select(ClienteContacto).where(
+                    ClienteContacto.ruc == cliente.ruc,
+                    ClienteContacto.telefono == lead.telefono
+                )
+                contacto_existente = (await self.db.execute(stmt_dup)).scalars().first()
+
+                if not contacto_existente:
+                    nuevo_contacto = ClienteContacto(
+                        ruc=cliente.ruc,
+                        nombre=lead.nombre or "Sin nombre",
+                        telefono=lead.telefono,
+                        correo=lead.correo,
+                        origen="WEB",
+                        is_active=True,
+                        is_principal=True,
+                        estado_id=estado_contacto_id
+                    )
+                    self.db.add(nuevo_contacto)
 
         lead.estado = "CONVERTIDO"
         lead.cliente_convertido_id = cliente_id

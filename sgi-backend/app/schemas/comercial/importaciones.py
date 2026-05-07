@@ -6,18 +6,16 @@ class ImportacionBase(BaseModel):
     id: int
     ruc: Optional[str] = None
     razon_social: Optional[str] = None
-    fob_anual_usd: Optional[Decimal] = None
-    flete_anual_usd: Optional[Decimal] = None
-    flete_x_kg_usd: Optional[Decimal] = None
-    peso_anual_kg: Optional[Decimal] = None
-    embarques_anuales: Optional[Decimal] = None
+    sector: Optional[str] = None
+    score: Optional[Decimal] = None
     agentes_distintos: Optional[int] = None
-    meses_distintos: Optional[int] = None
-    categoria_frecuencia: Optional[str] = None
-    prox_embarque_estimado: Optional[str] = None
-    paises_origen: Optional[str] = None
-    aduanas: Optional[str] = None
-    partidas_arancelarias: Optional[str] = None
+    total_embarques: Optional[int] = None
+    meses_activos: Optional[int] = None
+    fob_promedio: Optional[Decimal] = None
+    via_predominante: Optional[str] = None
+    paises_principales: Optional[str] = None
+    ultima_importacion: Optional[str] = None
+    dias_desde_ultima: Optional[int] = None
 
 class ImportacionResponse(ImportacionBase):
     model_config = ConfigDict(from_attributes=True)

@@ -6,7 +6,7 @@ canales de captación y métricas operativas.
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, case, and_, extract, or_
+from sqlalchemy import func, case, and_, extract, or_, text
 from app.models.comercial import Cliente, ClienteContacto, Cita, CasoLlamada
 from app.models.historial_llamadas import HistorialLlamada
 from app.models.comercial_inbox import Inbox
@@ -15,6 +15,7 @@ from app.models.cliente_gestion import ClienteGestion
 from app.models.seguridad import Usuario, Rol
 from app.models.administrativo import Empleado
 from datetime import date, datetime, timedelta
+from app.utils.horario_laboral import calcular_segundos_horario_laboral
 
 logger = logging.getLogger(__name__)
 
@@ -65,21 +66,21 @@ class AnalyticsService:
             uid = com.id
             nombre = com.nombres.split()[0] if com.nombres else 'Sin Nombre'
             
-            # Total llamadas (HistorialLlamada con fecha_llamada)
+            # Total llamadas completadas (updated_at = fecha real de la llamada)
             stmt_llamadas = select(func.count()).select_from(HistorialLlamada).where(
-                and_(HistorialLlamada.comercial_id == uid, HistorialLlamada.fecha_llamada >= dt_inicio, HistorialLlamada.fecha_llamada <= dt_fin)
+                and_(HistorialLlamada.comercial_id == uid, HistorialLlamada.updated_at >= dt_inicio, HistorialLlamada.updated_at <= dt_fin, HistorialLlamada.caso_id.isnot(None))
             )
             total_llamadas = (await self.db.execute(stmt_llamadas)).scalar() or 0
             
             # Llamadas contestadas
             stmt_contestadas = select(func.count()).select_from(HistorialLlamada).join(CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id).where(
-                and_(HistorialLlamada.comercial_id == uid, HistorialLlamada.fecha_llamada >= dt_inicio, HistorialLlamada.fecha_llamada <= dt_fin, CasoLlamada.contestado == True)
+                and_(HistorialLlamada.comercial_id == uid, HistorialLlamada.updated_at >= dt_inicio, HistorialLlamada.updated_at <= dt_fin, CasoLlamada.contestado == True)
             )
             llamadas_contestadas = (await self.db.execute(stmt_contestadas)).scalar() or 0
             
             # Llamadas efectivas
             stmt_efectivas = select(func.count()).select_from(HistorialLlamada).join(CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id).where(
-                and_(HistorialLlamada.comercial_id == uid, HistorialLlamada.fecha_llamada >= dt_inicio, HistorialLlamada.fecha_llamada <= dt_fin, CasoLlamada.gestionable == True)
+                and_(HistorialLlamada.comercial_id == uid, HistorialLlamada.updated_at >= dt_inicio, HistorialLlamada.updated_at <= dt_fin, CasoLlamada.gestionable == True)
             )
             llamadas_efectivas = (await self.db.execute(stmt_efectivas)).scalar() or 0
             
@@ -106,6 +107,8 @@ class AnalyticsService:
     # =========================================================================
 
     async def get_reporte_cartera(self, dt_inicio: datetime, dt_fin: datetime, comercial_ids: list = None, empresa: str = None) -> dict:
+        from app.models.comercial_catalogos import MotivoGestion
+
         # Obtener comerciales activos y filtrar
         stmt_comerciales = select(Usuario.id, Empleado.nombres).join(Empleado).join(Usuario.roles).where(and_(Usuario.is_active == True, Rol.nombre == "COMERCIAL"))
         if comercial_ids is not None:
@@ -115,44 +118,33 @@ class AnalyticsService:
         comerciales = (await self.db.execute(stmt_comerciales)).all()
         
         comerciales_stats = []
-        
-        # Filtro base para conteos
-        condicion_base = and_(ClienteGestion.created_at >= dt_inicio, ClienteGestion.created_at <= dt_fin)
-        if comercial_ids is not None:
-            condicion_base = and_(condicion_base, ClienteGestion.comercial_id.in_(comercial_ids))
-        # Nota: El filtro de empresa en los totales generales requeriría join con Usuario y Empleado, pero al mostrar
-        # por comercial al final, es mejor calcular los totales sólo para los comerciales filtrados.
-        
-        total_gestiones = 0
-        total_unicos_set = set()
 
         for com in comerciales:
             uid = com.id
             nombre = com.nombres.split()[0] if com.nombres else 'Sin Nombre'
             
-            # Count by motive
-            stmt_motivos = select(ClienteGestion.resultado, func.count().label('total')).where(
-                and_(ClienteGestion.comercial_id == uid, ClienteGestion.created_at >= dt_inicio, ClienteGestion.created_at <= dt_fin)
-            ).group_by(ClienteGestion.resultado)
+            # Count by motive — JOIN through Cliente.comercial_encargado_id and MotivoGestion.nombre
+            stmt_motivos = (
+                select(MotivoGestion.nombre, func.count().label('total'))
+                .select_from(ClienteGestion)
+                .join(Cliente, ClienteGestion.cliente_id == Cliente.id)
+                .join(MotivoGestion, ClienteGestion.motivo_id == MotivoGestion.id)
+                .where(and_(
+                    Cliente.comercial_encargado_id == uid,
+                    ClienteGestion.created_at >= dt_inicio,
+                    ClienteGestion.created_at <= dt_fin
+                ))
+                .group_by(MotivoGestion.nombre)
+            )
             
             result_motivos = await self.db.execute(stmt_motivos)
-            motivos = {row.resultado: row.total for row in result_motivos.all()}
+            motivos = {row.nombre: row.total for row in result_motivos.all()}
             
             seguimiento = motivos.get("SEGUIMIENTO_CARGA", 0)
             fidelizacion = motivos.get("FIDELIZACION", 0)
             dudas = motivos.get("DUDAS_CLIENTE", 0)
             cotizacion = motivos.get("QUIERE_COTIZACION", 0)
             total_comercial = seguimiento + fidelizacion + dudas + cotizacion
-            
-            total_gestiones += sum(motivos.values()) # O utilizar una cuenta pura
-            
-            # Obtener clientes unicos para este comercial
-            stmt_unicos = select(func.count(func.distinct(ClienteGestion.cliente_id))).where(
-                and_(ClienteGestion.comercial_id == uid, ClienteGestion.created_at >= dt_inicio, ClienteGestion.created_at <= dt_fin)
-            )
-            unicos = (await self.db.execute(stmt_unicos)).scalar() or 0
-            # Wait, accumulating unicos across comercial might lead to duplicates if shared. But typically a client is managed by one.
-            # I can just sum them up for simplicity.
             
             comerciales_stats.append({
                 "usuario_id": uid, "nombre": nombre,
@@ -163,13 +155,27 @@ class AnalyticsService:
                 "total": total_comercial
             })
             
-        # Re-evaluating unicos with exact logic taking into account provided filters (commercial IDs) and empresa (derived)
+        # Totales generales
         comercial_ids_validos = [c.id for c in comerciales]
         if comercial_ids_validos:
-            stmt_totales = select(func.count()).select_from(ClienteGestion).where(and_(condicion_base, ClienteGestion.comercial_id.in_(comercial_ids_validos)))
+            condicion_totales = and_(
+                ClienteGestion.created_at >= dt_inicio,
+                ClienteGestion.created_at <= dt_fin
+            )
+            stmt_totales = (
+                select(func.count())
+                .select_from(ClienteGestion)
+                .join(Cliente, ClienteGestion.cliente_id == Cliente.id)
+                .where(and_(condicion_totales, Cliente.comercial_encargado_id.in_(comercial_ids_validos)))
+            )
             total_gestiones_real = (await self.db.execute(stmt_totales)).scalar() or 0
             
-            stmt_unicos_real = select(func.count(func.distinct(ClienteGestion.cliente_id))).where(and_(condicion_base, ClienteGestion.comercial_id.in_(comercial_ids_validos)))
+            stmt_unicos_real = (
+                select(func.count(func.distinct(ClienteGestion.cliente_id)))
+                .select_from(ClienteGestion)
+                .join(Cliente, ClienteGestion.cliente_id == Cliente.id)
+                .where(and_(condicion_totales, Cliente.comercial_encargado_id.in_(comercial_ids_validos)))
+            )
             total_unicos_real = (await self.db.execute(stmt_unicos_real)).scalar() or 0
         else:
             total_gestiones_real = 0
@@ -221,13 +227,17 @@ class AnalyticsService:
                  stmt_total = stmt_total.where(Inbox.asignado_a.in_(comerciales_ids_validos))
         total_leads = (await self.db.execute(stmt_total)).scalar() or 0
 
-        # Convertidos
+        # Convertidos — filtrado por fecha_cierre (fecha de cierre real)
+        condicion_fecha_cierre = and_(
+            Inbox.fecha_cierre >= dt_inicio,
+            Inbox.fecha_cierre <= dt_fin
+        )
         stmt_convertidos = select(func.count()).select_from(Inbox).where(
-            and_(condicion_fecha, Inbox.estado == 'CONVERTIDO')
+            and_(condicion_fecha_cierre, Inbox.estado == 'CIERRE')
         )
         if filtro_aplicable and comerciales_ids_validos:
             stmt_convertidos = stmt_convertidos.where(Inbox.asignado_a.in_(comerciales_ids_validos))
-        total_convertidos = (await self.db.execute(stmt_convertidos)).scalar() if total_leads > 0 else 0
+        total_convertidos = (await self.db.execute(stmt_convertidos)).scalar() or 0
 
         # Descartados
         stmt_descartados = select(func.count()).select_from(Inbox).where(
@@ -245,13 +255,16 @@ class AnalyticsService:
             stmt_sin_respuesta = stmt_sin_respuesta.where(Inbox.asignado_a.in_(comerciales_ids_validos))
         total_sin_respuesta = (await self.db.execute(stmt_sin_respuesta)).scalar() if total_leads > 0 else 0
 
-        # Tiempo promedio de respuesta (solo leads con respuesta)
-        stmt_avg_tiempo = select(func.avg(Inbox.tiempo_respuesta_segundos)).where(
-            and_(condicion_fecha, Inbox.tiempo_respuesta_segundos != None)
-        )
+        # Tiempo promedio de respuesta en segundos (calculado usando horario laboral)
+        stmt_avg = select(Inbox.fecha_recepcion, Inbox.fecha_gestion)\
+                   .select_from(Inbox)\
+                   .where(and_(condicion_fecha, Inbox.fecha_gestion != None))
         if filtro_aplicable and comerciales_ids_validos:
-            stmt_avg_tiempo = stmt_avg_tiempo.where(Inbox.asignado_a.in_(comerciales_ids_validos))
-        avg_tiempo = (await self.db.execute(stmt_avg_tiempo)).scalar() if total_leads > 0 else 0
+            stmt_avg = stmt_avg.where(Inbox.asignado_a.in_(comerciales_ids_validos))
+            
+        result_tiempos = (await self.db.execute(stmt_avg)).all()
+        tiempos_segundos = [calcular_segundos_horario_laboral(r.fecha_recepcion, r.fecha_gestion) for r in result_tiempos]
+        avg_tiempo = sum(tiempos_segundos) / len(tiempos_segundos) if tiempos_segundos else 0
 
         # Tasa de conversión y abandono
         tasa_conversion = round((total_convertidos / total_leads * 100), 1) if total_leads > 0 else 0
@@ -287,9 +300,14 @@ class AnalyticsService:
                 select(func.count()).select_from(Inbox).where(cond_com)
             )).scalar() or 0
 
-            # Convertidos
+            # Convertidos — por fecha de cierre real
+            cond_cierre_com = and_(
+                Inbox.fecha_cierre >= dt_inicio,
+                Inbox.fecha_cierre <= dt_fin,
+                Inbox.asignado_a == uid
+            )
             convertidos = (await self.db.execute(
-                select(func.count()).select_from(Inbox).where(and_(cond_com, Inbox.estado == 'CONVERTIDO'))
+                select(func.count()).select_from(Inbox).where(and_(cond_cierre_com, Inbox.estado == 'CIERRE'))
             )).scalar() or 0
 
             # Descartados
@@ -304,12 +322,14 @@ class AnalyticsService:
                 )
             )).scalar() or 0
 
-            # Tiempo promedio respuesta
-            avg_resp = (await self.db.execute(
-                select(func.avg(Inbox.tiempo_respuesta_segundos)).where(
-                    and_(cond_com, Inbox.tiempo_respuesta_segundos != None)
-                )
-            )).scalar() or 0
+            # Tiempo promedio respuesta en horario laboral
+            stmt_avg_com = select(Inbox.fecha_recepcion, Inbox.fecha_gestion)\
+                           .select_from(Inbox)\
+                           .where(and_(cond_com, Inbox.fecha_gestion != None))
+            result_tiempos_com = (await self.db.execute(stmt_avg_com)).all()
+            tiempos_com = [calcular_segundos_horario_laboral(r.fecha_recepcion, r.fecha_gestion) for r in result_tiempos_com]
+            avg_resp = sum(tiempos_com) / len(tiempos_com) if tiempos_com else 0
+
 
             tasa_conv = round((convertidos / asignados * 100), 1) if asignados > 0 else 0
 
@@ -373,3 +393,116 @@ class AnalyticsService:
             }
             for row in rows
         ]
+
+    # =========================================================================
+    # E. Detalle de Base de Datos (para exportación Excel)
+    # =========================================================================
+
+    async def get_detalle_base_datos(self, dt_inicio: datetime, dt_fin: datetime, comercial_ids: list = None, empresa: str = None) -> list[dict]:
+        """Retorna filas individuales de HistorialLlamada para exportar a Excel."""
+
+        condicion = and_(
+            HistorialLlamada.updated_at >= dt_inicio,
+            HistorialLlamada.updated_at <= dt_fin,
+        )
+
+        stmt = (
+            select(
+                ClienteContacto.ruc.label("ruc"),
+                func.coalesce(Cliente.razon_social, "Sin razón social").label("razon_social"),
+                ClienteContacto.telefono,
+                CasoLlamada.contestado.label("contesto"),
+                CasoLlamada.nombre.label("caso"),
+                CasoLlamada.gestionable.label("efectiva"),
+                HistorialLlamada.comentario,
+                Empleado.nombres.label("comercial"),
+                HistorialLlamada.created_at.label("fecha_llamada"),
+            )
+            .join(ClienteContacto, HistorialLlamada.contacto_id == ClienteContacto.id)
+            .outerjoin(Cliente, ClienteContacto.ruc == Cliente.ruc)
+            .join(CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id)
+            .join(Usuario, HistorialLlamada.comercial_id == Usuario.id)
+            .join(Empleado, Usuario.empleado_id == Empleado.id)
+            .where(condicion)
+            .order_by(HistorialLlamada.created_at.desc())
+        )
+
+        if comercial_ids is not None:
+            stmt = stmt.where(HistorialLlamada.comercial_id.in_(comercial_ids))
+        if empresa:
+            stmt = stmt.where(Empleado.empresa == empresa)
+
+        rows = (await self.db.execute(stmt)).all()
+
+        return [
+            {
+                "RUC": row.ruc or "",
+                "Razón Social": row.razon_social,
+                "Teléfono": row.telefono or "",
+                "Contestó": "Sí" if row.contesto else "No",
+                "Efectiva": "Sí" if row.efectiva else "No",
+                "Caso": row.caso or "",
+                "Comentario": row.comentario or "",
+                "Comercial": (row.comercial.split()[0] if row.comercial else "Sin asignar"),
+                "Fecha y Hora": row.fecha_llamada.strftime("%Y-%m-%d %H:%M") if row.fecha_llamada else "",
+            }
+            for row in rows
+        ]
+
+    # =========================================================================
+    # F. Detalle de Mantenimiento de Cartera (para exportación Excel)
+    # =========================================================================
+
+    async def get_detalle_cartera(self, dt_inicio: datetime, dt_fin: datetime, comercial_ids: list = None, empresa: str = None) -> list[dict]:
+        """Retorna filas individuales de ClienteGestion para exportar a Excel."""
+        from app.models.comercial_catalogos import MotivoGestion
+
+        condicion = and_(
+            ClienteGestion.created_at >= dt_inicio,
+            ClienteGestion.created_at <= dt_fin,
+        )
+
+        stmt = (
+            select(
+                Cliente.ruc,
+                Cliente.razon_social,
+                MotivoGestion.nombre.label("motivo"),
+                ClienteGestion.comentario,
+                Empleado.nombres.label("comercial"),
+                ClienteGestion.created_at.label("fecha"),
+            )
+            .select_from(ClienteGestion)
+            .join(Cliente, ClienteGestion.cliente_id == Cliente.id)
+            .join(MotivoGestion, ClienteGestion.motivo_id == MotivoGestion.id)
+            .join(Usuario, Cliente.comercial_encargado_id == Usuario.id)
+            .join(Empleado, Usuario.empleado_id == Empleado.id)
+            .where(condicion)
+            .order_by(ClienteGestion.created_at.desc())
+        )
+
+        if comercial_ids is not None:
+            stmt = stmt.where(Cliente.comercial_encargado_id.in_(comercial_ids))
+        if empresa:
+            stmt = stmt.where(Empleado.empresa == empresa)
+
+        rows = (await self.db.execute(stmt)).all()
+
+        MOTIVO_LABELS = {
+            "SEGUIMIENTO_CARGA": "Seguimiento de carga",
+            "FIDELIZACION": "Fidelización",
+            "DUDAS_CLIENTE": "Dudas del cliente",
+            "QUIERE_COTIZACION": "Quiere cotización",
+        }
+
+        return [
+            {
+                "RUC": row.ruc or "",
+                "Razón Social": row.razon_social or "",
+                "Motivo de gestión": MOTIVO_LABELS.get(row.motivo, row.motivo or ""),
+                "Comentario": row.comentario or "",
+                "Comercial": (row.comercial.split()[0] if row.comercial else "Sin asignar"),
+                "Fecha": row.fecha.strftime("%Y-%m-%d %H:%M") if row.fecha else "",
+            }
+            for row in rows
+        ]
+

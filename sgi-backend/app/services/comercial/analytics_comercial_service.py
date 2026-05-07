@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_, case
 
 from app.models.comercial import Cliente
+from app.models.comercial_catalogos import EstadoCliente
 from app.models.cliente_gestion import ClienteGestion
 from app.models.cliente_historial import ClienteHistorial
 from app.models.orden import Orden
@@ -64,7 +65,9 @@ class AnalyticsComercialService:
             ClienteGestion.created_at <= fin_mes
         )
         if ids_usuarios:
-            q_gestiones = q_gestiones.where(ClienteGestion.comercial_id.in_(ids_usuarios))
+            q_gestiones = q_gestiones.join(Cliente, ClienteGestion.cliente_id == Cliente.id).where(
+                Cliente.comercial_encargado_id.in_(ids_usuarios)
+            )
         
         total_gestiones = (await self.db.execute(q_gestiones)).scalar() or 0
 
@@ -123,18 +126,20 @@ class AnalyticsComercialService:
                 porcentaje=porcentaje
             ))
 
-        # 3. Pipeline
+        # 3. Pipeline - usar JOINs a estado_cliente
+        estados_result = await self.db.execute(select(EstadoCliente.id, EstadoCliente.nombre))
+        em = {row.nombre: row.id for row in estados_result.all()}
+
         q_pipe = select(
             Cliente.comercial_encargado_id,
-            func.sum(case((Cliente.tipo_estado == 'PROSPECTO', 1), else_=0)).label('prospectos'),
-            func.sum(case((Cliente.tipo_estado == 'EN_NEGOCIACION', 1), else_=0)).label('negociacion'),
-            func.sum(case((Cliente.tipo_estado == 'CERRADA', 1), else_=0)).label('cerrada'),
-            func.sum(case((Cliente.tipo_estado == 'EN_OPERACION', 1), else_=0)).label('operacion'),
-            func.sum(case((Cliente.tipo_estado == 'CARGA_ENTREGADA', 1), else_=0)).label('carga_entregada')
+            func.sum(case((Cliente.estado_id == em.get('PROSPECTO', 0), 1), else_=0)).label('prospectos'),
+            func.sum(case((Cliente.estado_id == em.get('EN_NEGOCIACION', 0), 1), else_=0)).label('negociacion'),
+            func.sum(case((Cliente.estado_id == em.get('CERRADA', 0), 1), else_=0)).label('cerrada'),
+            func.sum(case((Cliente.estado_id == em.get('EN_OPERACION', 0), 1), else_=0)).label('operacion'),
+            func.sum(case((Cliente.estado_id == em.get('CARGA_ENTREGADA', 0), 1), else_=0)).label('carga_entregada')
         ).where(
             Cliente.is_active == True,
-            Cliente.tipo_estado != 'CAIDO',
-            Cliente.tipo_estado != 'INACTIVO',
+            Cliente.estado_id.notin_([em.get('CAIDO', 0), em.get('INACTIVO', 0)]),
             Cliente.comercial_encargado_id.in_(ids_usuarios) if ids_usuarios else True
         ).group_by(Cliente.comercial_encargado_id)
         
@@ -166,23 +171,21 @@ class AnalyticsComercialService:
             Empleado, Empleado.id == Usuario.empleado_id
         ).where(
             Cliente.is_active == True,
-            Cliente.tipo_estado != 'CAIDO',
-            Cliente.tipo_estado != 'INACTIVO',
-            Cliente.tipo_estado != 'CARGA_ENTREGADA',
-            or_(Cliente.ultimo_contacto < fecha_limite, Cliente.ultimo_contacto == None)
+            Cliente.estado_id.notin_([em.get('CAIDO', 0), em.get('INACTIVO', 0), em.get('CARGA_ENTREGADA', 0)]),
+            or_(Cliente.updated_at < fecha_limite, Cliente.updated_at == None)
         )
         if ids_usuarios:
             q_alertas = q_alertas.where(Cliente.comercial_encargado_id.in_(ids_usuarios))
             
         q_alertas = q_alertas.order_by(
-            case((Cliente.ultimo_contacto == None, 0), else_=1),
-            Cliente.ultimo_contacto.asc()
+            case((Cliente.updated_at == None, 0), else_=1),
+            Cliente.updated_at.asc()
         ).limit(20)
         res_alertas = (await self.db.execute(q_alertas)).all()
         
         alertas_list = []
         for c, u, e in res_alertas:
-            dias_sin_contacto = (datetime.now().date() - c.ultimo_contacto.date()).days if c.ultimo_contacto else 999
+            dias_sin_contacto = (datetime.now().date() - c.updated_at.replace(tzinfo=None).date()).days if c.updated_at else 999
             alertas_list.append(AlertaClienteMuerto(
                 cliente_id=c.id,
                 cliente_nombre=c.razon_social,
@@ -211,11 +214,11 @@ class AnalyticsComercialService:
         
         # 1. Pipeline global para embudo (de todos los activos)
         q_funnel = select(
-            func.sum(case((Cliente.tipo_estado == 'PROSPECTO', 1), else_=0)).label('prospectos'),
-            func.sum(case((Cliente.tipo_estado == 'EN_NEGOCIACION', 1), else_=0)).label('negociacion'),
-            func.sum(case((Cliente.tipo_estado == 'CERRADA', 1), else_=0)).label('cerrada'),
-            func.sum(case((Cliente.tipo_estado == 'EN_OPERACION', 1), else_=0)).label('operacion')
-        ).where(Cliente.is_active == True, Cliente.tipo_estado != 'CAIDO', Cliente.tipo_estado != 'INACTIVO')
+            func.sum(case((Cliente.estado_id == em.get('PROSPECTO', 0), 1), else_=0)).label('prospectos'),
+            func.sum(case((Cliente.estado_id == em.get('EN_NEGOCIACION', 0), 1), else_=0)).label('negociacion'),
+            func.sum(case((Cliente.estado_id == em.get('CERRADA', 0), 1), else_=0)).label('cerrada'),
+            func.sum(case((Cliente.estado_id == em.get('EN_OPERACION', 0), 1), else_=0)).label('operacion')
+        ).where(Cliente.is_active == True, Cliente.estado_id.notin_([em.get('CAIDO', 0), em.get('INACTIVO', 0)]))
         
         if comercial_ids:
             q_funnel = q_funnel.where(Cliente.comercial_encargado_id.in_(comercial_ids))
@@ -236,41 +239,32 @@ class AnalyticsComercialService:
 
         # 2. Tiempos Promedio por Etapa (historial del mes actual)
         # Asumiendo que `tiempo_en_estado_anterior` está poblado en `ClienteHistorial`
-        q_tiempos = select(
-            ClienteHistorial.estado_nuevo,
-            func.avg(ClienteHistorial.tiempo_en_estado_anterior).label('promedio')
-        ).where(
-            ClienteHistorial.created_at >= inicio_mes,
-            ClienteHistorial.created_at <= fin_mes,
-            ClienteHistorial.tiempo_en_estado_anterior != None
-        )
-        if comercial_ids:
-            q_tiempos = q_tiempos.join(Cliente, Cliente.id == ClienteHistorial.cliente_id).where(Cliente.comercial_encargado_id.in_(comercial_ids))
-            
-        q_tiempos = q_tiempos.group_by(ClienteHistorial.estado_nuevo)
+        q_tiempos = q_tiempos.group_by(EstadoCliente.nombre)
         res_tiempos = (await self.db.execute(q_tiempos)).all()
-        tiempos_list = [TiempoPromedio(etapa=row.estado_nuevo, dias_promedio=round(row.promedio / 1440, 1)) for row in res_tiempos]  # minutos -> dias
+        tiempos_list = [TiempoPromedio(etapa=row.nombre, dias_promedio=round(row.promedio / 1440, 1)) for row in res_tiempos]  # minutos -> dias
 
         # 3. Top Motivos Caída (de los caídos en el mes)
         # Check caidos que cayeron este mes (usando created_at del historial como proxy o simplemente los gestionados)
         q_caida = select(
-            Cliente.motivo_caida,
-            func.count(Cliente.id).label('cantidad')
+            ClienteHistorial.motivo,
+            func.count(ClienteHistorial.id).label('cantidad')
         ).where(
-            Cliente.tipo_estado == 'CAIDO',
-            Cliente.motivo_caida != None
+            ClienteHistorial.estado_nuevo_id == em.get('CAIDO', 0),
+            ClienteHistorial.motivo != None,
+            ClienteHistorial.created_at >= inicio_mes,
+            ClienteHistorial.created_at <= fin_mes
         )
         if comercial_ids:
-            q_caida = q_caida.where(Cliente.comercial_encargado_id.in_(comercial_ids))
+            q_caida = q_caida.join(Cliente, Cliente.id == ClienteHistorial.cliente_id).where(Cliente.comercial_encargado_id.in_(comercial_ids))
             
-        q_caida = q_caida.group_by(Cliente.motivo_caida).order_by(func.count(Cliente.id).desc()).limit(5)
+        q_caida = q_caida.group_by(ClienteHistorial.motivo).order_by(func.count(ClienteHistorial.id).desc()).limit(5)
         res_caidas = (await self.db.execute(q_caida)).all()
         
         total_caidas = sum(r.cantidad for r in res_caidas)
         caidas_list = []
         for row in res_caidas:
             porcentaje = round((row.cantidad / total_caidas * 100), 1) if total_caidas > 0 else 0.0
-            caidas_list.append(MotivoCaida(motivo=row.motivo_caida, cantidad=row.cantidad, porcentaje=porcentaje))
+            caidas_list.append(MotivoCaida(motivo=row.motivo, cantidad=row.cantidad, porcentaje=porcentaje))
 
         # 4. Efectividad por Origen
         # En SGI, no hay 'origen' claro en Cliente.

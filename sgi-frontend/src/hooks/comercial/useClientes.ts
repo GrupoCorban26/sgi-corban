@@ -22,19 +22,21 @@ export const useClientes = (
     comercialId: number | null = null,
     filtroFecha: string | null = null,
     page = 1,
-    pageSize = 15
+    pageSize = 15,
+    ordenarPor: string | null = null
 ) => {
     const queryClient = useQueryClient();
 
     // 1. Obtener Clientes (Paginado y con filtros)
     const listQuery = useQuery({
-        queryKey: ['clientes', busqueda, tipoEstado, comercialId, filtroFecha, page, pageSize],
+        queryKey: ['clientes', busqueda, tipoEstado, comercialId, filtroFecha, ordenarPor, page, pageSize],
         queryFn: async () => {
             const params: Record<string, unknown> = { page, page_size: pageSize };
             if (busqueda) params.busqueda = busqueda;
-            if (tipoEstado) params.tipo_estado = tipoEstado;
+            if (tipoEstado) params.estado_nombre = tipoEstado;
             if (comercialId) params.comercial_id = comercialId;
             if (filtroFecha) params.filtro_fecha = filtroFecha;
+            if (ordenarPor) params.ordenar_por = ordenarPor;
 
             const { data } = await api.get<ClientePaginationResponse>(`${CLIENTES_URL}`, { params });
             return data;
@@ -79,8 +81,8 @@ export const useClientes = (
 
     // 5. Cambiar Estado (Prospecto <-> En Negociación <-> Cliente)
     const cambiarEstadoMutation = useMutation({
-        mutationFn: async ({ id, nuevoEstado }: { id: number; nuevoEstado: string }) => {
-            const payload: ClienteCambiarEstado = { nuevo_estado: nuevoEstado };
+        mutationFn: async ({ id, nuevoEstadoId, motivo }: { id: number; nuevoEstadoId: number; motivo?: string }) => {
+            const payload: ClienteCambiarEstado = { nuevo_estado_id: nuevoEstadoId, motivo };
             const { data } = await api.post<ClienteOperationResult>(`${CLIENTES_URL}/${id}/cambiar-estado`, payload);
             return data;
         },
@@ -126,6 +128,21 @@ export const useClientes = (
         },
     });
 
+    // 9. Exportar
+    const exportMutation = useMutation({
+        mutationFn: async () => {
+            const params: Record<string, unknown> = {};
+            if (busqueda) params.busqueda = busqueda;
+            if (tipoEstado) params.estado_nombre = tipoEstado;
+            if (comercialId) params.comercial_id = comercialId;
+            if (filtroFecha) params.filtro_fecha = filtroFecha;
+            if (ordenarPor) params.ordenar_por = ordenarPor;
+
+            const { data } = await api.get<Cliente[]>(`${CLIENTES_URL}/exportar`, { params });
+            return data;
+        }
+    });
+
     return {
         listQuery,
         clientes: listQuery.data?.data || [],
@@ -142,7 +159,8 @@ export const useClientes = (
         cambiarEstadoMutation,
         marcarCaidoMutation,
         reactivarMutation,
-        archivarMutation
+        archivarMutation,
+        exportMutation
     };
 };
 

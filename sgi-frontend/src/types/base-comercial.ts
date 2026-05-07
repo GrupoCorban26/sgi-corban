@@ -13,8 +13,8 @@ export interface ContactoAsignado {
     comentario: string | null;
     estado: string;
     fecha_asignacion: string;
-    fecha_llamada: string | null;
-    is_client: boolean;
+    historial_id: number;
+    completado: boolean;
 }
 
 export interface CasoLlamada {
@@ -30,14 +30,14 @@ export interface FiltroBase {
     cantidad: number;
 }
 
-export interface PartidaFiltro {
-    partida: string;
+export interface SectorFiltro {
+    sector: string;
     cantidad: number;
 }
 
 export interface FiltrosBaseResponse {
     paises: FiltroBase[];
-    partidas: PartidaFiltro[];
+    sectores: SectorFiltro[];
 }
 
 export interface CargarBaseResponse {

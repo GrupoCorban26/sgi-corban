@@ -74,8 +74,8 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
 
     return (
         <div className="flex flex-col h-full bg-white">
-            {/* Header */}
-            <div className="px-4 pt-4 pb-3 bg-gradient-to-b from-slate-50 to-white">
+            {/* Header — Sticky */}
+            <div className="px-4 pt-4 pb-3 bg-gradient-to-b from-slate-50 to-white flex-shrink-0 sticky top-0 z-10">
                 <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2.5">
                         <div className="w-9 h-9 bg-emerald-600 rounded-xl flex items-center justify-center shadow-sm">

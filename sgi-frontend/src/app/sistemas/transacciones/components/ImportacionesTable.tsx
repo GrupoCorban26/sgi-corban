@@ -1,4 +1,4 @@
-import { Loader2 } from 'lucide-react';
+import { Loader2, Package, ArrowUpRight } from 'lucide-react';
 import { Importacion } from '@/types/importaciones';
 
 interface ImportacionesTableProps {
@@ -7,36 +7,133 @@ interface ImportacionesTableProps {
   onRowClick: (ruc: string, razonSocial: string) => void;
 }
 
+function ScoreBadge({ score }: { score: number | undefined }) {
+  if (score === undefined || score === null) return <span className="text-gray-300">—</span>;
+
+  let styles = 'bg-gray-100 text-gray-600 ring-gray-200';
+
+  if (score >= 70) {
+    styles = 'bg-emerald-50 text-emerald-700 ring-emerald-200';
+  } else if (score >= 45) {
+    styles = 'bg-amber-50 text-amber-700 ring-amber-200';
+  } else {
+    styles = 'bg-gray-100 text-gray-600 ring-gray-200';
+  }
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-bold tabular-nums ring-1 ring-inset ${styles}`}
+    >
+      {score}
+    </span>
+  );
+}
+
+function CurrencyCell({ value }: { value: number | undefined }) {
+  if (value === undefined || value === null) return <span className="text-gray-300">—</span>;
+
+  return (
+    <span className="font-medium tabular-nums text-gray-800">
+      {value.toLocaleString('es-PE', {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 0,
+      })}
+    </span>
+  );
+}
+
+function RecencyBadge({ dias }: { dias: number | undefined }) {
+  if (dias === undefined || dias === null) return <span className="text-gray-300">—</span>;
+
+  let styles = 'bg-gray-100 text-gray-600 ring-gray-200';
+  let label = `${dias}d`;
+
+  if (dias <= 7) {
+    styles = 'bg-emerald-50 text-emerald-700 ring-emerald-200';
+  } else if (dias <= 30) {
+    styles = 'bg-blue-50 text-blue-700 ring-blue-200';
+  } else if (dias <= 90) {
+    styles = 'bg-amber-50 text-amber-700 ring-amber-200';
+  } else {
+    styles = 'bg-red-50 text-red-600 ring-red-200';
+  }
+
+  return (
+    <span
+      className={`inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold tabular-nums ring-1 ring-inset ${styles}`}
+    >
+      {label}
+    </span>
+  );
+}
+
 export default function ImportacionesTable({ data, loading, onRowClick }: ImportacionesTableProps) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm text-left">
-        <thead className="bg-gray-50 text-gray-700 font-medium border-b">
-          <tr>
-            <th className="px-4 py-3">RUC</th>
-            <th className="px-4 py-3">Razón Social</th>
-            <th className="px-4 py-3 text-center">Frecuencia</th>
-            <th className="px-4 py-3 text-center">Prox. Embarque</th>
-            <th className="px-4 py-3 text-right">FOB Anual</th>
-            <th className="px-4 py-3 text-right">Flete Anual</th>
-            <th className="px-4 py-3 text-right">Peso Anual (KG)</th>
-            <th className="px-4 py-3 text-right">Embarques</th>
-            <th className="px-4 py-3 text-right">Agentes</th>
-            <th className="px-4 py-3">Países Origen</th>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-gray-100 bg-gray-50/80">
+            <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              RUC
+            </th>
+            <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              Razón Social
+            </th>
+            <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              Sector
+            </th>
+            <th className="px-5 py-3.5 text-center text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              Score
+            </th>
+            <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              FOB Prom.
+            </th>
+            <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              Embarques
+            </th>
+            <th className="px-5 py-3.5 text-right text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              Agentes
+            </th>
+            <th className="px-5 py-3.5 text-center text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              Vía
+            </th>
+            <th className="px-5 py-3.5 text-left text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              Países
+            </th>
+            <th className="px-5 py-3.5 text-center text-[11px] font-semibold uppercase tracking-wider text-gray-500">
+              Recency
+            </th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-200">
+        <tbody className="divide-y divide-gray-50">
           {loading && data.length === 0 ? (
             <tr>
-              <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
-                <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
-                Cargando datos...
+              <td colSpan={10} className="px-6 py-16 text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="h-8 w-8 animate-spin text-azul-400" />
+                  <span className="text-sm font-medium text-gray-500">
+                    Cargando prospectos...
+                  </span>
+                </div>
               </td>
             </tr>
           ) : data.length === 0 ? (
             <tr>
-              <td colSpan={10} className="px-6 py-8 text-center text-gray-500">
-                No hay registros. Sube un Excel para comenzar.
+              <td colSpan={10} className="px-6 py-16 text-center">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gray-100">
+                    <Package className="h-7 w-7 text-gray-400" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-gray-700">
+                      Sin registros
+                    </p>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Sube un archivo Excel de prospectos para comenzar a ver datos.
+                    </p>
+                  </div>
+                </div>
               </td>
             </tr>
           ) : (
@@ -44,32 +141,45 @@ export default function ImportacionesTable({ data, loading, onRowClick }: Import
               <tr
                 key={idx}
                 onClick={() => onRowClick(String(item.ruc) || '', item.razon_social || '')}
-                className="hover:bg-blue-50 cursor-pointer transition-colors"
+                className="group cursor-pointer transition-colors duration-150 hover:bg-azul-50/40"
               >
-                <td className="px-4 py-3 font-medium text-gray-900">{item.ruc}</td>
-                <td className="px-4 py-3 max-w-xs truncate" title={item.razon_social}>{item.razon_social}</td>
-                <td className="px-4 py-3 text-center">
-                  {item.categoria_frecuencia ? (
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      item.categoria_frecuencia.toUpperCase().includes('ALTA') ? 'bg-green-100 text-green-800' :
-                      item.categoria_frecuencia.toUpperCase().includes('MEDIA') ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {item.categoria_frecuencia}
+                <td className="whitespace-nowrap px-5 py-3.5">
+                  <span className="font-mono text-xs font-semibold text-azul-700">
+                    {item.ruc}
+                  </span>
+                </td>
+                <td className="max-w-[200px] truncate px-5 py-3.5" title={item.razon_social}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium text-gray-800">
+                      {item.razon_social}
                     </span>
-                  ) : '—'}
+                    <ArrowUpRight className="h-3.5 w-3.5 text-gray-300 opacity-0 transition-opacity group-hover:opacity-100" />
+                  </div>
                 </td>
-                <td className="px-4 py-3 text-center text-gray-600">{item.prox_embarque_estimado || '—'}</td>
-                <td className="px-4 py-3 text-right font-semibold text-emerald-700">
-                  {item.fob_anual_usd?.toLocaleString('es-PE', { style: 'currency', currency: 'USD' })}
+                <td className="max-w-[160px] truncate px-5 py-3.5 text-xs text-gray-500" title={item.sector}>
+                  {item.sector || '—'}
                 </td>
-                <td className="px-4 py-3 text-right text-gray-600">
-                  {item.flete_anual_usd?.toLocaleString('es-PE', { style: 'currency', currency: 'USD' })}
+                <td className="px-5 py-3.5 text-center">
+                  <ScoreBadge score={item.score} />
                 </td>
-                <td className="px-4 py-3 text-right text-gray-600">{(item.peso_anual_kg || 0).toLocaleString()}</td>
-                <td className="px-4 py-3 text-right">{item.embarques_anuales?.toLocaleString()}</td>
-                <td className="px-4 py-3 text-right">{item.agentes_distintos || 0}</td>
-                <td className="px-4 py-3 max-w-[150px] truncate" title={item.paises_origen}>{item.paises_origen}</td>
+                <td className="whitespace-nowrap px-5 py-3.5 text-right">
+                  <CurrencyCell value={item.fob_promedio} />
+                </td>
+                <td className="whitespace-nowrap px-5 py-3.5 text-right tabular-nums text-xs text-gray-700">
+                  {item.total_embarques?.toLocaleString() ?? '—'}
+                </td>
+                <td className="whitespace-nowrap px-5 py-3.5 text-right tabular-nums text-xs text-gray-700">
+                  {item.agentes_distintos ?? 0}
+                </td>
+                <td className="whitespace-nowrap px-5 py-3.5 text-center text-xs text-gray-500">
+                  {item.via_predominante || '—'}
+                </td>
+                <td className="max-w-[140px] truncate px-5 py-3.5 text-xs text-gray-500" title={item.paises_principales}>
+                  {item.paises_principales || '—'}
+                </td>
+                <td className="whitespace-nowrap px-5 py-3.5 text-center">
+                  <RecencyBadge dias={item.dias_desde_ultima} />
+                </td>
               </tr>
             ))
           )}

@@ -38,83 +38,27 @@ class Configuracion(Base):
     __table_args__ = {"schema": "core"}
 
     id = Column(Integer, primary_key=True, index=True)
-    clave = Column(String(100), nullable=False)
-    valor = Column(String(500))
+    clave = Column(String(100), nullable=False, unique=True)
+    valor = Column(String(2000))
     tipo_dato = Column(String(20), default="STRING", nullable=False)
     categoria = Column(String(100))
     descripcion = Column(String(300))
+    is_sensible = Column(Boolean, default=False, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
-class Notificacion(Base):
-    __tablename__ = "notificaciones"
+class ConfiguracionHistorial(Base):
+    """Auditoría de cambios críticos en las configuraciones del sistema"""
+    __tablename__ = "configuraciones_historial"
     __table_args__ = {"schema": "core"}
 
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=False)
-    tipo = Column(String(50), nullable=False)
-    titulo = Column(String(150), nullable=False)
-    mensaje = Column(String(500))
-    url_destino = Column(String(300))
-    leida = Column(Boolean, default=False, nullable=False)
-    fecha_lectura = Column(DateTime(timezone=True))
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    # usuario relationship defined in seg.usuarios if needed, or here:
-    usuario = relationship("app.models.seguridad.Usuario", backref="notificaciones")
-
-class Incoterm(Base):
-    __tablename__ = "incoterms"
-    __table_args__ = {"schema": "core"}
-
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(3), nullable=False)
-    nombre_largo = Column(String(100), nullable=False)
-    tipo = Column(String(100))
-    is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-class TipoContenedor(Base):
-    __tablename__ = "tipo_contenedores"
-    __table_args__ = {"schema": "core"}
-
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(50), nullable=False)
-    descripcion = Column(String(100))
-    is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-class Via(Base):
-    __tablename__ = "via"
-    __table_args__ = {"schema": "core"}
-
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(50), nullable=False)
-    descripcion = Column(String(100))
-    is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-class TipoMercaderia(Base):
-    __tablename__ = "tipo_mercaderia"
-    __table_args__ = {"schema": "core"}
-
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(50), nullable=False)
-    descripcion = Column(String(100))
-    is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
-
-class Servicios(Base):
-    __tablename__ = "servicios"
-    __table_args__ = {"schema": "core"}
-
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(50), nullable=False)
-    descripcion = Column(String(100))
-    is_active = Column(Boolean, default=True, nullable=False)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    configuracion_id = Column(Integer, ForeignKey("core.configuraciones.id"), nullable=False)
+    valor_anterior = Column(String(500))
+    valor_nuevo = Column(String(500))
+    motivo_cambio = Column(String(200))
+    modificado_por = Column(Integer, ForeignKey("seg.usuarios.id"))
+    fecha_cambio = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    
+    configuracion = relationship("Configuracion", backref="historial_cambios")
+

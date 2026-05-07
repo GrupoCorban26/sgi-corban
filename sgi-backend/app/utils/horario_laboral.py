@@ -32,13 +32,14 @@ FERIADOS_FIJOS = [
 ]
 
 # Horarios por día de semana (weekday: 0=Lunes ... 6=Domingo)
+# Soporta múltiples bloques por día (ej. mañana y tarde excluyendo almuerzo)
 HORARIO_LABORAL = {
-    0: (time(8, 0), time(18, 0)),  # Lunes
-    1: (time(8, 0), time(18, 0)),  # Martes
-    2: (time(8, 0), time(18, 0)),  # Miércoles
-    3: (time(8, 0), time(18, 0)),  # Jueves
-    4: (time(8, 0), time(18, 0)),  # Viernes
-    5: (time(8, 0), time(11, 0)),  # Sábado
+    0: [(time(8, 0), time(13, 0)), (time(14, 0), time(18, 0))],  # Lunes
+    1: [(time(8, 0), time(13, 0)), (time(14, 0), time(18, 0))],  # Martes
+    2: [(time(8, 0), time(13, 0)), (time(14, 0), time(18, 0))],  # Miércoles
+    3: [(time(8, 0), time(13, 0)), (time(14, 0), time(18, 0))],  # Jueves
+    4: [(time(8, 0), time(13, 0)), (time(14, 0), time(18, 0))],  # Viernes
+    5: [(time(8, 0), time(11, 0))],  # Sábado
     # Domingo: no aparece = no laboral
 }
 
@@ -109,8 +110,12 @@ def es_horario_laboral(dt: datetime = None) -> bool:
     if es_feriado(dt.date()):
         return False
     
-    hora_inicio, hora_fin = horario
-    return hora_inicio <= dt.time() < hora_fin
+    t = dt.time()
+    for hora_inicio, hora_fin in horario:
+        if hora_inicio <= t < hora_fin:
+            return True
+            
+    return False
 
 
 def proximos_dias_habiles(desde: date, cantidad: int = 10) -> list:
@@ -152,29 +157,28 @@ def calcular_segundos_horario_laboral(inicio: datetime, fin: datetime) -> int:
     
     while dia_actual <= dia_fin:
         # Verificar si el día es laboral
-        horario = HORARIO_LABORAL.get(dia_actual.weekday())
-        if horario and not es_feriado(dia_actual):
-            hora_inicio_laboral, hora_fin_laboral = horario
-            
-            # Determinar el inicio efectivo del conteo para este día
-            if dia_actual == inicio.date():
-                # Primer día: empezar desde la hora del inicio (o la hora laboral, lo que sea mayor)
-                inicio_efectivo = max(inicio.time(), hora_inicio_laboral)
-            else:
-                inicio_efectivo = hora_inicio_laboral
-            
-            # Determinar el fin efectivo del conteo para este día
-            if dia_actual == fin.date():
-                # Último día: terminar en la hora del fin (o la hora laboral, lo que sea menor)
-                fin_efectivo = min(fin.time(), hora_fin_laboral)
-            else:
-                fin_efectivo = hora_fin_laboral
-            
-            # Solo contar si el rango es válido
-            if inicio_efectivo < fin_efectivo:
-                dt_inicio = datetime.combine(dia_actual, inicio_efectivo)
-                dt_fin = datetime.combine(dia_actual, fin_efectivo)
-                total_segundos += int((dt_fin - dt_inicio).total_seconds())
+        horarios = HORARIO_LABORAL.get(dia_actual.weekday())
+        if horarios and not es_feriado(dia_actual):
+            for hora_inicio_laboral, hora_fin_laboral in horarios:
+                # Determinar el inicio efectivo del conteo para este día
+                if dia_actual == inicio.date():
+                    # Primer día: empezar desde la hora del inicio (o la hora laboral, lo que sea mayor)
+                    inicio_efectivo = max(inicio.time(), hora_inicio_laboral)
+                else:
+                    inicio_efectivo = hora_inicio_laboral
+                
+                # Determinar el fin efectivo del conteo para este día
+                if dia_actual == fin.date():
+                    # Último día: terminar en la hora del fin (o la hora laboral, lo que sea menor)
+                    fin_efectivo = min(fin.time(), hora_fin_laboral)
+                else:
+                    fin_efectivo = hora_fin_laboral
+                
+                # Solo contar si el rango es válido
+                if inicio_efectivo < fin_efectivo:
+                    dt_inicio = datetime.combine(dia_actual, inicio_efectivo)
+                    dt_fin = datetime.combine(dia_actual, fin_efectivo)
+                    total_segundos += int((dt_fin - dt_inicio).total_seconds())
         
         dia_actual += timedelta(days=1)
     

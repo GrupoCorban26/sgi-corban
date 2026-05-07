@@ -55,12 +55,12 @@ export default function ModalCita({ isOpen, onClose, citaToEdit }: ModalCitaProp
     useEffect(() => {
         if (citaToEdit) {
             setClienteId(citaToEdit.cliente_id ?? 0);
-            setFecha(citaToEdit.fecha.split('T')[0]);
-            setHora(citaToEdit.hora);
-            setTipoCita(citaToEdit.tipo_cita);
-            setDireccion(citaToEdit.direccion);
-            setMotivo(citaToEdit.motivo);
-            setConPresente(citaToEdit.con_presente);
+            setFecha(citaToEdit.fecha ? citaToEdit.fecha.split('T')[0] : '');
+            setHora(citaToEdit.hora || '');
+            setTipoCita(citaToEdit.tipo_cita || 'VISITA_CLIENTE');
+            setDireccion(citaToEdit.direccion || '');
+            setMotivo(citaToEdit.motivo || '');
+            setConPresente(citaToEdit.con_presente || false);
         } else {
             resetForm();
         }
