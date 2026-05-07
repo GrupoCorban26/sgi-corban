@@ -690,11 +690,18 @@ class ClientesService:
         transiciones = result_hist.all()
 
         # Función: dado un datetime, devuelve el estado vigente
+        def _to_naive(dt):
+            """Quitar timezone para comparación uniforme."""
+            if dt is None:
+                return None
+            return dt.replace(tzinfo=None) if hasattr(dt, 'tzinfo') and dt.tzinfo else dt
+
         def estado_en_fecha(fecha) -> str:
             estado = "PROSPECTO"  # default
+            fecha_n = _to_naive(fecha)
             for t in transiciones:
-                t_dt = t.created_at
-                if t_dt and fecha and t_dt <= fecha:
+                t_dt = _to_naive(t.created_at)
+                if t_dt and fecha_n and t_dt <= fecha_n:
                     estado = t.estado_nuevo or estado
                 else:
                     break
@@ -797,8 +804,14 @@ class ClientesService:
                         "comentario": row.mensaje_inicial or row.nombre_whatsapp or "-",
                     })
 
-        # 6. Ordenar cronológicamente
-        eventos.sort(key=lambda e: e["fecha"] or datetime.min)
+        # 6. Ordenar cronológicamente (normalizar naive/aware)
+        def _sort_fecha(e):
+            f = e["fecha"]
+            if f is None:
+                return datetime.min
+            # Quitar timezone para comparación uniforme
+            return f.replace(tzinfo=None) if hasattr(f, 'tzinfo') and f.tzinfo else f
+        eventos.sort(key=_sort_fecha)
 
         # Formatear fechas para JSON
         for e in eventos:
