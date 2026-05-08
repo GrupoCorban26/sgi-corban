@@ -38,6 +38,8 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Metadata de los modelos para soporte de autogenerate
+# Importar TODOS los modelos para que Base.metadata los registre
+import app.models  # noqa: F401 — registra todos los modelos en Base.metadata
 from app.models.base import Base
 target_metadata = Base.metadata
 
