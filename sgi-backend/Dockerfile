@@ -32,10 +32,7 @@ COPY . .
 # Crear carpeta de uploads si la necesita
 RUN mkdir -p /app/uploads
 
-# Dar permisos de ejecución al entrypoint
-RUN chmod +x /app/entrypoint.sh
-
 EXPOSE 8000
 
-# Producción: entrypoint que crea esquemas + migra + arranca uvicorn
-ENTRYPOINT ["/app/entrypoint.sh"]
+# Producción: sin --reload, con workers
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
