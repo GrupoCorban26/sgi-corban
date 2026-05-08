@@ -58,6 +58,12 @@ class Settings(BaseSettings):
     BOT_JEFE_COMERCIAL_ID: Optional[int] = None
     SGI_WEB_API_KEY: Optional[str] = None  # API Key para el endpoint público de leads web
 
+    # ========================
+    # Evolution API (Supervisión WhatsApp)
+    # ========================
+    EVOLUTION_API_URL: str = "http://localhost:8080"
+    EVOLUTION_API_KEY: str = "sgi_evo_dev_key_2026"
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",

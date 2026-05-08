@@ -1,4 +1,4 @@
-import { LucideIcon, Home, BarChart3, BarChart2, ArrowRightLeft, Users, Database, UserCog, Building2, Package, Cable, Clock, Phone, ShoppingBag, Globe, MessageSquare } from 'lucide-react';
+import { LucideIcon, Home, BarChart3, BarChart2, ArrowRightLeft, Users, Database, UserCog, Building2, Package, Cable, Clock, Phone, ShoppingBag, Globe, MessageSquare, Eye } from 'lucide-react';
 
 export interface MenuItem {
   label: string;
@@ -13,6 +13,7 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
     { label: 'Cartera', href: '/comercial/cartera', icon: Users },
     { label: 'Buzón', href: '/comercial/buzon', icon: Package },
     { label: 'Leads Web', href: '/comercial/leads-web', icon: Globe },
+    { label: 'Mi WhatsApp', href: '/comercial/supervision', icon: Eye },
     { label: 'Analytics Comercial', href: '/comercial/analytics', icon: BarChart3 },
   ],
   administrador: [
@@ -33,6 +34,7 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
     { label: 'Cartera', href: '/comercial/cartera', icon: Database },
     { label: 'Buzón', href: '/comercial/buzon', icon: Package },
     { label: 'Leads Web', href: '/comercial/leads-web', icon: Globe },
+    { label: 'Supervisión', href: '/comercial/supervision', icon: Eye },
     { label: 'Analytics Comercial', href: '/comercial/analytics', icon: BarChart3 },
     { label: 'Reportes', href: '/sistemas/reportes', icon: BarChart3 },
   ],
@@ -62,6 +64,7 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
     { label: 'Base', href: '/sistemas/base', icon: Database },
     { label: 'Usuarios', href: '/sistemas/usuarios', icon: UserCog },
     { label: 'Config Buzón', href: '/sistemas/buzon', icon: MessageSquare },
+    { label: 'Supervisión', href: '/comercial/supervision', icon: Eye },
     // Secciones administrativas (SISTEMAS = Super Admin)
     { label: 'Organización', href: '/administracion/organizacion', icon: Building2 },
     { label: 'Inventario', href: '/administracion/inventario', icon: Package },

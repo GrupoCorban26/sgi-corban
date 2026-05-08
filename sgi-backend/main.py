@@ -69,6 +69,7 @@ from app.api.v1.comercial.ordenes import router as ordenes_router
 from app.api.v1.administracion.asistencia import router as asistencia_router
 from app.api.v1.seguridad.roles import router as roles_router
 from app.api.v1.buzon_config import router as buzon_config_router
+from app.api.v1.comercial.supervision import router as supervision_router
 
 # Lifespan: tareas de inicio y cierre del servidor
 @asynccontextmanager
@@ -176,6 +177,7 @@ app.include_router(leads_web_publico_router, prefix="/api/v1")
 app.include_router(ordenes_router, prefix="/api/v1")
 app.include_router(roles_router, prefix="/api/v1")
 app.include_router(buzon_config_router, prefix="/api/v1")
+app.include_router(supervision_router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():

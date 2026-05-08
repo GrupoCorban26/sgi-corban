@@ -38,11 +38,11 @@ DB_URL = f"mssql+aioodbc:///?odbc_connect={urllib.parse.quote_plus(odbc_connecti
 engine = create_async_engine(
     DB_URL, 
     echo=settings.DB_ECHO,
-    pool_size=10,           # Conexiones que se mantienen abiertas siempre
-    max_overflow=20,        # Conexiones extra en picos (total max: 30)
-    pool_recycle=1800,      # Reinicia las conexiones cada 30 min
-    pool_pre_ping=True,     # Verifica si la conexión está viva antes de usarla
-    pool_timeout=10,        # Timeout de espera cuando el pool está lleno
+    pool_size=30,           # Aumentado para soportar los webhooks de Evolution
+    max_overflow=70,        # Total máximo 100 conexiones
+    pool_recycle=1800,
+    pool_pre_ping=True,
+    pool_timeout=30,        # Esperar un poco más si hay cuellos de botella
 )
 
 # Fábrica de sesiones

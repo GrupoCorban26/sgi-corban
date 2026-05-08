@@ -12,6 +12,7 @@ from . import chat
 from . import whatsapp
 from . import reportes
 from . import notificaciones
+from . import supervision
 
 api_router = APIRouter()
 
@@ -28,3 +29,4 @@ api_router.include_router(chat.router)
 api_router.include_router(whatsapp.router)
 api_router.include_router(reportes.router)
 api_router.include_router(notificaciones.router)
+api_router.include_router(supervision.router)
