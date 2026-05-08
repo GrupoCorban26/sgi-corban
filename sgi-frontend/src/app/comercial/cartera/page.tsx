@@ -230,6 +230,7 @@ export default function CarteraPage() {
         'Teléfono': c.telefono || '-',
         'Correo': c.correo || '-',
         'Próximo Contacto': c.proxima_fecha_contacto ? formatDate(c.proxima_fecha_contacto) : '-',
+        'Comentario': c.ultimo_comentario || '-',
         'Fecha Creación': c.created_at ? formatDate(c.created_at) : '-'
       }));
 
@@ -409,6 +410,7 @@ export default function CarteraPage() {
                         Próx. Contacto {sortIcon}
                       </button>
                     </th>
+                    <th className="px-3 py-3 font-semibold">Comentario</th>
                     <th className="px-3 py-3 font-semibold text-center w-[80px]">Acc.</th>
                   </tr>
                 </thead>
@@ -448,6 +450,11 @@ export default function CarteraPage() {
                       <td className="px-3 py-3">
                         <span className={`inline-flex px-2 py-0.5 rounded-md text-[11px] ${getSemaforoStyle(cliente.proxima_fecha_contacto)}`}>
                           {formatDate(cliente.proxima_fecha_contacto)}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 max-w-[200px]">
+                        <span className="text-xs text-gray-500 line-clamp-2" title={cliente.ultimo_comentario || ''}>
+                          {cliente.ultimo_comentario || <span className="text-gray-300 italic">—</span>}
                         </span>
                       </td>
                       <td className="px-3 py-3">

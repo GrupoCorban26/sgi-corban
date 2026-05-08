@@ -18,6 +18,7 @@ export interface Cliente {
     is_active: boolean;
     created_at: string | null;
     updated_at: string | null;
+    ultimo_comentario: string | null;
 }
 
 export interface ClienteCreate {

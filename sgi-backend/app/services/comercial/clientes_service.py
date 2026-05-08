@@ -99,6 +99,61 @@ class ClientesService:
             .scalar_subquery()
         )
 
+        # ── Último comentario (fuente dual: gestiones de cartera + llamadas de base) ──
+        # Gestión de cartera (cliente_gestiones)
+        subq_gest_comentario = (
+            select(ClienteGestion.comentario)
+            .where(ClienteGestion.cliente_id == Cliente.id, ClienteGestion.comentario.isnot(None))
+            .order_by(ClienteGestion.created_at.desc())
+            .limit(1)
+            .correlate(Cliente)
+            .scalar_subquery()
+        )
+        subq_gest_fecha = (
+            select(ClienteGestion.created_at)
+            .where(ClienteGestion.cliente_id == Cliente.id, ClienteGestion.comentario.isnot(None))
+            .order_by(ClienteGestion.created_at.desc())
+            .limit(1)
+            .correlate(Cliente)
+            .scalar_subquery()
+        )
+
+        # Llamadas de base (historial_llamadas vía contacto → RUC)
+        subq_ll_comentario = (
+            select(HistorialLlamada.comentario)
+            .join(ClienteContacto, HistorialLlamada.contacto_id == ClienteContacto.id)
+            .where(
+                ClienteContacto.ruc == Cliente.ruc,
+                HistorialLlamada.caso_id.isnot(None),
+                HistorialLlamada.comentario.isnot(None),
+            )
+            .order_by(func.coalesce(HistorialLlamada.updated_at, HistorialLlamada.created_at).desc())
+            .limit(1)
+            .correlate(Cliente)
+            .scalar_subquery()
+        )
+        subq_ll_fecha = (
+            select(func.coalesce(HistorialLlamada.updated_at, HistorialLlamada.created_at))
+            .join(ClienteContacto, HistorialLlamada.contacto_id == ClienteContacto.id)
+            .where(
+                ClienteContacto.ruc == Cliente.ruc,
+                HistorialLlamada.caso_id.isnot(None),
+                HistorialLlamada.comentario.isnot(None),
+            )
+            .order_by(func.coalesce(HistorialLlamada.updated_at, HistorialLlamada.created_at).desc())
+            .limit(1)
+            .correlate(Cliente)
+            .scalar_subquery()
+        )
+
+        # Elegir el comentario más reciente entre ambas fuentes
+        subq_ultimo_comentario = case(
+            (subq_gest_fecha.is_(None), subq_ll_comentario),
+            (subq_ll_fecha.is_(None), subq_gest_comentario),
+            (subq_gest_fecha >= subq_ll_fecha, subq_gest_comentario),
+            else_=subq_ll_comentario
+        )
+
         stmt = select(
             Cliente,
             EstadoCliente.nombre.label("estado_nombre"),
@@ -106,7 +161,8 @@ class ClientesService:
             func.concat(Empleado.nombres, ' ', Empleado.apellido_paterno).label("comercial_nombre"),
             func.coalesce(subq_telefono_principal, subq_telefono_fallback).label("telefono_contacto"),
             subq_correo.label("correo_contacto"),
-            subq_nombre_contacto.label("nombre_contacto")
+            subq_nombre_contacto.label("nombre_contacto"),
+            subq_ultimo_comentario.label("ultimo_comentario")
         ).outerjoin(EstadoCliente, Cliente.estado_id == EstadoCliente.id) \
          .outerjoin(OrigenCliente, Cliente.origen_id == OrigenCliente.id) \
          .outerjoin(Usuario, Cliente.comercial_encargado_id == Usuario.id) \
@@ -176,7 +232,8 @@ class ClientesService:
                 "origen_id": c.origen_id,
                 "origen_nombre": row.origen_nombre,
                 "is_active": c.is_active,
-                "created_at": c.created_at
+                "created_at": c.created_at,
+                "ultimo_comentario": row.ultimo_comentario
             })
 
         return {
