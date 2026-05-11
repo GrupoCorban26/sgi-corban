@@ -40,8 +40,8 @@ export default function VistaComercial() {
                         Conecta tu WhatsApp
                     </h2>
                     <p className="text-sm text-slate-500 mb-8 leading-relaxed">
-                        Vincula tu número corporativo para que tu jefe pueda supervisar
-                        las conversaciones comerciales.
+                        Vincula tu número corporativo para acceder a las herramientas
+                        de WhatsApp desde la plataforma.
                     </p>
                     <button
                         onClick={handleCrear}
@@ -86,7 +86,7 @@ export default function VistaComercial() {
                         <span className="font-medium">En línea</span>
                     </div>
                     <p className="text-xs text-slate-400 mt-4">
-                        Las conversaciones se están registrando automáticamente.
+                        Tu WhatsApp está sincronizado con la plataforma.
                     </p>
                 </div>
             </div>
