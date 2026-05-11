@@ -64,6 +64,9 @@ services:
       - DATABASE_SAVE_DATA_HISTORIC=false
       - DATABASE_SAVE_DATA_LABELS=false
 
+      # ── WhatsApp: forzar teléfonos reales en lugar de LID ──
+      - WPP_LID_MODE=false
+
       # ── Cache ──
       - CACHE_REDIS_ENABLED=false
       - CACHE_LOCAL_ENABLED=true

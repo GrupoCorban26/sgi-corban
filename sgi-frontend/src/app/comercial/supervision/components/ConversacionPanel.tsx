@@ -33,7 +33,7 @@ function extractPhone(jid: string): string | null {
     // Los JIDs de grupo (@g.us) son IDs internos, no teléfonos
     if (jid.includes('@g.us')) return null;
     // Solo formatear como teléfono si parece real (9-15 dígitos)
-    if (/^\d{9,15}$/.test(raw)) {
+    if (/^\d{9,13}$/.test(raw)) {
         return `+${raw}`;
     }
     return raw;

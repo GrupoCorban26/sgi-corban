@@ -159,7 +159,7 @@ export default function MensajePanel({ conversacion, instancia }: MensajePanelPr
 
     const rawPhone = conversacion.remote_jid.split('@')[0];
     const isGroup = conversacion.remote_jid.includes('@g.us');
-    const isRealPhone = !isGroup && /^\d{9,15}$/.test(rawPhone);
+    const isRealPhone = !isGroup && /^\d{9,13}$/.test(rawPhone);
     const formattedPhone = isRealPhone ? `+${rawPhone}` : null;
 
     const contactName = isGroup
