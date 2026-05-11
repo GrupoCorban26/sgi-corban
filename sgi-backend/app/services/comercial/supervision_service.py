@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────
 # Configuración Evolution API
 # ─────────────────────────────────────────────
-EVOLUTION_API_URL = "http://localhost:8080"
+EVOLUTION_API_URL = "http://host.docker.internal:8080"
 EVOLUTION_API_KEY = "sgi_evo_dev_key_2026"
 
 

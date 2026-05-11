@@ -61,7 +61,7 @@ class Settings(BaseSettings):
     # ========================
     # Evolution API (Supervisión WhatsApp)
     # ========================
-    EVOLUTION_API_URL: str = "http://localhost:8080"
+    EVOLUTION_API_URL: str = "http://host.docker.internal:8080"
     EVOLUTION_API_KEY: str = "sgi_evo_dev_key_2026"
 
     model_config = {
