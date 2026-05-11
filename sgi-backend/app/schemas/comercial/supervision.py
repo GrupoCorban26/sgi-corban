@@ -113,3 +113,22 @@ class WebhookPayload(BaseModel):
     sender: Optional[str] = None
     server_url: Optional[str] = None
     apikey: Optional[str] = None
+
+
+# ─────────────────────────────────────────────
+# Comerciales por Empresa (Filtros de supervisión)
+# ─────────────────────────────────────────────
+
+class ComercialInfoResponse(BaseModel):
+    """Info de un comercial con estado de instancia WhatsApp."""
+    usuario_id: int
+    nombre_completo: str
+    empresa: str
+    tiene_instancia: bool = False
+    instancia_id: Optional[int] = None
+    estado_instancia: Optional[str] = None  # CONECTADO, CONECTANDO, DESCONECTADO
+    telefono: Optional[str] = None
+    total_conversaciones: int = 0
+
+    class Config:
+        from_attributes = True

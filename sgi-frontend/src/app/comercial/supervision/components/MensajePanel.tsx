@@ -157,7 +157,16 @@ export default function MensajePanel({ conversacion, instancia }: MensajePanelPr
         }
     }
 
-    const contactName = conversacion.nombre_contacto || conversacion.remote_jid.split('@')[0];
+    const rawPhone = conversacion.remote_jid.split('@')[0];
+    const isGroup = conversacion.remote_jid.includes('@g.us');
+    const isRealPhone = !isGroup && /^\d{9,15}$/.test(rawPhone);
+    const formattedPhone = isRealPhone ? `+${rawPhone}` : null;
+
+    const contactName = isGroup
+        ? (conversacion.nombre_contacto || 'Grupo sin nombre')
+        : conversacion.nombre_contacto && formattedPhone
+            ? `${conversacion.nombre_contacto} - ${formattedPhone}`
+            : conversacion.nombre_contacto || formattedPhone || rawPhone;
 
     return (
         <div className="flex-1 flex flex-col bg-slate-50">

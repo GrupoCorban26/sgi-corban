@@ -1,9 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useConversaciones } from '@/hooks/comercial/useSupervision';
 import { EvoInstancia, EvoConversacion } from '@/types/supervision';
-import { MessageCircle, Users, User, Loader2 } from 'lucide-react';
+import { MessageCircle, Users, User, Loader2, Search, X } from 'lucide-react';
 
 interface ConversacionPanelProps {
     instancia: EvoInstancia | null;
@@ -28,8 +28,30 @@ function formatTime(dateStr: string | null): string {
     return date.toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' });
 }
 
-function extractPhone(jid: string): string {
-    return jid.split('@')[0] || jid;
+function extractPhone(jid: string): string | null {
+    const raw = jid.split('@')[0] || jid;
+    // Los JIDs de grupo (@g.us) son IDs internos, no teléfonos
+    if (jid.includes('@g.us')) return null;
+    // Solo formatear como teléfono si parece real (9-15 dígitos)
+    if (/^\d{9,15}$/.test(raw)) {
+        return `+${raw}`;
+    }
+    return raw;
+}
+
+function getDisplayName(conv: EvoConversacion): string {
+    const phone = extractPhone(conv.remote_jid);
+
+    if (conv.es_grupo) {
+        // Grupos: solo nombre, sin ID interno
+        return conv.nombre_contacto || 'Grupo sin nombre';
+    }
+
+    // Chat individual: [nombre] - [teléfono] o solo [teléfono]
+    if (conv.nombre_contacto && phone) {
+        return `${conv.nombre_contacto} - ${phone}`;
+    }
+    return conv.nombre_contacto || phone || conv.remote_jid.split('@')[0];
 }
 
 export default function ConversacionPanel({
@@ -39,6 +61,23 @@ export default function ConversacionPanel({
 }: ConversacionPanelProps) {
     const { data, isLoading } = useConversaciones(instancia?.id ?? null);
     const conversaciones = data?.items || [];
+    const [searchTerm, setSearchTerm] = useState('');
+
+    // Resetear búsqueda al cambiar de comercial
+    useEffect(() => {
+        setSearchTerm('');
+    }, [instancia?.id]);
+
+    // Filtrar conversaciones por teléfono o nombre de contacto
+    const filtered = useMemo(() => {
+        if (!searchTerm.trim()) return conversaciones;
+        const q = searchTerm.toLowerCase().replace(/[+\s-]/g, '');
+        return conversaciones.filter((conv) => {
+            const phone = conv.remote_jid.split('@')[0];
+            const name = (conv.nombre_contacto || '').toLowerCase();
+            return phone.includes(q) || name.includes(q);
+        });
+    }, [conversaciones, searchTerm]);
 
     return (
         <div className="w-96 min-w-[340px] flex flex-col border-r border-slate-200 bg-white">
@@ -57,6 +96,26 @@ export default function ConversacionPanel({
                         </p>
                     </div>
                 </div>
+
+                {/* Buscador por teléfono/nombre */}
+                <div className="relative mt-2.5">
+                    <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                    <input
+                        type="text"
+                        placeholder="Buscar por número o nombre..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-naranja-500/20 focus:border-naranja-500/50 transition-all"
+                    />
+                    {searchTerm && (
+                        <button
+                            onClick={() => setSearchTerm('')}
+                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                            <X size={14} />
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* Lista */}
@@ -71,12 +130,17 @@ export default function ConversacionPanel({
                         <MessageCircle size={28} className="mb-2 opacity-40" />
                         <p className="text-xs">Sin conversaciones registradas</p>
                     </div>
+                ) : filtered.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-40 text-slate-400">
+                        <Search size={22} className="mb-2 opacity-40" />
+                        <p className="text-xs">No se encontraron resultados</p>
+                        <p className="text-[10px] mt-0.5 opacity-60">para "{searchTerm}"</p>
+                    </div>
                 ) : (
                     <div className="divide-y divide-slate-100">
-                        {conversaciones.map((conv) => {
+                        {filtered.map((conv) => {
                             const isSelected = selectedConvId === conv.id;
-                            const displayName =
-                                conv.nombre_contacto || extractPhone(conv.remote_jid);
+                            const displayName = getDisplayName(conv);
 
                             return (
                                 <div

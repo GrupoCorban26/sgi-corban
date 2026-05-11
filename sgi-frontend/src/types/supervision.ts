@@ -57,3 +57,14 @@ export interface EvoMensajeList {
     items: EvoMensaje[];
     total: number;
 }
+
+export interface ComercialInfo {
+    usuario_id: number;
+    nombre_completo: string;
+    empresa: string;
+    tiene_instancia: boolean;
+    instancia_id: number | null;
+    estado_instancia: 'CONECTADO' | 'CONECTANDO' | 'DESCONECTADO' | null;
+    telefono: string | null;
+    total_conversaciones: number;
+}

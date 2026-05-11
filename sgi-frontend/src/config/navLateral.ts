@@ -25,6 +25,8 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
     { label: 'Cumpleaños', href: '/administracion/cumpleanos', icon: Users },
     { label: 'Asistencias', href: '/administracion/asistencias', icon: Clock },
     { label: 'Rendimiento', href: '/administracion/rendimiento', icon: BarChart3 },
+    { label: 'Buzón', href: '/comercial/buzon', icon: Package },
+    { label: 'Supervisión', href: '/comercial/supervision', icon: Eye },
     { label: 'Reportes', href: '/sistemas/reportes', icon: BarChart3 },
     { label: 'Analytics Comercial', href: '/comercial/analytics', icon: BarChart3 },
   ],

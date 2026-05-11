@@ -26,6 +26,7 @@ from app.schemas.comercial.supervision import (
     ConversacionListResponse,
     MensajeListResponse,
     WebhookPayload,
+    ComercialInfoResponse,
 )
 from app.core.dependencies import (
     get_current_user_obj,
@@ -35,6 +36,26 @@ from app.core.dependencies import (
 from app.models.seguridad import Usuario
 
 router = APIRouter(prefix="/comercial/supervision", tags=["supervision"])
+
+
+# ═════════════════════════════════════════════
+#  COMERCIALES POR EMPRESA (Filtros de supervisión)
+# ═════════════════════════════════════════════
+
+@router.get("/comerciales", response_model=List[ComercialInfoResponse])
+async def listar_comerciales(
+    empresa: Optional[str] = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user_obj),
+    comercial_ids: Optional[List[int]] = Depends(resolver_comercial_ids),
+    _: bool = Depends(require_any_role("JEFE_COMERCIAL", "ADMIN", "GERENCIA", "SISTEMAS")),
+):
+    """Lista todos los comerciales, opcionalmente filtrados por empresa, con estado de instancia WhatsApp."""
+    service = SupervisionService(db)
+    return await service.listar_comerciales_por_empresa(
+        empresa=empresa,
+        comercial_ids=comercial_ids,
+    )
 
 
 # ═════════════════════════════════════════════

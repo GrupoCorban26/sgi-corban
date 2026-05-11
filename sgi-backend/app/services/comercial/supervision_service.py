@@ -510,7 +510,7 @@ class SupervisionService:
         conversacion = await self._get_or_create_conversacion(
             instancia_id=instancia.id,
             remote_jid=remote_jid,
-            nombre_contacto=push_name if not es_grupo else None,
+            nombre_contacto=push_name if (not es_grupo and not from_me) else None,
             es_grupo=es_grupo,
         )
 
@@ -536,7 +536,7 @@ class SupervisionService:
         conversacion.ultimo_mensaje_at = timestamp
         if not from_me:
             conversacion.mensajes_no_leidos = (conversacion.mensajes_no_leidos or 0) + 1
-        if push_name and not conversacion.nombre_contacto and not es_grupo:
+        if push_name and not conversacion.nombre_contacto and not es_grupo and not from_me:
             conversacion.nombre_contacto = push_name
 
         # Actualizar last_seen de instancia
@@ -684,6 +684,84 @@ class SupervisionService:
                 logger.warning(f"No se pudo actualizar el nombre del grupo {remote_jid}: {e}")
 
         return conv
+
+    # ═══════════════════════════════════════════
+    #  COMERCIALES POR EMPRESA (FILTROS)
+    # ═══════════════════════════════════════════
+
+    async def listar_comerciales_por_empresa(
+        self,
+        empresa: Optional[str] = None,
+        comercial_ids: Optional[List[int]] = None,
+    ) -> list:
+        """
+        Lista todos los usuarios con rol COMERCIAL, con info de su instancia WhatsApp.
+        Si empresa es especificado, filtra por esa empresa.
+        Si comercial_ids es especificado (RBAC), solo muestra los de su equipo.
+        """
+        from app.models.seguridad import Rol, usuarios_roles
+
+        query = (
+            select(
+                Usuario.id.label("usuario_id"),
+                Empleado.nombres,
+                Empleado.apellido_paterno,
+                Empleado.apellido_materno,
+                Empleado.empresa,
+                EvoInstancia.id.label("instancia_id"),
+                EvoInstancia.estado.label("estado_instancia"),
+                EvoInstancia.telefono.label("telefono"),
+                func.count(EvoConversacion.id.distinct()).label("total_conversaciones"),
+            )
+            .join(Empleado, Usuario.empleado_id == Empleado.id)
+            .join(usuarios_roles, usuarios_roles.c.usuario_id == Usuario.id)
+            .join(Rol, Rol.id == usuarios_roles.c.rol_id)
+            .outerjoin(EvoInstancia, EvoInstancia.usuario_id == Usuario.id)
+            .outerjoin(EvoConversacion, EvoConversacion.instancia_id == EvoInstancia.id)
+            .where(
+                and_(
+                    Rol.nombre == "COMERCIAL",
+                    Usuario.is_active == True,
+                    Empleado.is_active == True,
+                )
+            )
+            .group_by(
+                Usuario.id,
+                Empleado.nombres,
+                Empleado.apellido_paterno,
+                Empleado.apellido_materno,
+                Empleado.empresa,
+                EvoInstancia.id,
+                EvoInstancia.estado,
+                EvoInstancia.telefono,
+            )
+            .order_by(Empleado.empresa, Empleado.nombres)
+        )
+
+        if empresa:
+            query = query.where(Empleado.empresa == empresa)
+
+        if comercial_ids is not None:
+            query = query.where(Usuario.id.in_(comercial_ids))
+
+        result = await self.db.execute(query)
+        rows = result.all()
+
+        return [
+            {
+                "usuario_id": row.usuario_id,
+                "nombre_completo": f"{row.nombres} {row.apellido_paterno}" + (
+                    f" {row.apellido_materno}" if row.apellido_materno else ""
+                ),
+                "empresa": row.empresa,
+                "tiene_instancia": row.instancia_id is not None,
+                "instancia_id": row.instancia_id,
+                "estado_instancia": row.estado_instancia,
+                "telefono": row.telefono,
+                "total_conversaciones": row.total_conversaciones or 0,
+            }
+            for row in rows
+        ]
 
     # ═══════════════════════════════════════════
     #  CONSULTAS DE SUPERVISIÓN

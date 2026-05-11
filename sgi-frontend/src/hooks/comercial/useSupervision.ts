@@ -5,6 +5,7 @@ import {
     EvoInstanciaQR,
     EvoConversacionList,
     EvoMensajeList,
+    ComercialInfo,
 } from '@/types/supervision';
 
 const BASE_URL = '/comercial/supervision';
@@ -155,5 +156,25 @@ export const useMensajes = (conversacionId: number | null, page: number = 1) => 
         },
         enabled: !!conversacionId,
         refetchInterval: 10000,
+    });
+};
+
+// ─────────────────────────────────────────────
+// Comerciales por Empresa (Filtros de supervisión)
+// ─────────────────────────────────────────────
+
+export const useComerciales = (empresa: string | null) => {
+    return useQuery({
+        queryKey: ['supervision', 'comerciales', empresa],
+        queryFn: async () => {
+            const params: Record<string, string> = {};
+            if (empresa) params.empresa = empresa;
+            const { data } = await api.get<ComercialInfo[]>(
+                `${BASE_URL}/comerciales`,
+                { params }
+            );
+            return data;
+        },
+        refetchInterval: 30000,
     });
 };
