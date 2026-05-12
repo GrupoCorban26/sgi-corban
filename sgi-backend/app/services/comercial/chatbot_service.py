@@ -35,6 +35,7 @@ from app.models.whatsapp_bot_config import WhatsAppBotConfig
 from app.services.comercial.bot_messages import (
     MSG_BIENVENIDA,
     DEFAULT_NOMBRE_BOT,
+    DEFAULT_NOMBRE_EMPRESA,
     MSG_MENU_REGRESO,
     MENU_BUTTONS,
     MSG_ASESOR_ASIGNADO,
@@ -77,6 +78,10 @@ class ChatbotService:
     @property
     def _bot_name(self) -> str:
         return self.bot_config.nombre_bot if self.bot_config else DEFAULT_NOMBRE_BOT
+
+    @property
+    def _empresa_name(self) -> str:
+        return self.bot_config.nombre_empresa if self.bot_config else DEFAULT_NOMBRE_EMPRESA
 
     @property
     def _wa_token(self) -> str | None:
@@ -419,9 +424,11 @@ class ChatbotService:
         if session:
             await self._delete_session(session)
 
+        mensaje = MSG_DESPEDIDA.format(nombre_empresa=self._empresa_name)
+
         try:
             await WhatsAppService.send_text(
-                phone, MSG_DESPEDIDA,
+                phone, mensaje,
                 token=self._wa_token, phone_id=self._wa_phone_id,
             )
 
@@ -432,7 +439,7 @@ class ChatbotService:
                 telefono=phone,
                 direccion="SALIENTE",
                 remitente_tipo="BOT",
-                contenido=MSG_DESPEDIDA,
+                contenido=mensaje,
                 estado_envio="ENVIADO",
                 tipo_contenido="text",
             ))
@@ -538,7 +545,7 @@ class ChatbotService:
         if es_regreso:
             mensaje = MSG_MENU_REGRESO
         else:
-            mensaje = MSG_BIENVENIDA.format(nombre_bot=self._bot_name)
+            mensaje = MSG_BIENVENIDA.format(nombre_bot=self._bot_name, nombre_empresa=self._empresa_name)
         return WhatsAppResponse(
             action="send_buttons",
             messages=[BotMessage(type="buttons", body=mensaje, buttons=MENU_BUTTONS)],

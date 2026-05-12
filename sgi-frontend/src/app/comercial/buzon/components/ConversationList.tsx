@@ -5,7 +5,6 @@ import { useEquipoDisponibilidad } from '@/hooks/comercial/useEquipoDisponibilid
 import { ChatConversationPreview } from '@/types/chat';
 import ConversationItem from './ConversationItem';
 import { Loader2, MessageSquareDashed, Search, X, Inbox, ChevronDown, Users, Users2 } from 'lucide-react';
-import { useComerciales } from '@/hooks/organizacion/useComerciales';
 import Cookies from 'js-cookie';
 
 interface Props {
@@ -50,7 +49,6 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
         } catch (e) { console.error(e); }
     }, []);
 
-    const { data: comerciales = [] } = useComerciales();
     const { data: jefesSubordinados = [] } = useJefesSubordinados();
     const { data: conversations = [], isLoading } = useChatConversations(filtroComercial, filtroJefeId);
     const { disponible, toggle, isToggling } = useDisponibilidadBuzon();
@@ -250,11 +248,20 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
                             className="w-full pl-3 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-emerald-300 focus:ring-1 focus:ring-emerald-200"
                         >
                             <option value="">Todos los asesores...</option>
-                            {comerciales.map(c => (
-                                <option key={c.id} value={c.id}>
-                                    {c.nombre}
-                                </option>
-                            ))}
+                            {/* Derivar asesores de las conversaciones cargadas */}
+                            {(() => {
+                                const asesoresMap = new Map<number, string>();
+                                conversations.forEach(c => {
+                                    if (c.asignado_a && c.nombre_asignado) {
+                                        asesoresMap.set(c.asignado_a, c.nombre_asignado);
+                                    }
+                                });
+                                return Array.from(asesoresMap.entries())
+                                    .sort((a, b) => a[1].localeCompare(b[1]))
+                                    .map(([id, nombre]) => (
+                                        <option key={id} value={id}>{nombre}</option>
+                                    ));
+                            })()}
                         </select>
                     </div>
                 )}

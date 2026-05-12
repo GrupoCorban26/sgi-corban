@@ -17,6 +17,7 @@ class WhatsAppBotConfig(Base):
     id = Column(Integer, primary_key=True, index=True)
     slug = Column(String(50), nullable=False, unique=True, index=True)
     nombre_bot = Column(Unicode(100), nullable=False)
+    nombre_empresa = Column(Unicode(150), nullable=False, server_default="Grupo Corban")
     jefe_comercial_id = Column(Integer, ForeignKey("adm.empleados.id"), nullable=False)
     whatsapp_token = Column(String(500), nullable=False)
     whatsapp_phone_id = Column(String(50), nullable=False)

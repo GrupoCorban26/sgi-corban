@@ -10,10 +10,11 @@ o traducir sin tocar la lógica del servicio.
 # MENÚ PRINCIPAL
 # ==========================================
 
-MSG_BIENVENIDA = "Hola, soy {nombre_bot}🤖, tu asistente virtual del Grupo Corban. ¿En qué puedo ayudarte hoy?🤗"
+MSG_BIENVENIDA = "Hola, soy {nombre_bot}🤖, tu asistente virtual de {nombre_empresa}. ¿En qué puedo ayudarte hoy?🤗"
 
 # Nombre por defecto cuando no hay bot_config
 DEFAULT_NOMBRE_BOT = "Corby"
+DEFAULT_NOMBRE_EMPRESA = "Grupo Corban"
 
 MSG_MENU_REGRESO = "¿En qué más puedo ayudarte? 😊"
 
@@ -85,7 +86,7 @@ MSG_CARGA_LISTA_ASIGNADO_FUERA_HORARIO = (
 # CIERRE Y DESPEDIDA
 # ==========================================
 
-MSG_DESPEDIDA = "¡Gracias por comunicarte con Grupo Corban! Fue un placer atenderte. ¡Que tengas un excelente día! 🤗"
+MSG_DESPEDIDA = "¡Gracias por comunicarte con {nombre_empresa}! Fue un placer atenderte. ¡Que tengas un excelente día! 🤗"
 
 MSG_CANCELADO = "Operación cancelada. Escribe *menu* cuando quieras volver a empezar. 👋"
 
