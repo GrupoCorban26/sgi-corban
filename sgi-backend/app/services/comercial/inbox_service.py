@@ -31,7 +31,7 @@ class InboxService:
         query_inbox = select(Inbox).where(
             and_(
                 Inbox.telefono == phone, 
-                Inbox.estado.in_(['PENDIENTE', 'NUEVO'])
+                Inbox.estado.in_(['PENDIENTE', 'NUEVO', 'BOT'])
             )
         ).order_by(Inbox.id.desc())
         result_inbox = await self.db.execute(query_inbox)
