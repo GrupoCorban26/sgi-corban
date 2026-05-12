@@ -59,7 +59,15 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
     const enLineaCount = equipo.filter(u => u.disponible_buzon).length;
 
     const filtered = conversations.filter(c => {
-        if (activeTab !== 'all' && c.estado !== activeTab) return false;
+        // En "Todos", excluimos los DESCARTADOS (estos solo se ven en su pestaña)
+        if (activeTab === 'all' && c.estado === 'DESCARTADO') return false;
+        
+        // El tab "Nuevos" (BOT) incluye tanto 'BOT' como el antiguo estado 'NUEVO'
+        if (activeTab === 'BOT' && c.estado !== 'BOT' && c.estado !== 'NUEVO') return false;
+        
+        // Para el resto de tabs
+        if (activeTab !== 'all' && activeTab !== 'BOT' && c.estado !== activeTab) return false;
+
         if (searchTerm) {
             const term = searchTerm.toLowerCase();
             return (c.nombre_whatsapp?.toLowerCase().includes(term) || c.telefono.includes(term));
@@ -69,8 +77,8 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
 
     // Contadores por estado
     const counts: Record<string, number> = {
-        all: conversations.length,
-        BOT: conversations.filter(c => c.estado === 'BOT').length,
+        all: conversations.filter(c => c.estado !== 'DESCARTADO').length,
+        BOT: conversations.filter(c => c.estado === 'BOT' || c.estado === 'NUEVO').length,
         PENDIENTE: conversations.filter(c => c.estado === 'PENDIENTE').length,
         EN_GESTION: conversations.filter(c => c.estado === 'EN_GESTION').length,
         COTIZADO: conversations.filter(c => c.estado === 'COTIZADO').length,

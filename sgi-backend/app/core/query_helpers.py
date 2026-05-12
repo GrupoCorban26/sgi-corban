@@ -20,7 +20,8 @@ async def aplicar_filtro_comercial(
     db: AsyncSession,
     comercial_ids: list = None, 
     filtro_comercial_id: int = None,
-    incluir_sin_asignar: bool = False
+    incluir_sin_asignar: bool = False,
+    jefe_comercial_id: int = None
 ):
     """
     Aplica filtro de equipo comercial a una query SQLAlchemy.
@@ -48,7 +49,20 @@ async def aplicar_filtro_comercial(
         
         # Incluir leads sin asignar (estado BOT) para supervisores
         if incluir_sin_asignar:
-            condiciones.append(columna_asignado == None)
+            if jefe_comercial_id:
+                from app.models.whatsapp_bot_config import WhatsAppBotConfig
+                from sqlalchemy import and_
+                # Obtenemos los bots que pertenecen a este jefe o están bajo su cadena
+                # Como simplificación directa, buscamos los bots cuyo jefe sea el actual
+                cond_sin_asignar = and_(
+                    columna_asignado == None,
+                    columna_asignado.class_.bot_config_id.in_(
+                        select(WhatsAppBotConfig.id).where(WhatsAppBotConfig.jefe_comercial_id == jefe_comercial_id)
+                    )
+                )
+                condiciones.append(cond_sin_asignar)
+            else:
+                condiciones.append(columna_asignado == None)
         
         return stmt.where(or_(*condiciones))
     

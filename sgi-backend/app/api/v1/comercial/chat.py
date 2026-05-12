@@ -95,14 +95,25 @@ async def get_conversations(
                 sub_user_ids = [uid for uid in sub_user_ids if uid in effective_comercial_ids]
             effective_comercial_ids = sub_user_ids if sub_user_ids else [0]  # [0] = sin resultados
     
+    # Determinar qué jefe_comercial_id usar para filtrar los bots asignados
+    jefe_para_filtro = None
+    if filtro_jefe_id:
+        jefe_para_filtro = filtro_jefe_id
+    elif any(r.nombre == "JEFE_COMERCIAL" for r in current_user.roles) and current_user.empleado_id:
+        jefe_para_filtro = current_user.empleado_id
+    
     # Si comercial_ids es None → rol global (Admin/Sistemas/Gerencia), ve todo
     if effective_comercial_ids is None:
-        return await chat_svc.get_all_conversations(filtro_comercial_id=effective_filtro_comercial)
+        return await chat_svc.get_all_conversations(
+            filtro_comercial_id=effective_filtro_comercial,
+            jefe_comercial_id=jefe_para_filtro
+        )
     
     # Jefe Comercial o Comercial → filtrar por equipo
     return await chat_svc.get_all_conversations(
         comercial_ids=effective_comercial_ids, 
-        filtro_comercial_id=effective_filtro_comercial
+        filtro_comercial_id=effective_filtro_comercial,
+        jefe_comercial_id=jefe_para_filtro
     )
 
 @router.get("/{inbox_id}/messages", response_model=List[ChatMessageResponse])
