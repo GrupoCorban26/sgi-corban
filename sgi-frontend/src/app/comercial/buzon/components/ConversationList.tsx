@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
-import { useChatConversations } from '@/hooks/comercial/useChat';
+import { useChatConversations, useJefesSubordinados } from '@/hooks/comercial/useChat';
 import { useDisponibilidadBuzon } from '@/hooks/comercial/useDisponibilidad';
 import { useEquipoDisponibilidad } from '@/hooks/comercial/useEquipoDisponibilidad';
 import { ChatConversationPreview } from '@/types/chat';
 import ConversationItem from './ConversationItem';
-import { Loader2, MessageSquareDashed, Search, X, Inbox, ChevronDown, Users } from 'lucide-react';
+import { Loader2, MessageSquareDashed, Search, X, Inbox, ChevronDown, Users, Users2 } from 'lucide-react';
 import { useComerciales } from '@/hooks/organizacion/useComerciales';
 import Cookies from 'js-cookie';
 
@@ -15,15 +15,19 @@ interface Props {
 
 const TABS = [
     { id: 'all', label: 'Todos', emoji: '' },
+    { id: 'BOT', label: 'Nuevos', emoji: '🤖' },
     { id: 'PENDIENTE', label: 'Pendientes', emoji: '⏳' },
     { id: 'EN_GESTION', label: 'Gestión', emoji: '💬' },
     { id: 'COTIZADO', label: 'Cotizados', emoji: '📋' },
+    { id: 'CERRADO', label: 'Cerrados', emoji: '✅' },
+    { id: 'DESCARTADO', label: 'Descartados', emoji: '🚫' },
 ];
 
 export default function ConversationList({ selectedId, onSelect }: Props) {
     const [activeTab, setActiveTab] = useState('all');
     const [searchTerm, setSearchTerm] = useState('');
     const [filtroComercial, setFiltroComercial] = useState<number | ''>('');
+    const [filtroJefeId, setFiltroJefeId] = useState<number | ''>('');
     const [equipoOpen, setEquipoOpen] = useState(false);
 
     // Verificar roles del usuario
@@ -47,7 +51,8 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
     }, []);
 
     const { data: comerciales = [] } = useComerciales();
-    const { data: conversations = [], isLoading } = useChatConversations(filtroComercial);
+    const { data: jefesSubordinados = [] } = useJefesSubordinados();
+    const { data: conversations = [], isLoading } = useChatConversations(filtroComercial, filtroJefeId);
     const { disponible, toggle, isToggling } = useDisponibilidadBuzon();
     const { equipo, toggleUsuario, isToggling: isTogglingEquipo } = useEquipoDisponibilidad(isSupervisor);
 
@@ -63,11 +68,14 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
     });
 
     // Contadores por estado
-    const counts = {
+    const counts: Record<string, number> = {
         all: conversations.length,
+        BOT: conversations.filter(c => c.estado === 'BOT').length,
         PENDIENTE: conversations.filter(c => c.estado === 'PENDIENTE').length,
         EN_GESTION: conversations.filter(c => c.estado === 'EN_GESTION').length,
         COTIZADO: conversations.filter(c => c.estado === 'COTIZADO').length,
+        CERRADO: conversations.filter(c => c.estado === 'CERRADO').length,
+        DESCARTADO: conversations.filter(c => c.estado === 'DESCARTADO').length,
     };
 
     const totalNoLeidos = conversations.reduce((sum, c) => sum + c.mensajes_no_leidos, 0);
@@ -202,6 +210,28 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
                         </button>
                     )}
                 </div>
+
+                {/* Filtro Equipo (Si tiene Jefes a cargo) */}
+                {jefesSubordinados.length > 0 && (
+                    <div className="mt-2 text-xs flex gap-2">
+                        <Users2 className="text-slate-400 mt-1.5 flex-shrink-0" size={14} />
+                        <select
+                            value={filtroJefeId}
+                            onChange={(e) => {
+                                setFiltroJefeId(e.target.value ? Number(e.target.value) : '');
+                                setFiltroComercial(''); // Resetear comercial al cambiar jefe
+                            }}
+                            className="w-full pl-3 pr-8 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-emerald-300 focus:ring-1 focus:ring-emerald-200"
+                        >
+                            <option value="">Todo el departamento...</option>
+                            {jefesSubordinados.map(jefe => (
+                                <option key={jefe.empleado_id} value={jefe.empleado_id}>
+                                    Equipo de: {jefe.nombre}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                )}
 
                 {/* Filtro Comercial (Solo Jefatura) */}
                 {isJefa && (

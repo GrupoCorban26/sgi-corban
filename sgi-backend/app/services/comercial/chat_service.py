@@ -24,7 +24,7 @@ class ChatService:
             .where(
                 and_(
                     Inbox.asignado_a == comercial_id,
-                    Inbox.estado.not_in(['DESCARTADO', 'CONVERTIDO'])
+                    Inbox.estado.not_in(['CONVERTIDO'])
                 )
             )
             .options(
@@ -84,7 +84,7 @@ class ChatService:
         query = (
             select(Inbox)
             .where(
-                Inbox.estado.not_in(['DESCARTADO', 'CONVERTIDO'])
+                Inbox.estado.not_in(['CONVERTIDO'])
             )
             .options(
                 selectinload(Inbox.mensajes),
@@ -186,8 +186,8 @@ class ChatService:
             inbox.ultimo_mensaje_at = func.now()
             # Si it's a new incoming message from client in a closed state
             if msg_in.direccion == 'ENTRANTE':
-                if inbox.estado in ['CIERRE', 'CONVERTIDO']:
-                    inbox.estado = 'NUEVO'
+                if inbox.estado in ['CIERRE', 'CERRADO', 'CONVERTIDO']:
+                    inbox.estado = 'BOT'
                     inbox.modo = 'BOT' # Return to bot when reactivated 
                 elif inbox.estado == 'DESCARTADO':
                     # Si está descartado, lo dejamos descartado para el comercial pero
@@ -236,7 +236,7 @@ class ChatService:
             raise HTTPException(status_code=404, detail="Inbox not found")
             
         inbox.modo = 'ASESOR'
-        if inbox.estado in ['NUEVO', 'PENDIENTE']:
+        if inbox.estado in ['BOT', 'NUEVO', 'PENDIENTE']:
             inbox.estado = 'EN_GESTION'
 
         # Registrar primera interacción del comercial
@@ -266,12 +266,12 @@ class ChatService:
         if not inbox:
             raise HTTPException(status_code=404, detail="Inbox not found")
             
-        valid_states = ['EN_GESTION', 'COTIZADO', 'CIERRE', 'DESCARTADO', 'CONVERTIDO']
+        valid_states = ['EN_GESTION', 'COTIZADO', 'CIERRE', 'CERRADO', 'DESCARTADO', 'CONVERTIDO']
         if nuevo_estado not in valid_states:
             raise HTTPException(status_code=400, detail="Estado no válido")
             
         inbox.estado = nuevo_estado
-        if nuevo_estado in ['CIERRE', 'DESCARTADO']:
+        if nuevo_estado in ['CIERRE', 'CERRADO', 'DESCARTADO']:
             inbox.modo = 'BOT'
             inbox.fecha_cierre = datetime.now()
 

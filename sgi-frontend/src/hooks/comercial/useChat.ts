@@ -10,13 +10,31 @@ import { AxiosError } from 'axios';
 
 const CHAT_URL = '/comercial/chat';
 
-export const useChatConversations = (filtroComercialId?: number | '') => {
-    return useQuery({
-        queryKey: ['chat-conversations', filtroComercialId],
+interface JefeSubordinado {
+    empleado_id: number;
+    nombre: string;
+}
+
+export const useJefesSubordinados = () => {
+    return useQuery<JefeSubordinado[]>({
+        queryKey: ['jefes-subordinados'],
         queryFn: async () => {
-            const params: Record<string, any> = {};
+            const { data } = await api.get<JefeSubordinado[]>(`${CHAT_URL}/jefes-subordinados`);
+            return data;
+        },
+    });
+};
+
+export const useChatConversations = (filtroComercialId?: number | '', filtroJefeId?: number | '') => {
+    return useQuery({
+        queryKey: ['chat-conversations', filtroComercialId, filtroJefeId],
+        queryFn: async () => {
+            const params: Record<string, number> = {};
             if (filtroComercialId) {
-                params.filtro_comercial_id = filtroComercialId;
+                params.filtro_comercial_id = filtroComercialId as number;
+            }
+            if (filtroJefeId) {
+                params.filtro_jefe_id = filtroJefeId as number;
             }
             const { data } = await api.get<ChatConversationPreview[]>(`${CHAT_URL}/conversations`, { params });
             return data;

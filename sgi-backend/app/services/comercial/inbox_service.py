@@ -160,7 +160,7 @@ class InboxService:
                     assigned_user = commercials_sorted[0]
         
         # 5. Create or Update Inbox Entry
-        if existing_inbox and existing_inbox.estado == 'NUEVO':
+        if existing_inbox and existing_inbox.estado in ('NUEVO', 'BOT'):
             new_lead = existing_inbox
             new_lead.asignado_a = assigned_user.id
             new_lead.estado = 'PENDIENTE'

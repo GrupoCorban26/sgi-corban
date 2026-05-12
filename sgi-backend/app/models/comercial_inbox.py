@@ -13,7 +13,7 @@ class Inbox(Base):
     mensaje_inicial = Column(UnicodeText)
     nombre_whatsapp = Column(Unicode(100))
     asignado_a = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=True)
-    estado = Column(String(20), default="NUEVO", nullable=False, index=True)  # NUEVO, PENDIENTE, EN_GESTION, COTIZADO, CIERRE, DESCARTADO
+    estado = Column(String(20), default="BOT", nullable=False, index=True)  # BOT, NUEVO, PENDIENTE, EN_GESTION, COTIZADO, CERRADO, DESCARTADO, CONVERTIDO
     tipo_interes = Column(String(30), nullable=True)  # ASESORIA, COTIZACION, CARGA_LISTA
     tipo_asignacion = Column(String(20), nullable=True)  # MANUAL, AUTOMATICA
     fecha_recepcion = Column(DateTime(timezone=True), server_default=func.now())

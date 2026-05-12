@@ -244,7 +244,7 @@ async def _process_webhook(payload: WhatsAppWebhookPayload, slug: str | None):
                                 telefono=from_num_norm,
                                 mensaje_inicial=incoming.message_text if msg_type == "text" else "Interacción inicial",
                                 nombre_whatsapp=contact_name,
-                                estado="NUEVO",
+                                estado="BOT",
                                 modo="BOT",
                                 bot_config_id=bot_config_id,  # MULTI-BOT
                             )

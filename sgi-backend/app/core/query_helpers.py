@@ -46,19 +46,9 @@ async def aplicar_filtro_comercial(
     if comercial_ids is not None:
         condiciones = [columna_asignado.in_(comercial_ids)]
         
-        # Si el jefe del bot está en el equipo, también ve leads sin asignar
+        # Incluir leads sin asignar (estado BOT) para supervisores
         if incluir_sin_asignar:
-            settings = get_settings()
-            bot_jefe_id = settings.BOT_JEFE_COMERCIAL_ID
-            if bot_jefe_id:
-                try:
-                    from app.models.seguridad import Usuario
-                    query_bot_jefe = select(Usuario.id).where(Usuario.empleado_id == bot_jefe_id)
-                    bot_jefe_uid = (await db.execute(query_bot_jefe)).scalar()
-                    if bot_jefe_uid and bot_jefe_uid in comercial_ids:
-                        condiciones.append(columna_asignado == None)
-                except Exception as e:
-                    logger.warning(f"No se pudo resolver BOT_JEFE_COMERCIAL_ID: {e}")
+            condiciones.append(columna_asignado == None)
         
         return stmt.where(or_(*condiciones))
     

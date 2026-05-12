@@ -99,7 +99,7 @@ async def resolver_comercial_ids(
     if any(role in roles for role in ROLES_VER_TODO):
         return None
     
-    # JEFE_COMERCIAL: ve lo suyo + lo de sus subordinados directos
+    # JEFE_COMERCIAL: ve lo suyo + subordinados recursivos (cadena completa)
     if "JEFE_COMERCIAL" in roles:
         # 1. Obtener el empleado_id del jefe
         stmt_jefe = select(Usuario.empleado_id).where(Usuario.id == user_id)
@@ -108,17 +108,13 @@ async def resolver_comercial_ids(
         if not empleado_id_jefe:
             return [user_id]  # Sin empleado asociado, solo ve lo suyo
         
-        # 2. Buscar empleados subordinados (donde jefe_id = empleado_id del jefe)
-        stmt_subordinados = select(Empleado.id).where(
-            Empleado.jefe_id == empleado_id_jefe,
-            Empleado.is_active == True
-        )
-        empleado_ids_subordinados = (await db.execute(stmt_subordinados)).scalars().all()
+        # 2. Buscar subordinados recursivamente (todos los niveles)
+        todos_empleado_ids = await _get_subordinados_recursivo(db, empleado_id_jefe)
         
         # 3. Obtener los usuario_ids de esos empleados
-        if empleado_ids_subordinados:
+        if todos_empleado_ids:
             stmt_usuarios = select(Usuario.id).where(
-                Usuario.empleado_id.in_(empleado_ids_subordinados),
+                Usuario.empleado_id.in_(todos_empleado_ids),
                 Usuario.is_active == True
             )
             usuario_ids_subordinados = (await db.execute(stmt_usuarios)).scalars().all()
@@ -128,3 +124,67 @@ async def resolver_comercial_ids(
     
     # COMERCIAL u otro rol: solo ve lo propio
     return [user_id]
+
+
+async def _get_subordinados_recursivo(
+    db: AsyncSession, 
+    jefe_empleado_id: int, 
+    visitados: set = None
+) -> List[int]:
+    """
+    Obtiene todos los empleado_ids subordinados recursivamente.
+    Evita ciclos con el set de visitados.
+    """
+    if visitados is None:
+        visitados = set()
+    
+    if jefe_empleado_id in visitados:
+        return []
+    visitados.add(jefe_empleado_id)
+    
+    stmt = select(Empleado.id).where(
+        Empleado.jefe_id == jefe_empleado_id,
+        Empleado.is_active == True
+    )
+    directos = (await db.execute(stmt)).scalars().all()
+    
+    todos = list(directos)
+    for sub_id in directos:
+        sub_subordinados = await _get_subordinados_recursivo(db, sub_id, visitados)
+        todos.extend(sub_subordinados)
+    
+    return todos
+
+
+async def get_jefes_subordinados(
+    db: AsyncSession,
+    empleado_id_jefe: int
+) -> List[dict]:
+    """
+    Obtiene los jefes comerciales que son subordinados directos.
+    Solo devuelve empleados que a su vez tienen subordinados propios (son jefes).
+    Usado para el dropdown 'Equipo de:' en el frontend.
+    """
+    # Subordinados directos del jefe actual
+    stmt_directos = select(Empleado).where(
+        Empleado.jefe_id == empleado_id_jefe,
+        Empleado.is_active == True
+    )
+    directos = (await db.execute(stmt_directos)).scalars().all()
+    
+    jefes = []
+    for emp in directos:
+        # Verificar si este subordinado tiene subordinados propios (es jefe)
+        stmt_tiene_sub = select(Empleado.id).where(
+            Empleado.jefe_id == emp.id,
+            Empleado.is_active == True
+        ).limit(1)
+        tiene_subordinados = (await db.execute(stmt_tiene_sub)).scalar()
+        
+        if tiene_subordinados:
+            jefes.append({
+                "empleado_id": emp.id,
+                "nombre": f"{emp.nombres} {emp.apellido_paterno}",
+            })
+    
+    return jefes

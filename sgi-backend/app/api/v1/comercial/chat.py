@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import List
 
 from app.database.db_connection import get_db
-from app.core.dependencies import get_current_user_obj, resolver_comercial_ids
+from app.core.dependencies import get_current_user_obj, resolver_comercial_ids, get_jefes_subordinados, _get_subordinados_recursivo
 from app.models.seguridad import Usuario
 from app.models.comercial_inbox import Inbox
 from app.models.chat_message import ChatMessage
@@ -53,22 +53,57 @@ def _ventana_24h_abierta(ultimo_entrante_at: datetime | None) -> bool:
     return diferencia.total_seconds() < 86400  # 24 horas
 
 
+@router.get("/jefes-subordinados")
+async def get_jefes_subordinados_endpoint(
+    current_user: Usuario = Depends(get_current_user_obj),
+    db: AsyncSession = Depends(get_db)
+):
+    """Obtiene jefes comerciales subordinados (para dropdown 'Equipo de:').
+    Solo retorna datos si el usuario actual es jefe de jefes."""
+    if not current_user.empleado_id:
+        return []
+    return await get_jefes_subordinados(db, current_user.empleado_id)
+
+
 @router.get("/conversations", response_model=List[ChatConversationPreview])
 async def get_conversations(
     current_user: Usuario = Depends(get_current_user_obj),
     comercial_ids: list = Depends(resolver_comercial_ids),
     filtro_comercial_id: int = None,
+    filtro_jefe_id: int = None,
     db: AsyncSession = Depends(get_db)
 ):
     """Obtener conversaciones activas filtradas por equipo del usuario."""
     chat_svc = ChatService(db)
     
+    # Si filtro_jefe_id está presente, resolver los IDs de ese equipo
+    effective_filtro_comercial = filtro_comercial_id
+    effective_comercial_ids = comercial_ids
+    
+    if filtro_jefe_id:
+        # Obtener todos los subordinados del jefe seleccionado
+        sub_empleado_ids = await _get_subordinados_recursivo(db, filtro_jefe_id)
+        if sub_empleado_ids:
+            # Obtener usuario_ids de esos empleados + el del propio jefe
+            stmt = select(Usuario.id).where(
+                Usuario.empleado_id.in_([filtro_jefe_id] + sub_empleado_ids),
+                Usuario.is_active == True
+            )
+            sub_user_ids = list((await db.execute(stmt)).scalars().all())
+            # Intersectar con los IDs que el usuario tiene permiso de ver
+            if effective_comercial_ids is not None:
+                sub_user_ids = [uid for uid in sub_user_ids if uid in effective_comercial_ids]
+            effective_comercial_ids = sub_user_ids if sub_user_ids else [0]  # [0] = sin resultados
+    
     # Si comercial_ids es None → rol global (Admin/Sistemas/Gerencia), ve todo
-    if comercial_ids is None:
-        return await chat_svc.get_all_conversations(filtro_comercial_id=filtro_comercial_id)
+    if effective_comercial_ids is None:
+        return await chat_svc.get_all_conversations(filtro_comercial_id=effective_filtro_comercial)
     
     # Jefe Comercial o Comercial → filtrar por equipo
-    return await chat_svc.get_all_conversations(comercial_ids=comercial_ids, filtro_comercial_id=filtro_comercial_id)
+    return await chat_svc.get_all_conversations(
+        comercial_ids=effective_comercial_ids, 
+        filtro_comercial_id=effective_filtro_comercial
+    )
 
 @router.get("/{inbox_id}/messages", response_model=List[ChatMessageResponse])
 async def get_messages(
