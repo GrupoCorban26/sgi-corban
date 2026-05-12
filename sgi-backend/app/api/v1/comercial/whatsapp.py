@@ -12,6 +12,7 @@ from app.schemas.comercial.whatsapp import WhatsAppIncoming, WhatsAppResponse, W
 from app.schemas.comercial.chat import ChatMessageCreate
 from app.models.comercial_inbox import Inbox
 from app.models.chat_message import ChatMessage
+from app.models.whatsapp_bot_config import WhatsAppBotConfig
 from app.database.db_connection import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
@@ -24,21 +25,58 @@ async def test_endpoint():
     return {"message": "WhatsApp Router Loaded OK"}
 
 
+# ==========================================
+# WEBHOOK DINÁMICO POR SLUG (multi-bot)
+# ==========================================
+
+@router.get("/webhook/{slug}")
+async def verify_webhook_slug(
+    slug: str,
+    mode: str = Query(..., alias="hub.mode"),
+    token: str = Query(..., alias="hub.verify_token"),
+    challenge: str = Query(..., alias="hub.challenge")
+):
+    """Webhook verification for a specific bot (by slug)."""
+    async with AsyncSessionLocal() as db:
+        bot = await _get_bot_by_slug(db, slug)
+        if not bot:
+            raise HTTPException(status_code=404, detail=f"Bot '{slug}' no encontrado")
+
+        if mode == "subscribe" and token == bot.whatsapp_verify_token:
+            from fastapi import Response
+            return Response(content=challenge, media_type="text/plain")
+
+    raise HTTPException(status_code=403, detail="Verification failed")
+
+
+@router.post("/webhook/{slug}")
+async def receive_webhook_slug(
+    slug: str,
+    payload: WhatsAppWebhookPayload,
+    background_tasks: BackgroundTasks,
+):
+    """Receive messages from Meta Webhook for a specific bot."""
+    background_tasks.add_task(_process_webhook, payload, slug)
+    return {"status": "ok"}
+
+
+# ==========================================
+# WEBHOOK LEGACY (retrocompatibilidad)
+# ==========================================
+
 @router.get("/webhook")
 async def verify_webhook(
     mode: str = Query(..., alias="hub.mode"),
     token: str = Query(..., alias="hub.verify_token"),
     challenge: str = Query(..., alias="hub.challenge")
 ):
-    """
-    Webhook verification endpoint for Meta.
-    """
+    """Webhook verification endpoint for Meta (legacy, uses env vars)."""
     VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "sgi_token_123")
-    
+
     if mode == "subscribe" and token == VERIFY_TOKEN:
         from fastapi import Response
         return Response(content=challenge, media_type="text/plain")
-    
+
     raise HTTPException(status_code=403, detail="Verification failed")
 
 
@@ -47,36 +85,64 @@ async def receive_webhook_message(
     payload: WhatsAppWebhookPayload,
     background_tasks: BackgroundTasks,
 ):
-    """
-    Receive messages from Meta Webhook.
-    Responde 200 OK inmediatamente y procesa en background para cumplir
-    con el timeout de 5 segundos de Meta.
-    """
-    background_tasks.add_task(_process_webhook, payload)
+    """Receive messages from Meta Webhook (legacy, uses env vars)."""
+    background_tasks.add_task(_process_webhook, payload, None)
     return {"status": "ok"}
 
 
-async def _process_webhook(payload: WhatsAppWebhookPayload):
+# ==========================================
+# HELPER: buscar bot por slug
+# ==========================================
+
+async def _get_bot_by_slug(db, slug: str) -> WhatsAppBotConfig | None:
+    """Busca un bot activo por su slug."""
+    result = await db.execute(
+        select(WhatsAppBotConfig).where(
+            and_(WhatsAppBotConfig.slug == slug, WhatsAppBotConfig.is_active == True)
+        )
+    )
+    return result.scalar_one_or_none()
+
+
+# ==========================================
+# PROCESAMIENTO EN BACKGROUND
+# ==========================================
+
+async def _process_webhook(payload: WhatsAppWebhookPayload, slug: str | None):
     """
     Procesamiento real del webhook en background.
     Usa su propia sesión de BD porque el request original ya cerró.
+    Si slug es None, usa credenciales de .env (modo legacy).
     """
     async with AsyncSessionLocal() as db:
         try:
-            service = ChatbotService(db)
-            
+            # Resolver configuración del bot
+            bot_config = None
+            if slug:
+                bot_config = await _get_bot_by_slug(db, slug)
+                if not bot_config:
+                    logger.error(f"Bot con slug '{slug}' no encontrado. Ignorando webhook.")
+                    return
+
+            # Credenciales para enviar respuestas
+            wa_token = bot_config.whatsapp_token if bot_config else None
+            wa_phone_id = bot_config.whatsapp_phone_id if bot_config else None
+            bot_config_id = bot_config.id if bot_config else None
+
+            service = ChatbotService(db, bot_config=bot_config)
+
             for entry in payload.entry:
                 for change in entry.changes:
                     value = change.value
-                    
+
                     if not value.messages:
                         continue
-                    
+
                     for msg in value.messages:
                         from_number = msg.get("from")
                         msg_type = msg.get("type")
                         msg_id = msg.get("id")
-                        
+
                         # ==========================================
                         # FIX 1: Idempotencia — ignorar mensajes ya procesados
                         # ==========================================
@@ -87,21 +153,21 @@ async def _process_webhook(payload: WhatsAppWebhookPayload):
                             if existing.scalars().first():
                                 logger.info(f"Mensaje duplicado ignorado: {msg_id}")
                                 continue
-                        
+
                         # Obtener nombre del contacto
                         contact_name = "Usuario"
                         if value.contacts:
                             contact = next((c for c in value.contacts if c.get("wa_id") == from_number), None)
                             if contact:
                                 contact_name = contact.get("profile", {}).get("name", "Usuario")
-                                
+
                         # Normalizar a WhatsAppIncoming
                         incoming = WhatsAppIncoming(
                             from_number=from_number,
                             contact_name=contact_name,
                             message_type=msg_type
                         )
-                        
+
                         # Extraer contenido según el tipo
                         if msg_type == "text":
                             incoming.message_text = msg.get("text", {}).get("body", "")
@@ -123,38 +189,38 @@ async def _process_webhook(payload: WhatsAppWebhookPayload):
                             incoming.message_text = location.get("name", "")
 
                         # ==========================================
-                        # Manejo de archivos multimedia (imagen, documento, audio, video, sticker)
+                        # Manejo de archivos multimedia
                         # ==========================================
                         media_url = None
                         tipo_contenido = "text"
-                        
+
                         if msg_type in ("image", "document", "video", "audio", "sticker"):
                             tipo_contenido = msg_type
                             media_data = msg.get(msg_type, {})
                             media_id = media_data.get("id")
                             caption = media_data.get("caption", "")
-                            
+
                             if media_id:
                                 from app.services.comercial.media_service import MediaService
                                 resultado_media = await MediaService.descargar_media(media_id)
                                 if resultado_media:
                                     media_url = resultado_media["ruta_relativa"]
-                            
+
                             # Usar caption como texto del mensaje, o un placeholder descriptivo
                             if caption:
                                 incoming.message_text = caption
                             else:
                                 labels = {
                                     "image": "📷 Imagen",
-                                    "document": "📄 Documento", 
+                                    "document": "📄 Documento",
                                     "video": "🎥 Video",
                                     "audio": "🎵 Audio",
                                     "sticker": "🪄 Sticker"
                                 }
                                 incoming.message_text = labels.get(msg_type, "📎 Archivo")
-                        
+
                         # ==========================================
-                        # FIX 3: Normalizar teléfono y usar igualdad exacta (no LIKE)
+                        # FIX 3: Normalizar teléfono
                         # ==========================================
                         from_num_norm = from_number.replace(" ", "").replace("+", "")
                         if from_num_norm.startswith("51"):
@@ -169,18 +235,18 @@ async def _process_webhook(payload: WhatsAppWebhookPayload):
                         ).order_by(Inbox.id.desc())
                         result_inbox = await db.execute(query_inbox)
                         inbox = result_inbox.scalars().first()
-                        
+
                         chat_svc = ChatService(db)
-                        
-                        # If it's a new interaction and no inbox exists, create one in NUEVO state
-                        # This guarantees we capture all conversation history before it's assigned to a commercial
+
+                        # If no inbox exists, create one in NUEVO state
                         if not inbox and msg_type in ("text", "interactive", "location", "image", "document", "video", "audio", "sticker"):
                             new_inbox = Inbox(
                                 telefono=from_num_norm,
                                 mensaje_inicial=incoming.message_text if msg_type == "text" else "Interacción inicial",
                                 nombre_whatsapp=contact_name,
                                 estado="NUEVO",
-                                modo="BOT"
+                                modo="BOT",
+                                bot_config_id=bot_config_id,  # MULTI-BOT
                             )
                             db.add(new_inbox)
                             await db.commit()
@@ -199,15 +265,18 @@ async def _process_webhook(payload: WhatsAppWebhookPayload):
                                 media_url=media_url,
                                 whatsapp_msg_id=msg_id
                             ))
-                            
+
                             # Actualizar timestamp del último mensaje del cliente (ventana 24h)
                             inbox.ultimo_mensaje_cliente_at = datetime.now()
+                            # Asegurar bot_config_id si el inbox existía sin uno
+                            if bot_config_id and not inbox.bot_config_id:
+                                inbox.bot_config_id = bot_config_id
                             await db.commit()
 
                         # If mode is ASESOR, skip bot
                         if inbox and inbox.modo == 'ASESOR':
                             continue
-                            
+
                         # Procesar con el bot
                         response = await service.process_message(incoming)
 
@@ -217,23 +286,28 @@ async def _process_webhook(payload: WhatsAppWebhookPayload):
                         # Si el bot indica "no_action", skip
                         if response.action == "no_action":
                             continue
-                        
+
                         # Enviar respuesta y guardarla
                         for bot_msg in response.messages:
                             txt_content = bot_msg.content if bot_msg.type == "text" else bot_msg.body
                             if bot_msg.type == "text":
-                                await WhatsAppService.send_text(from_number, bot_msg.content)
+                                await WhatsAppService.send_text(
+                                    from_number, bot_msg.content,
+                                    token=wa_token, phone_id=wa_phone_id,
+                                )
                             elif bot_msg.type == "buttons":
                                 buttons = [{"id": b["id"], "title": b["title"]} for b in bot_msg.buttons]
                                 await WhatsAppService.send_interactive_buttons(
-                                    from_number, bot_msg.body, buttons
+                                    from_number, bot_msg.body, buttons,
+                                    token=wa_token, phone_id=wa_phone_id,
                                 )
                             elif bot_msg.type == "list":
                                 await WhatsAppService.send_interactive_list(
                                     from_number, bot_msg.body, bot_msg.header,
-                                    bot_msg.button_text, bot_msg.sections
+                                    bot_msg.button_text, bot_msg.sections,
+                                    token=wa_token, phone_id=wa_phone_id,
                                 )
-                                
+
                             # Save bot responses to history if inbox exists
                             if inbox:
                                 await chat_svc.save_message(ChatMessageCreate(
@@ -244,6 +318,6 @@ async def _process_webhook(payload: WhatsAppWebhookPayload):
                                     contenido=txt_content,
                                     estado_envio='ENVIADO'
                                 ))
-                    
+
         except Exception as e:
             logger.error(f"Error processing webhook: {e}", exc_info=True)

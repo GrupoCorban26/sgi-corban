@@ -1,4 +1,4 @@
-import { LucideIcon, Home, BarChart3, BarChart2, ArrowRightLeft, Users, Database, UserCog, Building2, Package, Cable, Clock, Phone, ShoppingBag, Globe, MessageSquare, Eye } from 'lucide-react';
+import { LucideIcon, Home, BarChart3, BarChart2, ArrowRightLeft, Users, Database, UserCog, Building2, Package, Cable, Clock, Phone, ShoppingBag, Globe, MessageSquare, Eye, Bot } from 'lucide-react';
 
 export interface MenuItem {
   label: string;
@@ -66,6 +66,7 @@ export const MENU_ROLES: Record<string, MenuItem[]> = {
     { label: 'Base', href: '/sistemas/base', icon: Database },
     { label: 'Usuarios', href: '/sistemas/usuarios', icon: UserCog },
     { label: 'Config Buzón', href: '/sistemas/buzon', icon: MessageSquare },
+    { label: 'WhatsApp Bots', href: '/sistemas/whatsapp-bots', icon: Bot },
     { label: 'Supervisión', href: '/comercial/supervision', icon: Eye },
     // Secciones administrativas (SISTEMAS = Super Admin)
     { label: 'Organización', href: '/administracion/organizacion', icon: Building2 },

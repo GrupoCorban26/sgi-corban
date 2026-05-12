@@ -7,19 +7,45 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 
-WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
-WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID")
-WHATSAPP_API_URL = f"https://graph.facebook.com/v21.0/{WHATSAPP_PHONE_ID}/messages"
+# Credenciales por defecto (retrocompatibilidad con el primer bot)
+DEFAULT_WHATSAPP_TOKEN = os.getenv("WHATSAPP_TOKEN")
+DEFAULT_WHATSAPP_PHONE_ID = os.getenv("WHATSAPP_PHONE_ID")
+
+API_BASE = "https://graph.facebook.com/v21.0"
+
+
+def _resolve_credentials(token: str | None, phone_id: str | None) -> tuple[str, str]:
+    """Resuelve las credenciales: usa las pasadas o cae al default de .env."""
+    t = token or DEFAULT_WHATSAPP_TOKEN
+    p = phone_id or DEFAULT_WHATSAPP_PHONE_ID
+    if not t or not p:
+        raise ValueError(
+            "No se encontraron credenciales de WhatsApp. "
+            "Configura WHATSAPP_TOKEN y WHATSAPP_PHONE_ID en .env o pasa las credenciales explícitamente."
+        )
+    return t, p
 
 
 class WhatsAppService:
-    """Service to send messages via WhatsApp Cloud API."""
+    """Service to send messages via WhatsApp Cloud API.
+
+    Todos los métodos aceptan `token` y `phone_id` opcionales.
+    Si no se pasan, se usan las variables de entorno (retrocompatibilidad).
+    """
 
     @staticmethod
-    async def send_text(to: str, message: str) -> dict:
+    async def send_text(
+        to: str,
+        message: str,
+        *,
+        token: str | None = None,
+        phone_id: str | None = None,
+    ) -> dict:
         """Send a simple text message."""
+        t, p = _resolve_credentials(token, phone_id)
+        url = f"{API_BASE}/{p}/messages"
         headers = {
-            "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+            "Authorization": f"Bearer {t}",
             "Content-Type": "application/json",
         }
         payload = {
@@ -29,31 +55,41 @@ class WhatsAppService:
             "text": {"body": message},
         }
         async with httpx.AsyncClient() as client:
-            response = await client.post(WHATSAPP_API_URL, json=payload, headers=headers)
+            response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
             return response.json()
 
     @staticmethod
-    async def send_template(to: str, template_name: str, language: str = "es", parameters: list = None) -> dict:
+    async def send_template(
+        to: str,
+        template_name: str,
+        language: str = "es",
+        parameters: list = None,
+        *,
+        token: str | None = None,
+        phone_id: str | None = None,
+    ) -> dict:
         """Send a template message (required for first contact or after 24h)."""
+        t, p = _resolve_credentials(token, phone_id)
+        url = f"{API_BASE}/{p}/messages"
         headers = {
-            "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+            "Authorization": f"Bearer {t}",
             "Content-Type": "application/json",
         }
-        
+
         template = {
             "name": template_name,
             "language": {"code": language},
         }
-        
+
         if parameters:
             template["components"] = [
                 {
                     "type": "body",
-                    "parameters": [{"type": "text", "text": p} for p in parameters],
+                    "parameters": [{"type": "text", "text": p_val} for p_val in parameters],
                 }
             ]
-        
+
         payload = {
             "messaging_product": "whatsapp",
             "to": to,
@@ -61,18 +97,27 @@ class WhatsAppService:
             "template": template,
         }
         async with httpx.AsyncClient() as client:
-            response = await client.post(WHATSAPP_API_URL, json=payload, headers=headers)
+            response = await client.post(url, json=payload, headers=headers)
             return response.json()
 
     @staticmethod
-    async def send_interactive_buttons(to: str, body_text: str, buttons: list) -> dict:
+    async def send_interactive_buttons(
+        to: str,
+        body_text: str,
+        buttons: list,
+        *,
+        token: str | None = None,
+        phone_id: str | None = None,
+    ) -> dict:
         """
         Send an interactive message with reply buttons (max 3).
         buttons: [{"id": "btn_importar", "title": "Quiero importar"}, ...]
         Only works within 24h session window.
         """
+        t, p = _resolve_credentials(token, phone_id)
+        url = f"{API_BASE}/{p}/messages"
         headers = {
-            "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+            "Authorization": f"Bearer {t}",
             "Content-Type": "application/json",
         }
         payload = {
@@ -94,21 +139,32 @@ class WhatsAppService:
             },
         }
         async with httpx.AsyncClient() as client:
-            response = await client.post(WHATSAPP_API_URL, json=payload, headers=headers)
+            response = await client.post(url, json=payload, headers=headers)
             if response.status_code >= 400:
                 logger.error(f"WhatsApp API Error (Interactive): {response.status_code} - {response.text}")
             response.raise_for_status()
             return response.json()
 
     @staticmethod
-    async def send_interactive_list(to: str, body_text: str, header: str, button_text: str, sections: list) -> dict:
+    async def send_interactive_list(
+        to: str,
+        body_text: str,
+        header: str,
+        button_text: str,
+        sections: list,
+        *,
+        token: str | None = None,
+        phone_id: str | None = None,
+    ) -> dict:
         """
         Send an interactive list message.
         sections: [{"title": "Section", "rows": [{"id": "x", "title": "Y", "description": "Z"}]}]
         Max 10 rows per section, max 10 sections.
         """
+        t, p = _resolve_credentials(token, phone_id)
+        url = f"{API_BASE}/{p}/messages"
         headers = {
-            "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+            "Authorization": f"Bearer {t}",
             "Content-Type": "application/json",
         }
         interactive_data = {
@@ -129,7 +185,7 @@ class WhatsAppService:
             "interactive": interactive_data,
         }
         async with httpx.AsyncClient() as client:
-            response = await client.post(WHATSAPP_API_URL, json=payload, headers=headers)
+            response = await client.post(url, json=payload, headers=headers)
             if response.status_code >= 400:
                 logger.error(f"WhatsApp API Error (List): {response.status_code} - {response.text}")
             response.raise_for_status()

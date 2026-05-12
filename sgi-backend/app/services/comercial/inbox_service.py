@@ -89,21 +89,29 @@ class InboxService:
             if not all_commercials:
                 raise Exception("No active commercials found")
             
-            # Filtrar comerciales por JEFE_COMERCIAL si está configurado en .env
-            bot_jefe_id_str = os.getenv("BOT_JEFE_COMERCIAL_ID")
-            if bot_jefe_id_str:
-                try:
-                    jefe_id_val = int(bot_jefe_id_str)
-                    filtered_commercials = [c for c in all_commercials if c.empleado and c.empleado.jefe_id == jefe_id_val]
-                    
-                    if filtered_commercials:
-                        all_commercials = filtered_commercials
-                    else:
-                        logger.warning(
-                            f"No se encontraron comerciales activos bajo el jefe_id={jefe_id_val}. Fallback a todos los comerciales."
-                        )
-                except ValueError:
-                    pass
+            # ============================================================
+            # MULTI-BOT: Filtrar por jefe_comercial_id del bot que recibió
+            # ============================================================
+            jefe_id_val = data.jefe_comercial_id  # Viene del bot_config
+            
+            # Fallback: si no viene del bot, intentar con el env var legacy
+            if not jefe_id_val:
+                bot_jefe_id_str = os.getenv("BOT_JEFE_COMERCIAL_ID")
+                if bot_jefe_id_str:
+                    try:
+                        jefe_id_val = int(bot_jefe_id_str)
+                    except ValueError:
+                        pass
+            
+            if jefe_id_val:
+                filtered_commercials = [c for c in all_commercials if c.empleado and c.empleado.jefe_id == jefe_id_val]
+                
+                if filtered_commercials:
+                    all_commercials = filtered_commercials
+                else:
+                    logger.warning(
+                        f"No se encontraron comerciales activos bajo el jefe_id={jefe_id_val}. Fallback a todos los comerciales."
+                    )
             
             # Filtrar solo los disponibles en buzón
             disponibles = [c for c in all_commercials if c.disponible_buzon]
@@ -128,9 +136,15 @@ class InboxService:
                 commercials_sorted = sorted(disponibles, key=lambda u: u.id)
                 
                 # Lock de BD: SELECT ... FOR UPDATE sobre el último lead asignado
+                # MULTI-BOT: Filtrar por bot_config_id si está presente
                 last_assigned_query = select(Inbox).where(
                     Inbox.asignado_a.isnot(None)
-                ).order_by(Inbox.id.desc()).limit(1).with_for_update()
+                )
+                if data.bot_config_id:
+                    last_assigned_query = last_assigned_query.where(
+                        Inbox.bot_config_id == data.bot_config_id
+                    )
+                last_assigned_query = last_assigned_query.order_by(Inbox.id.desc()).limit(1).with_for_update()
                 last_result = await self.db.execute(last_assigned_query)
                 last_lead = last_result.scalar_one_or_none()
                 
@@ -154,6 +168,9 @@ class InboxService:
             new_lead.tiempo_respuesta_segundos = None
             new_lead.fecha_primera_respuesta = None
             new_lead.tipo_interes = data.tipo_interes
+            # MULTI-BOT: Asignar bot_config_id si aún no tiene
+            if data.bot_config_id and not new_lead.bot_config_id:
+                new_lead.bot_config_id = data.bot_config_id
             # Update the original message if None or generic
             if not new_lead.mensaje_inicial or new_lead.mensaje_inicial == "Interacción inicial":
                 new_lead.mensaje_inicial = data.mensaje
@@ -166,6 +183,7 @@ class InboxService:
                 fecha_asignacion=datetime.now(),
                 estado='PENDIENTE',
                 tipo_interes=data.tipo_interes,
+                bot_config_id=data.bot_config_id,  # MULTI-BOT
             )
             self.db.add(new_lead)
             
@@ -351,7 +369,12 @@ class InboxService:
             if enviar_mensaje:
                 try:
                     from app.services.comercial.chatbot_service import ChatbotService
-                    bot_svc = ChatbotService(self.db)
+                    # MULTI-BOT: resolver bot_config del lead
+                    bot_cfg = None
+                    if lead.bot_config_id:
+                        from app.models.whatsapp_bot_config import WhatsAppBotConfig
+                        bot_cfg = await self.db.get(WhatsAppBotConfig, lead.bot_config_id)
+                    bot_svc = ChatbotService(self.db, bot_config=bot_cfg)
                     await bot_svc.send_despedida(lead.telefono, lead.id)
                 except Exception as e:
                     logger.warning(f"Error enviando despedida al descartar: {e}")

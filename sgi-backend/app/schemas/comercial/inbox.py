@@ -15,6 +15,8 @@ class InboxDistribute(BaseModel):
     mensaje: str
     nombre_display: Optional[str] = None
     tipo_interes: Optional[str] = None  # ASESORIA, COTIZACION, CARGA_LISTA
+    bot_config_id: Optional[int] = None        # ID del bot que recibió el lead
+    jefe_comercial_id: Optional[int] = None    # Jefe cuyo equipo debe recibir el lead
 
 class InboxResponse(InboxBase):
     id: int

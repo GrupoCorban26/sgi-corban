@@ -30,8 +30,11 @@ from app.services.comercial.chat_service import ChatService
 from app.schemas.comercial.chat import ChatMessageCreate
 from app.utils.horario_laboral import es_horario_laboral
 
+from app.models.whatsapp_bot_config import WhatsAppBotConfig
+
 from app.services.comercial.bot_messages import (
     MSG_BIENVENIDA,
+    DEFAULT_NOMBRE_BOT,
     MSG_MENU_REGRESO,
     MENU_BUTTONS,
     MSG_ASESOR_ASIGNADO,
@@ -66,8 +69,30 @@ SESSION_TIMEOUT_MINUTES = 30
 # ==========================================
 
 class ChatbotService:
-    def __init__(self, db: AsyncSession):
+    def __init__(self, db: AsyncSession, bot_config: WhatsAppBotConfig | None = None):
         self.db = db
+        self.bot_config = bot_config
+
+    # --- Helpers multi-bot ---
+    @property
+    def _bot_name(self) -> str:
+        return self.bot_config.nombre_bot if self.bot_config else DEFAULT_NOMBRE_BOT
+
+    @property
+    def _wa_token(self) -> str | None:
+        return self.bot_config.whatsapp_token if self.bot_config else None
+
+    @property
+    def _wa_phone_id(self) -> str | None:
+        return self.bot_config.whatsapp_phone_id if self.bot_config else None
+
+    @property
+    def _bot_config_id(self) -> int | None:
+        return self.bot_config.id if self.bot_config else None
+
+    @property
+    def _jefe_comercial_id(self) -> int | None:
+        return self.bot_config.jefe_comercial_id if self.bot_config else None
 
     # =====================================================================
     # PUNTO DE ENTRADA PRINCIPAL
@@ -353,6 +378,8 @@ class ChatbotService:
                 mensaje=mensaje_contexto,
                 nombre_display=data.contact_name,
                 tipo_interes=tipo_interes,
+                bot_config_id=self._bot_config_id,
+                jefe_comercial_id=self._jefe_comercial_id,
             )
             result = await inbox_service.distribute_lead(distribute_data)
             nombre_comercial = result["assigned_to"]["nombre"]
@@ -393,7 +420,10 @@ class ChatbotService:
             await self._delete_session(session)
 
         try:
-            await WhatsAppService.send_text(phone, MSG_DESPEDIDA)
+            await WhatsAppService.send_text(
+                phone, MSG_DESPEDIDA,
+                token=self._wa_token, phone_id=self._wa_phone_id,
+            )
 
             # Guardar en historial de chat
             chat_svc = ChatService(self.db)
@@ -433,13 +463,23 @@ class ChatbotService:
                     requerimientos = datos.get("requerimientos", [])
                     resumen = "\n".join(f"• {r}" for r in requerimientos) if requerimientos else "Cotización sin detalles"
 
-                    # Distribuir lead
+                    # Distribuir lead — usar bot_config de la sesión si existe
+                    bot_cfg = None
+                    if session.bot_config_id:
+                        bot_cfg = await self.db.get(WhatsAppBotConfig, session.bot_config_id)
+                    _token = bot_cfg.whatsapp_token if bot_cfg else self._wa_token
+                    _phone = bot_cfg.whatsapp_phone_id if bot_cfg else self._wa_phone_id
+                    _jefe = bot_cfg.jefe_comercial_id if bot_cfg else self._jefe_comercial_id
+                    _bcid = bot_cfg.id if bot_cfg else self._bot_config_id
+
                     inbox_service = InboxService(self.db)
                     distribute_data = InboxDistribute(
                         telefono=phone,
                         mensaje=f"Solicitud de cotización (auto-derivada):\n{resumen}",
                         nombre_display="Cliente WhatsApp",
                         tipo_interes="COTIZACION",
+                        bot_config_id=_bcid,
+                        jefe_comercial_id=_jefe,
                     )
                     result_dist = await inbox_service.distribute_lead(distribute_data)
                     nombre_comercial = result_dist["assigned_to"]["nombre"]
@@ -455,7 +495,9 @@ class ChatbotService:
                             nombre=nombre_comercial, horario=MSG_HORARIO_INFO
                         )
 
-                    await WhatsAppService.send_text(phone, texto)
+                    await WhatsAppService.send_text(
+                        phone, texto, token=_token, phone_id=_phone,
+                    )
 
                     # Guardar respuesta del bot en historial
                     inbox_id = result_dist.get("lead_id")
@@ -493,7 +535,10 @@ class ChatbotService:
 
     def _send_menu(self, es_regreso: bool = False) -> WhatsAppResponse:
         """Envía el menú principal con 3 botones."""
-        mensaje = MSG_MENU_REGRESO if es_regreso else MSG_BIENVENIDA
+        if es_regreso:
+            mensaje = MSG_MENU_REGRESO
+        else:
+            mensaje = MSG_BIENVENIDA.format(nombre_bot=self._bot_name)
         return WhatsAppResponse(
             action="send_buttons",
             messages=[BotMessage(type="buttons", body=mensaje, buttons=MENU_BUTTONS)],
@@ -588,6 +633,7 @@ class ChatbotService:
             estado=estado,
             datos=json.dumps(datos) if datos else None,
             expires_at=expires,
+            bot_config_id=self._bot_config_id,
         )
         self.db.add(session)
         await self.db.commit()

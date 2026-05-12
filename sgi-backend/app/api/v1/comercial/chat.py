@@ -107,7 +107,20 @@ async def send_message(
         )
     
     try:
-        await WhatsAppService.send_text(inbox.telefono, request.contenido)
+        # MULTI-BOT: usar credenciales del bot que originó el lead
+        wa_token = None
+        wa_phone_id = None
+        if inbox.bot_config_id:
+            from app.models.whatsapp_bot_config import WhatsAppBotConfig
+            bot = await db.get(WhatsAppBotConfig, inbox.bot_config_id)
+            if bot:
+                wa_token = bot.whatsapp_token
+                wa_phone_id = bot.whatsapp_phone_id
+
+        await WhatsAppService.send_text(
+            inbox.telefono, request.contenido,
+            token=wa_token, phone_id=wa_phone_id,
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error al enviar mensaje por WhatsApp: {e}")
         
@@ -154,7 +167,12 @@ async def release_chat(
     
     # Enviar mensaje de despedida al cliente
     from app.services.comercial.chatbot_service import ChatbotService
-    bot_svc = ChatbotService(db)
+    # MULTI-BOT: resolver bot_config del lead
+    bot_cfg = None
+    if inbox.bot_config_id:
+        from app.models.whatsapp_bot_config import WhatsAppBotConfig
+        bot_cfg = await db.get(WhatsAppBotConfig, inbox.bot_config_id)
+    bot_svc = ChatbotService(db, bot_config=bot_cfg)
     await bot_svc.send_despedida(telefono, inbox.id)
 
     return {"status": "success", "modo": inbox.modo}

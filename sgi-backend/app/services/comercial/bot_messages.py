@@ -10,7 +10,10 @@ o traducir sin tocar la lógica del servicio.
 # MENÚ PRINCIPAL
 # ==========================================
 
-MSG_BIENVENIDA = "Hola, soy Corby🤖, tu asistente virtual del Grupo Corban. ¿En qué puedo ayudarte hoy?🤗"
+MSG_BIENVENIDA = "Hola, soy {nombre_bot}🤖, tu asistente virtual del Grupo Corban. ¿En qué puedo ayudarte hoy?🤗"
+
+# Nombre por defecto cuando no hay bot_config
+DEFAULT_NOMBRE_BOT = "Corby"
 
 MSG_MENU_REGRESO = "¿En qué más puedo ayudarte? 😊"
 

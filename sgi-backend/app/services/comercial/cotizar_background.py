@@ -14,6 +14,7 @@ from sqlalchemy.future import select
 from app.database.db_connection import AsyncSessionLocal
 from app.models.comercial_session import ConversationSession
 from app.models.comercial_inbox import Inbox
+from app.models.whatsapp_bot_config import WhatsAppBotConfig
 from app.services.comercial.whatsapp_service import WhatsAppService
 from app.services.comercial.chatbot_service import (
     COTIZAR_VENTANA_GRACIA_SEGUNDOS,
@@ -76,10 +77,20 @@ async def _ejecutar_ventana_gracia(phone: str, from_number: str, contact_name: s
                 # ¡60 segundos sin mensajes! Derivar al asesor.
                 logger.info(f"[COTIZAR] {phone}: ventana de gracia terminada. Derivando al asesor.")
 
+                # MULTI-BOT: resolver credenciales del bot desde la sesión
+                bot_cfg = None
+                if session.bot_config_id:
+                    bot_cfg = await db.get(WhatsAppBotConfig, session.bot_config_id)
+                _token = bot_cfg.whatsapp_token if bot_cfg else None
+                _phone_id = bot_cfg.whatsapp_phone_id if bot_cfg else None
+                _jefe = bot_cfg.jefe_comercial_id if bot_cfg else None
+                _bcid = bot_cfg.id if bot_cfg else None
+
                 # Enviar mensaje de confirmación al cliente
                 await WhatsAppService.send_text(
                     from_number,
-                    "Entiendo estimado, he recibido sus requerimientos, ahora lo derivaré con un asesor 🚀"
+                    "Entiendo estimado, he recibido sus requerimientos, ahora lo derivaré con un asesor 🚀",
+                    token=_token, phone_id=_phone_id,
                 )
 
                 # Derivar mediante Round Robin
@@ -88,7 +99,9 @@ async def _ejecutar_ventana_gracia(phone: str, from_number: str, contact_name: s
                     telefono=from_number,
                     mensaje="Solicitud de cotización",
                     nombre_display=contact_name,
-                    tipo_interes="COTIZACION"
+                    tipo_interes="COTIZACION",
+                    bot_config_id=_bcid,
+                    jefe_comercial_id=_jefe,
                 )
                 result_lead = await inbox_service.distribute_lead(distribute_data)
                 nombre_comercial = result_lead["assigned_to"]["nombre"]
@@ -96,7 +109,8 @@ async def _ejecutar_ventana_gracia(phone: str, from_number: str, contact_name: s
                 # Enviar mensaje con nombre del asesor asignado
                 await WhatsAppService.send_text(
                     from_number,
-                    f"El asesor *{nombre_comercial}* se pondrá en contacto contigo en breve. 🚀"
+                    f"El asesor *{nombre_comercial}* se pondrá en contacto contigo en breve. 🚀",
+                    token=_token, phone_id=_phone_id,
                 )
 
                 # Guardar las respuestas del bot en el historial de chat

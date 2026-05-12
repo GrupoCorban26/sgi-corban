@@ -37,7 +37,11 @@ class Inbox(Base):
     # Cierre / Conversión
     fecha_cierre = Column(DateTime(timezone=True), nullable=True)
 
+    # Bot de origen (multi-bot)
+    bot_config_id = Column(Integer, ForeignKey("comercial.whatsapp_bot_config.id"), nullable=True)
+
     # Relationships
     usuario_asignado = relationship("app.models.seguridad.Usuario", foreign_keys=[asignado_a])
     motivo_descarte = relationship("app.models.comercial_catalogos.MotivoDescarteInbox")
     mensajes = relationship("app.models.chat_message.ChatMessage", back_populates="inbox", cascade="all, delete-orphan")
+    bot_config = relationship("app.models.whatsapp_bot_config.WhatsAppBotConfig", foreign_keys=[bot_config_id])

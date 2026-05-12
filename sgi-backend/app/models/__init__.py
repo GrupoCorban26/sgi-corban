@@ -29,3 +29,4 @@ from .historial_llamadas import HistorialLlamada
 from .orden import Orden
 from .dia_no_laborable import DiaNoLaborable
 from .whatsapp_supervision import EvoInstancia, EvoConversacion, EvoMensaje
+from .whatsapp_bot_config import WhatsAppBotConfig
