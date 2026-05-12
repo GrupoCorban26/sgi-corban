@@ -5,11 +5,10 @@ Centraliza lógica de filtrado por equipo comercial que antes estaba
 duplicada en inbox_service, chat_service, etc.
 """
 import logging
-from sqlalchemy import Column, or_
+from typing import List, Optional
+from sqlalchemy import Column, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-
-from app.core.settings import get_settings
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +20,7 @@ async def aplicar_filtro_comercial(
     comercial_ids: list = None, 
     filtro_comercial_id: int = None,
     incluir_sin_asignar: bool = False,
-    jefe_comercial_id: int = None
+    jefe_empleado_ids: Optional[List[int]] = None
 ):
     """
     Aplica filtro de equipo comercial a una query SQLAlchemy.
@@ -29,10 +28,11 @@ async def aplicar_filtro_comercial(
     Args:
         stmt: Query SQLAlchemy existente
         columna_asignado: Columna del modelo (ej. Inbox.asignado_a)
-        db: Sesión de base de datos (para resolver BOT_JEFE_COMERCIAL_ID)
-        comercial_ids: Lista de IDs permitidos (None = sin filtro / ve todo)
+        db: Sesión de base de datos
+        comercial_ids: Lista de usuario_ids permitidos (None = sin filtro / ve todo)
         filtro_comercial_id: ID específico para filtrar (dropdown del jefe)
-        incluir_sin_asignar: Si True, también incluye registros sin asignar (para jefes)
+        incluir_sin_asignar: Si True, incluye leads sin asignar (BOT) filtrados por bot_config
+        jefe_empleado_ids: Lista de empleado_ids del jefe + subordinados (para filtrar bots)
     
     Returns:
         Query con filtro aplicado, o None si no tiene permiso
@@ -47,22 +47,19 @@ async def aplicar_filtro_comercial(
     if comercial_ids is not None:
         condiciones = [columna_asignado.in_(comercial_ids)]
         
-        # Incluir leads sin asignar (estado BOT) para supervisores
-        if incluir_sin_asignar:
-            if jefe_comercial_id:
-                from app.models.whatsapp_bot_config import WhatsAppBotConfig
-                from sqlalchemy import and_
-                # Obtenemos los bots que pertenecen a este jefe o están bajo su cadena
-                # Como simplificación directa, buscamos los bots cuyo jefe sea el actual
-                cond_sin_asignar = and_(
-                    columna_asignado == None,
-                    columna_asignado.class_.bot_config_id.in_(
-                        select(WhatsAppBotConfig.id).where(WhatsAppBotConfig.jefe_comercial_id == jefe_comercial_id)
+        # Incluir leads sin asignar (estado BOT) — solo para jefes, no para comerciales
+        if incluir_sin_asignar and jefe_empleado_ids:
+            from app.models.whatsapp_bot_config import WhatsAppBotConfig
+            # Filtrar leads BOT por los bots que pertenecen a cualquier jefe en la cadena
+            cond_sin_asignar = and_(
+                columna_asignado == None,
+                columna_asignado.class_.bot_config_id.in_(
+                    select(WhatsAppBotConfig.id).where(
+                        WhatsAppBotConfig.jefe_comercial_id.in_(jefe_empleado_ids)
                     )
                 )
-                condiciones.append(cond_sin_asignar)
-            else:
-                condiciones.append(columna_asignado == None)
+            )
+            condiciones.append(cond_sin_asignar)
         
         return stmt.where(or_(*condiciones))
     

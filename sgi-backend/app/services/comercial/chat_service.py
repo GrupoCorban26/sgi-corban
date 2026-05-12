@@ -77,7 +77,13 @@ class ChatService:
             })
         return previews
 
-    async def get_all_conversations(self, comercial_ids: list = None, filtro_comercial_id: int = None, jefe_comercial_id: int = None):
+    async def get_all_conversations(
+        self, 
+        comercial_ids: list = None, 
+        filtro_comercial_id: int = None, 
+        incluir_sin_asignar: bool = False,
+        jefe_empleado_ids: list = None
+    ):
         """Fetch all conversations, optionally filtered by team."""
         from sqlalchemy import or_
         
@@ -103,8 +109,8 @@ class ChatService:
             query, Inbox.asignado_a, self.db,
             comercial_ids=comercial_ids,
             filtro_comercial_id=filtro_comercial_id,
-            incluir_sin_asignar=True,
-            jefe_comercial_id=jefe_comercial_id
+            incluir_sin_asignar=incluir_sin_asignar,
+            jefe_empleado_ids=jefe_empleado_ids
         )
         if query is None:
             return []

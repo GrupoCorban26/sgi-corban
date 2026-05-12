@@ -260,8 +260,8 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
                 )}
             </div>
 
-            {/* Tabs con contadores */}
-            <div className="flex border-b border-slate-100 px-1">
+            {/* Tabs con contadores — scroll horizontal */}
+            <div className="flex border-b border-slate-100 px-1 overflow-x-auto scrollbar-hide" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
                 {TABS.map(tab => {
                     const count = counts[tab.id as keyof typeof counts];
                     return (
@@ -269,8 +269,8 @@ export default function ConversationList({ selectedId, onSelect }: Props) {
                             key={tab.id}
                             onClick={() => setActiveTab(tab.id)}
                             className={`
-                                flex-1 flex items-center justify-center gap-1 px-2 py-2.5
-                                text-xs font-semibold whitespace-nowrap transition-all duration-200 relative
+                                flex items-center justify-center gap-1 px-3 py-2.5
+                                text-xs font-semibold whitespace-nowrap transition-all duration-200 relative flex-shrink-0
                                 ${activeTab === tab.id
                                     ? 'text-emerald-700'
                                     : 'text-slate-400 hover:text-slate-600'

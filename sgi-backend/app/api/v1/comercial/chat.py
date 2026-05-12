@@ -76,44 +76,55 @@ async def get_conversations(
     """Obtener conversaciones activas filtradas por equipo del usuario."""
     chat_svc = ChatService(db)
     
-    # Si filtro_jefe_id está presente, resolver los IDs de ese equipo
+    roles_usuario = [r.nombre for r in current_user.roles]
+    es_jefe = "JEFE_COMERCIAL" in roles_usuario
+    
     effective_filtro_comercial = filtro_comercial_id
     effective_comercial_ids = comercial_ids
     
+    # --- Filtro por equipo de un jefe específico (dropdown "Equipo de:") ---
     if filtro_jefe_id:
-        # Obtener todos los subordinados del jefe seleccionado
         sub_empleado_ids = await _get_subordinados_recursivo(db, filtro_jefe_id)
         if sub_empleado_ids:
-            # Obtener usuario_ids de esos empleados + el del propio jefe
             stmt = select(Usuario.id).where(
                 Usuario.empleado_id.in_([filtro_jefe_id] + sub_empleado_ids),
                 Usuario.is_active == True
             )
             sub_user_ids = list((await db.execute(stmt)).scalars().all())
-            # Intersectar con los IDs que el usuario tiene permiso de ver
             if effective_comercial_ids is not None:
                 sub_user_ids = [uid for uid in sub_user_ids if uid in effective_comercial_ids]
-            effective_comercial_ids = sub_user_ids if sub_user_ids else [0]  # [0] = sin resultados
+            effective_comercial_ids = sub_user_ids if sub_user_ids else [0]
     
-    # Determinar qué jefe_comercial_id usar para filtrar los bots asignados
-    jefe_para_filtro = None
-    if filtro_jefe_id:
-        jefe_para_filtro = filtro_jefe_id
-    elif any(r.nombre == "JEFE_COMERCIAL" for r in current_user.roles) and current_user.empleado_id:
-        jefe_para_filtro = current_user.empleado_id
+    # --- Determinar si debe ver leads sin asignar (BOT) ---
+    # Comercial: NO ve leads BOT. Solo Jefes y superiores.
+    incluir_bots = es_jefe  # Solo JEFE_COMERCIAL ve los BOT
     
-    # Si comercial_ids es None → rol global (Admin/Sistemas/Gerencia), ve todo
+    # --- Resolver lista de empleado_ids para filtrar bots ---
+    jefe_empleado_ids = None
+    if incluir_bots and current_user.empleado_id:
+        if filtro_jefe_id:
+            # Filtrando por un jefe específico: solo bots de ese jefe
+            jefe_empleado_ids = [filtro_jefe_id]
+        else:
+            # Sin filtro de jefe: bots del jefe actual + todos sus subordinados
+            todos_sub = await _get_subordinados_recursivo(db, current_user.empleado_id)
+            jefe_empleado_ids = [current_user.empleado_id] + todos_sub
+    
+    # --- Ejecutar query ---
+    # Roles globales (ADMIN/GERENCIA/SISTEMAS): comercial_ids es None, ve todo
     if effective_comercial_ids is None:
         return await chat_svc.get_all_conversations(
             filtro_comercial_id=effective_filtro_comercial,
-            jefe_comercial_id=jefe_para_filtro
+            incluir_sin_asignar=True,  # Roles globales ven todo incluido BOT
+            jefe_empleado_ids=None     # Sin filtro de bot = todos
         )
     
-    # Jefe Comercial o Comercial → filtrar por equipo
+    # Jefe Comercial o Comercial
     return await chat_svc.get_all_conversations(
         comercial_ids=effective_comercial_ids, 
         filtro_comercial_id=effective_filtro_comercial,
-        jefe_comercial_id=jefe_para_filtro
+        incluir_sin_asignar=incluir_bots,
+        jefe_empleado_ids=jefe_empleado_ids
     )
 
 @router.get("/{inbox_id}/messages", response_model=List[ChatMessageResponse])
