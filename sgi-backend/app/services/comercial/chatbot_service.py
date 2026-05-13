@@ -146,8 +146,25 @@ class ChatbotService:
             if button_id in ("btn_asesor", "btn_cotizar", "btn_carga"):
                 # Presionó un botón del menú → crear sesión y procesar
                 session = await self._create_session(phone, "MENU")
+            elif text_lower:
+                # Texto libre sin sesión → crear sesión MENU y procesar
+                # como si estuviera en el menú (detectará intención o derivará)
+                session = await self._create_session(phone, "MENU")
+
+                # Enviar bienvenida primero, luego el handler derivará
+                bienvenida = self._send_menu()
+
+                # Procesar el texto para derivar al comercial
+                derivacion = await self._handle_menu(session, data, phone)
+
+                # Combinar: enviar bienvenida + respuesta de derivación
+                all_messages = bienvenida.messages + derivacion.messages
+                return WhatsAppResponse(
+                    action=derivacion.action,
+                    messages=all_messages,
+                )
             else:
-                # Primera interacción o lead cerrado → mostrar bienvenida
+                # Sin texto y sin botón (ej. sticker solo) → mostrar bienvenida
                 return self._send_menu()
 
         # 7. Enrutar según estado actual
