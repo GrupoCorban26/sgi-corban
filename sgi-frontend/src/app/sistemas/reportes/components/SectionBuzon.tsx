@@ -25,14 +25,34 @@ export function SectionBuzon() {
                 return;
             }
             const wb = XLSX.utils.book_new();
-            const wsData = XLSX.utils.json_to_sheet(detalle.map(row => ({
-                'TELEFONO': row.telefono,
+
+            // Hoja 1: Todos los Leads
+            const wsAll = XLSX.utils.json_to_sheet(detalle.map(row => ({
+                'TELÉFONO': row.telefono,
+                'NOMBRE': row.nombre,
                 'ESTADO': row.estado,
-                'COMENTARIO': row.comentario,
-                'FECHA': row.fecha,
-                'COMERCIAL': row.comercial
+                'TIPO INTERÉS': row.tipo_interes,
+                'ORIGEN': row.origen,
+                'COMERCIAL': row.comercial,
+                'FECHA RECEPCIÓN': row.fecha_recepcion,
+                'FECHA GESTIÓN': row.fecha_gestion,
+                'FECHA CIERRE': row.fecha_cierre,
             })));
-            XLSX.utils.book_append_sheet(wb, wsData, "Buzón WhatsApp");
+            XLSX.utils.book_append_sheet(wb, wsAll, "Todos los Leads");
+
+            // Hoja 2: Descartados
+            const descartados = detalle.filter(row => row.estado_raw === 'DESCARTADO');
+            if (descartados.length > 0) {
+                const wsDesc = XLSX.utils.json_to_sheet(descartados.map(row => ({
+                    'TELÉFONO': row.telefono,
+                    'NOMBRE': row.nombre,
+                    'MOTIVO DESCARTE': row.motivo_descarte,
+                    'COMENTARIO': row.comentario_descarte,
+                    'COMERCIAL': row.comercial,
+                })));
+                XLSX.utils.book_append_sheet(wb, wsDesc, "Descartados");
+            }
+
             XLSX.writeFile(wb, `Reporte_Buzon_${format(new Date(), 'yyyyMMdd')}.xlsx`);
             toast.success('Reporte exportado correctamente');
         } catch (error) {

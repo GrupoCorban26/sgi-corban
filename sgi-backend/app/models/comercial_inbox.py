@@ -40,6 +40,11 @@ class Inbox(Base):
     # Bot de origen (multi-bot)
     bot_config_id = Column(Integer, ForeignKey("comercial.whatsapp_bot_config.id"), nullable=True)
 
+    # Origen del lead (Campaña Meta vs Orgánico)
+    origen_lead = Column(String(20), default="ORGANICO", nullable=False)  # ORGANICO, CAMPAÑA
+    referral_source_id = Column(String(100), nullable=True)   # ID del anuncio de Meta
+    referral_headline = Column(String(300), nullable=True)    # Título del anuncio
+
     # Relationships
     usuario_asignado = relationship("app.models.seguridad.Usuario", foreign_keys=[asignado_a])
     motivo_descarte = relationship("app.models.comercial_catalogos.MotivoDescarteInbox")

@@ -352,6 +352,7 @@ class AnalyticsService:
 
     async def get_detalle_buzon(self, dt_inicio: datetime, dt_fin: datetime, comercial_ids: list = None, empresa: str = None) -> list[dict]:
         """Retorna filas individuales del Inbox para exportar a Excel."""
+        from app.models.comercial_catalogos import MotivoDescarteInbox
 
         # Condición base de fechas
         condicion = and_(
@@ -362,13 +363,20 @@ class AnalyticsService:
         stmt = (
             select(
                 Inbox.telefono,
+                Inbox.nombre_whatsapp,
                 Inbox.estado,
+                Inbox.tipo_interes,
+                Inbox.origen_lead,
                 Inbox.comentario_descarte,
+                func.coalesce(MotivoDescarteInbox.nombre, '').label("motivo_descarte"),
                 Inbox.fecha_recepcion,
+                Inbox.fecha_gestion,
+                Inbox.fecha_cierre,
                 Empleado.nombres.label("comercial"),
             )
             .outerjoin(Usuario, Inbox.asignado_a == Usuario.id)
             .outerjoin(Empleado, Usuario.empleado_id == Empleado.id)
+            .outerjoin(MotivoDescarteInbox, Inbox.motivo_descarte_id == MotivoDescarteInbox.id)
             .where(condicion)
             .order_by(Inbox.fecha_recepcion.desc())
         )
@@ -383,12 +391,40 @@ class AnalyticsService:
 
         rows = (await self.db.execute(stmt)).all()
 
+        TIPO_LABELS = {
+            'IMPORTACION': 'Importación',
+            'ASESORIA': 'Asesoría',
+            'DUDAS': 'Dudas',
+            'SIN_RESPUESTA': 'Sin respuesta',
+            'ASIGNACION_MANUAL': 'Asignación manual',
+            'AGENDAMIENTO': 'Agendamiento'
+        }
+
+        ESTADO_LABELS = {
+            'BOT': 'Bot',
+            'NUEVO': 'Nuevo',
+            'PENDIENTE': 'Pendiente',
+            'EN_GESTION': 'En Gestión',
+            'SEGUIMIENTO': 'Seguimiento',
+            'COTIZADO': 'Cotizado',
+            'CIERRE': 'Cierre',
+            'DESCARTADO': 'Descartado',
+            'CONVERTIDO': 'Convertido',
+        }
+
         return [
             {
                 "telefono": row.telefono,
-                "estado": row.estado,
-                "comentario": row.comentario_descarte or "",
-                "fecha": row.fecha_recepcion.strftime("%Y-%m-%d %H:%M") if row.fecha_recepcion else "",
+                "nombre": row.nombre_whatsapp or "",
+                "estado": ESTADO_LABELS.get(row.estado, row.estado),
+                "estado_raw": row.estado,
+                "tipo_interes": TIPO_LABELS.get(row.tipo_interes, row.tipo_interes or ""),
+                "origen": row.origen_lead or "ORGANICO",
+                "motivo_descarte": row.motivo_descarte or "",
+                "comentario_descarte": row.comentario_descarte or "",
+                "fecha_recepcion": row.fecha_recepcion.strftime("%Y-%m-%d %H:%M") if row.fecha_recepcion else "",
+                "fecha_gestion": row.fecha_gestion.strftime("%Y-%m-%d %H:%M") if row.fecha_gestion else "",
+                "fecha_cierre": row.fecha_cierre.strftime("%Y-%m-%d %H:%M") if row.fecha_cierre else "",
                 "comercial": (row.comercial.split()[0] if row.comercial else "Sin asignar"),
             }
             for row in rows

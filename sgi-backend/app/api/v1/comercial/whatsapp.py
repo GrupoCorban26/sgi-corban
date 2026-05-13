@@ -226,6 +226,21 @@ async def _process_webhook(payload: WhatsAppWebhookPayload, slug: str | None):
                         if from_num_norm.startswith("51"):
                             from_num_norm = from_num_norm[2:]
 
+                        # ==========================================
+                        # Capturar referral de Meta Ads (campaña vs orgánico)
+                        # ==========================================
+                        referral = msg.get("referral")
+                        origen_lead = "ORGANICO"
+                        referral_source_id = None
+                        referral_headline = None
+                        if referral:
+                            source_type = referral.get("source_type", "")
+                            if source_type == "ad":
+                                origen_lead = "CAMPAÑA"
+                                referral_source_id = referral.get("source_id")
+                                referral_headline = referral.get("headline", referral.get("body", ""))
+                                logger.info(f"Lead desde CAMPAÑA Meta: ad_id={referral_source_id}, headline={referral_headline}")
+
                         # Check if there's an active inbox
                         query_inbox = select(Inbox).where(
                             and_(
@@ -247,11 +262,20 @@ async def _process_webhook(payload: WhatsAppWebhookPayload, slug: str | None):
                                 estado="BOT",
                                 modo="BOT",
                                 bot_config_id=bot_config_id,  # MULTI-BOT
+                                origen_lead=origen_lead,
+                                referral_source_id=referral_source_id,
+                                referral_headline=referral_headline,
                             )
                             db.add(new_inbox)
                             await db.commit()
                             await db.refresh(new_inbox)
                             inbox = new_inbox
+                        elif inbox and referral and inbox.origen_lead == "ORGANICO" and origen_lead == "CAMPAÑA":
+                            # Si el inbox ya existía pero ahora llega con referral, actualizar
+                            inbox.origen_lead = origen_lead
+                            inbox.referral_source_id = referral_source_id
+                            inbox.referral_headline = referral_headline
+                            await db.commit()
 
                         # Save incoming message if Inbox exists
                         if inbox:

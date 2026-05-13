@@ -11,6 +11,7 @@ from . import citas
 from . import chat
 from . import whatsapp
 from . import reportes
+from . import dashboard
 from . import notificaciones
 from . import supervision
 
@@ -28,5 +29,7 @@ api_router.include_router(citas.router)
 api_router.include_router(chat.router)
 api_router.include_router(whatsapp.router)
 api_router.include_router(reportes.router)
+api_router.include_router(dashboard.router)
 api_router.include_router(notificaciones.router)
 api_router.include_router(supervision.router)
+

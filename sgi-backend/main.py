@@ -60,6 +60,7 @@ from app.api.v1.comercial.whatsapp import router as whatsapp_router
 from app.api.v1.comercial.chat import router as chat_router
 from app.api.v1.comercial.gestiones import router as gestiones_router
 from app.api.v1.comercial.reportes import router as reportes_router
+from app.api.v1.comercial.dashboard import router as dashboard_comercial_router
 from app.api.v1.comercial.notificaciones import router as notificaciones_router
 from app.api.v1.comercial.analytics_buzon import router as analytics_buzon_router
 from app.api.v1.comercial.analytics_comercial import router as analytics_comercial_router
@@ -166,6 +167,7 @@ app.include_router(inbox_router, prefix="/api/v1")
 app.include_router(whatsapp_router, prefix="/api/v1")
 app.include_router(chat_router, prefix="/api/v1")
 app.include_router(dashboard_router, prefix="/api/v1")
+app.include_router(dashboard_comercial_router, prefix="/api/v1")
 app.include_router(gestiones_router, prefix="/api/v1")
 app.include_router(productos_oficina_router, prefix="/api/v1")
 app.include_router(reportes_router, prefix="/api/v1")
