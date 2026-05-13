@@ -38,5 +38,24 @@ export const importacionesService = {
         formData.append('file', file);
         const { data } = await api.post('/importaciones/upload', formData);
         return data;
+    },
+
+    exportAll: async (
+        search?: string,
+        sinTelefono?: boolean,
+        sortByRuc?: string,
+        paisOrigen?: string,
+        cantAgentes?: number | null
+    ): Promise<ImportacionResponse> => {
+        const params: Record<string, unknown> = { page: 1, page_size: 50000 };
+        if (search) params.search = search;
+        if (sinTelefono) params.sin_telefono = true;
+        if (sortByRuc) params.sort_by_ruc = sortByRuc;
+        if (paisOrigen) params.pais_origen = paisOrigen;
+        if (cantAgentes !== null && cantAgentes !== undefined && !isNaN(cantAgentes)) {
+            params.cant_agentes = cantAgentes;
+        }
+        const { data } = await api.get('/importaciones/', { params });
+        return data;
     }
 };

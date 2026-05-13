@@ -360,36 +360,56 @@ class AnalyticsService:
             Inbox.fecha_recepcion <= dt_fin,
         )
 
-        stmt = (
-            select(
-                Inbox.telefono,
-                Inbox.nombre_whatsapp,
-                Inbox.estado,
-                Inbox.tipo_interes,
-                Inbox.origen_lead,
-                Inbox.comentario_descarte,
-                func.coalesce(MotivoDescarteInbox.nombre, '').label("motivo_descarte"),
-                Inbox.fecha_recepcion,
-                Inbox.fecha_gestion,
-                Inbox.fecha_cierre,
-                Empleado.nombres.label("comercial"),
+        # Columnas base (sin origen_lead que puede no existir aún)
+        columnas_base = [
+            Inbox.telefono,
+            Inbox.nombre_whatsapp,
+            Inbox.estado,
+            Inbox.tipo_interes,
+            Inbox.comentario_descarte,
+            func.coalesce(MotivoDescarteInbox.nombre, '').label("motivo_descarte"),
+            Inbox.fecha_recepcion,
+            Inbox.fecha_gestion,
+            Inbox.fecha_cierre,
+            Empleado.nombres.label("comercial"),
+        ]
+
+        # Intentar incluir origen_lead (disponible tras migración)
+        try:
+            columnas = columnas_base.copy()
+            columnas.insert(4, Inbox.origen_lead)
+            stmt = (
+                select(*columnas)
+                .outerjoin(Usuario, Inbox.asignado_a == Usuario.id)
+                .outerjoin(Empleado, Usuario.empleado_id == Empleado.id)
+                .outerjoin(MotivoDescarteInbox, Inbox.motivo_descarte_id == MotivoDescarteInbox.id)
+                .where(condicion)
+                .order_by(Inbox.fecha_recepcion.desc())
             )
-            .outerjoin(Usuario, Inbox.asignado_a == Usuario.id)
-            .outerjoin(Empleado, Usuario.empleado_id == Empleado.id)
-            .outerjoin(MotivoDescarteInbox, Inbox.motivo_descarte_id == MotivoDescarteInbox.id)
-            .where(condicion)
-            .order_by(Inbox.fecha_recepcion.desc())
-        )
+            if comercial_ids is not None:
+                stmt = stmt.where(Inbox.asignado_a.in_(comercial_ids))
+            if empresa:
+                stmt = stmt.where(Empleado.empresa == empresa)
 
-        # Filtrar por comerciales permitidos
-        if comercial_ids is not None:
-            stmt = stmt.where(Inbox.asignado_a.in_(comercial_ids))
+            rows = (await self.db.execute(stmt)).all()
+            tiene_origen = True
+        except Exception:
+            # Columna origen_lead aún no existe → query sin ella
+            stmt = (
+                select(*columnas_base)
+                .outerjoin(Usuario, Inbox.asignado_a == Usuario.id)
+                .outerjoin(Empleado, Usuario.empleado_id == Empleado.id)
+                .outerjoin(MotivoDescarteInbox, Inbox.motivo_descarte_id == MotivoDescarteInbox.id)
+                .where(condicion)
+                .order_by(Inbox.fecha_recepcion.desc())
+            )
+            if comercial_ids is not None:
+                stmt = stmt.where(Inbox.asignado_a.in_(comercial_ids))
+            if empresa:
+                stmt = stmt.where(Empleado.empresa == empresa)
 
-        # Filtrar por empresa del empleado
-        if empresa:
-            stmt = stmt.where(Empleado.empresa == empresa)
-
-        rows = (await self.db.execute(stmt)).all()
+            rows = (await self.db.execute(stmt)).all()
+            tiene_origen = False
 
         TIPO_LABELS = {
             'IMPORTACION': 'Importación',
@@ -419,7 +439,7 @@ class AnalyticsService:
                 "estado": ESTADO_LABELS.get(row.estado, row.estado),
                 "estado_raw": row.estado,
                 "tipo_interes": TIPO_LABELS.get(row.tipo_interes, row.tipo_interes or ""),
-                "origen": row.origen_lead or "ORGANICO",
+                "origen": (row.origen_lead or "ORGANICO") if tiene_origen else "ORGANICO",
                 "motivo_descarte": row.motivo_descarte or "",
                 "comentario_descarte": row.comentario_descarte or "",
                 "fecha_recepcion": row.fecha_recepcion.strftime("%Y-%m-%d %H:%M") if row.fecha_recepcion else "",

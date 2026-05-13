@@ -4,12 +4,15 @@ import { useState, useEffect } from 'react';
 import { ExcelUploader } from '@/components/common/ExcelUploader';
 import { ContactsModal } from '@/components/common/ContactsModal';
 import {
-  AlertCircle, CheckCircle, X, Ship, TrendingUp, Globe
+  AlertCircle, CheckCircle, X, Ship, TrendingUp, Globe, Download
 } from 'lucide-react';
 import { useImportaciones } from '@/hooks/comercial/useImportaciones';
+import { importacionesService } from '@/services/comercial/importaciones';
 import TransaccionesToolbar from './components/TransaccionesToolbar';
 import ImportacionesTable from './components/ImportacionesTable';
 import Pagination from '@/components/ui/Pagination';
+import * as XLSX from 'xlsx';
+import { toast } from 'sonner';
 
 export default function TransaccionesPage() {
   const {
@@ -27,6 +30,50 @@ export default function TransaccionesPage() {
   const [selectedRazonSocial, setSelectedRazonSocial] = useState('');
   const [uploadStatus, setUploadStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
   const [showUploader, setShowUploader] = useState(false);
+  const [exporting, setExporting] = useState(false);
+
+  const exportarAExcel = async () => {
+    try {
+      setExporting(true);
+      toast.info('Generando reporte...');
+      const parsedAgentes = cantAgentes ? parseInt(cantAgentes) : null;
+      const res = await importacionesService.exportAll(
+        search || undefined,
+        sinTelefono || undefined,
+        sortByRuc || undefined,
+        paisOrigen || undefined,
+        parsedAgentes
+      );
+      if (!res.data || res.data.length === 0) {
+        toast.error('No hay datos para exportar');
+        return;
+      }
+      const wb = XLSX.utils.book_new();
+      const wsData = XLSX.utils.json_to_sheet(res.data.map(row => ({
+        'RUC': row.ruc || '',
+        'RAZÓN SOCIAL': row.razon_social || '',
+        'SECTOR': row.sector || '',
+        'SCORE': row.score ?? '',
+        'AGENTES': row.agentes_distintos ?? '',
+        'EMBARQUES': row.total_embarques ?? '',
+        'MESES ACTIVOS': row.meses_activos ?? '',
+        'FOB PROMEDIO': row.fob_promedio ?? '',
+        'VÍA': row.via_predominante || '',
+        'PAÍSES': row.paises_principales || '',
+        'ÚLTIMA IMPORTACIÓN': row.ultima_importacion || '',
+        'DÍAS DESDE ÚLTIMA': row.dias_desde_ultima ?? '',
+      })));
+      XLSX.utils.book_append_sheet(wb, wsData, 'Prospectos');
+      const fecha = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+      XLSX.writeFile(wb, `Prospectos_${fecha}.xlsx`);
+      toast.success(`Se exportaron ${res.data.length} registros`);
+    } catch (error) {
+      console.error('Error exporting:', error);
+      toast.error('Error al generar el archivo Excel');
+    } finally {
+      setExporting(false);
+    }
+  };
 
   // Auto-dismiss notifications
   useEffect(() => {
@@ -97,6 +144,16 @@ export default function TransaccionesPage() {
               <span className="text-white/70">Países:</span>
               <span className="font-semibold">{uniqueCountries}</span>
             </div>
+
+            {/* Export button */}
+            <button
+              onClick={exportarAExcel}
+              disabled={exporting || loading}
+              className="flex items-center gap-2 rounded-full bg-emerald-500 px-5 py-2 text-sm font-semibold text-white shadow-md transition-all duration-200 hover:bg-emerald-600 hover:shadow-lg active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Download className="h-4 w-4" />
+              {exporting ? 'Exportando...' : 'Exportar Excel'}
+            </button>
 
             {/* Upload toggle button */}
             <button

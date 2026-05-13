@@ -369,28 +369,19 @@ class ChatbotService:
 
         if lead_reciente and lead_reciente.asignado_a:
             # Ya tiene asesor asignado → reconectar
-            query_user = (
-                select(Usuario)
-                .options(selectinload(Usuario.empleado))
-                .where(Usuario.id == lead_reciente.asignado_a)
-            )
-            result_user = await self.db.execute(query_user)
-            user = result_user.scalar_one_or_none()
-            nombre_comercial = self._get_user_name(user)
-
             await self._update_session(session, "ATENDIDO", {"inbox_id": lead_reciente.id})
 
             if en_horario:
-                texto = MSG_ASESOR_EXISTENTE.format(nombre=nombre_comercial)
+                # Derivación completamente silenciosa si ya está siendo atendido
+                return WhatsAppResponse(action="no_action")
             else:
                 texto = MSG_ASESOR_EXISTENTE_FUERA_HORARIO.format(
-                    nombre=nombre_comercial, horario=MSG_HORARIO_INFO
+                    nombre="tu asesor", horario=MSG_HORARIO_INFO
                 )
-
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content=texto)],
-            )
+                return WhatsAppResponse(
+                    action="send_text",
+                    messages=[BotMessage(type="text", content=texto)],
+                )
 
         # Nuevo lead → distribuir por round-robin
         try:
@@ -404,22 +395,21 @@ class ChatbotService:
                 jefe_comercial_id=self._jefe_comercial_id,
             )
             result = await inbox_service.distribute_lead(distribute_data)
-            nombre_comercial = result["assigned_to"]["nombre"]
             inbox_id = result.get("lead_id")
 
             await self._update_session(session, "ATENDIDO", {"inbox_id": inbox_id})
 
             if en_horario:
-                texto = msg_asignado.format(nombre=nombre_comercial)
+                # Derivación completamente silenciosa: no enviar nada al cliente.
+                return WhatsAppResponse(action="no_action")
             else:
                 texto = msg_asignado_fuera.format(
-                    nombre=nombre_comercial, horario=MSG_HORARIO_INFO
+                    nombre="nuestro equipo", horario=MSG_HORARIO_INFO
                 )
-
-            return WhatsAppResponse(
-                action="send_text",
-                messages=[BotMessage(type="text", content=texto)],
-            )
+                return WhatsAppResponse(
+                    action="send_text",
+                    messages=[BotMessage(type="text", content=texto)],
+                )
         except Exception as e:
             logger.error(f"Error al derivar a comercial: {e}", exc_info=True)
             await self._delete_session(session)
