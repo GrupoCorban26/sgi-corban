@@ -26,7 +26,7 @@ async def upload_importaciones(
 @router.get("/", response_model=ImportacionPagination)
 async def list_importaciones(
     page: int = Query(1, gt=0),
-    page_size: int = Query(20, gt=0, le=100),
+    page_size: int = Query(20, gt=0, le=50000),
     search: str = Query(None),
     sin_telefono: bool = Query(False),
     sort_by_ruc: str = Query(None, description="Ordenar por RUC: 'asc' o 'desc'"),

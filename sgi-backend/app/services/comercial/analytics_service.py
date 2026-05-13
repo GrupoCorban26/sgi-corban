@@ -440,12 +440,12 @@ class AnalyticsService:
                 "estado_raw": row.estado,
                 "tipo_interes": TIPO_LABELS.get(row.tipo_interes, row.tipo_interes or ""),
                 "origen": (row.origen_lead or "ORGANICO") if tiene_origen else "ORGANICO",
-                "motivo_descarte": row.motivo_descarte or "",
+                "motivo_descarte": row._mapping.get("motivo_descarte") or "",
                 "comentario_descarte": row.comentario_descarte or "",
                 "fecha_recepcion": row.fecha_recepcion.strftime("%Y-%m-%d %H:%M") if row.fecha_recepcion else "",
                 "fecha_gestion": row.fecha_gestion.strftime("%Y-%m-%d %H:%M") if row.fecha_gestion else "",
                 "fecha_cierre": row.fecha_cierre.strftime("%Y-%m-%d %H:%M") if row.fecha_cierre else "",
-                "comercial": (row.comercial.split()[0] if row.comercial else "Sin asignar"),
+                "comercial": (row._mapping.get("comercial").split()[0] if row._mapping.get("comercial") else "Sin asignar"),
             }
             for row in rows
         ]
