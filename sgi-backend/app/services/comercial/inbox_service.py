@@ -418,8 +418,8 @@ class InboxService:
         if not lead:
             raise Exception("Lead no encontrado")
         
-        if lead.estado not in ('NUEVO', 'PENDIENTE'):
-            raise Exception(f"Solo se pueden asignar leads en estado NUEVO o PENDIENTE (actual: {lead.estado})")
+        if lead.estado not in ('NUEVO', 'PENDIENTE', 'BOT'):
+            raise Exception(f"Solo se pueden asignar leads en estado BOT, NUEVO o PENDIENTE (actual: {lead.estado})")
         
         # Verificar que el comercial existe y está activo
         query_user = select(Usuario).options(selectinload(Usuario.empleado)).where(
