@@ -360,7 +360,7 @@ class InboxService:
                 lead.fecha_gestion = datetime.now()
             
             if request_data:
-                lead.motivo_descarte = request_data.get('motivo_descarte')
+                lead.motivo_descarte_id = request_data.get('motivo_descarte_id')
                 lead.comentario_descarte = request_data.get('comentario_descarte')
             
             # Solo enviar mensaje si el frontend lo solicita (default: True)
