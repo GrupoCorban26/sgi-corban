@@ -181,6 +181,7 @@ class InboxService:
                 nombre_whatsapp=data.nombre_display,
                 asignado_a=assigned_user.id,
                 fecha_asignacion=datetime.now(),
+                fecha_recepcion=datetime.utcnow(),
                 estado='PENDIENTE',
                 tipo_interes=data.tipo_interes,
                 bot_config_id=data.bot_config_id,  # MULTI-BOT

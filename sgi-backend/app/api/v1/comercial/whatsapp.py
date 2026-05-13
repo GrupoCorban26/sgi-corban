@@ -265,6 +265,7 @@ async def _process_webhook(payload: WhatsAppWebhookPayload, slug: str | None):
                                 origen_lead=origen_lead,
                                 referral_source_id=referral_source_id,
                                 referral_headline=referral_headline,
+                                fecha_recepcion=datetime.utcnow()
                             )
                             db.add(new_inbox)
                             await db.commit()

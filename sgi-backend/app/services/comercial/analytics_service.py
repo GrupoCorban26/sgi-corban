@@ -442,9 +442,9 @@ class AnalyticsService:
                 "origen": (row.origen_lead or "ORGANICO") if tiene_origen else "ORGANICO",
                 "motivo_descarte": row._mapping.get("motivo_descarte") or "",
                 "comentario_descarte": row.comentario_descarte or "",
-                "fecha_recepcion": row.fecha_recepcion.strftime("%Y-%m-%d %H:%M") if row.fecha_recepcion else "",
-                "fecha_gestion": row.fecha_gestion.strftime("%Y-%m-%d %H:%M") if row.fecha_gestion else "",
-                "fecha_cierre": row.fecha_cierre.strftime("%Y-%m-%d %H:%M") if row.fecha_cierre else "",
+                "fecha_recepcion": (row.fecha_recepcion - timedelta(hours=5)).strftime("%Y-%m-%d %H:%M") if row.fecha_recepcion else "",
+                "fecha_gestion": (row.fecha_gestion - timedelta(hours=5)).strftime("%Y-%m-%d %H:%M") if row.fecha_gestion else "",
+                "fecha_cierre": (row.fecha_cierre - timedelta(hours=5)).strftime("%Y-%m-%d %H:%M") if row.fecha_cierre else "",
                 "comercial": (row._mapping.get("comercial").split()[0] if row._mapping.get("comercial") else "Sin asignar"),
             }
             for row in rows
