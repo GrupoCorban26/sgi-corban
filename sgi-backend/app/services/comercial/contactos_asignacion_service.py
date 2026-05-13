@@ -374,9 +374,10 @@ class ContactosAsignacionService:
             
         await self.db.commit()
         return {"success": True, "message": f"Lead {ruc} derivado exitosamente."}
-    
+
     async def actualizar_feedback(self, contacto_id: int, caso_id: int, comentario: str, user_id: int = None):
-        """Actualiza el feedback en historial_llamadas y gestiona estados."""
+        """Actualiza el feedback en historial_llamadas y gestiona estados.
+        Soporta tanto guardado inicial (caso_id IS NULL) como re-edición."""
         estado_gestionado_id = await self._get_estado_contacto_id('GESTIONADO')
         estado_en_gestion_id = await self._get_estado_contacto_id('EN_GESTION')
         estado_asignado_id = await self._get_estado_contacto_id('ASIGNADO')
@@ -391,7 +392,7 @@ class ContactosAsignacionService:
         if not contact:
             raise HTTPException(404, "Contacto no encontrado")
 
-        # Get existing historial record (caso_id IS NULL = pending)
+        # Buscar historial: primero pendiente (caso_id NULL), luego el más reciente
         historial = (await self.db.execute(
             select(HistorialLlamada).where(
                 HistorialLlamada.contacto_id == contacto_id,
@@ -399,14 +400,33 @@ class ContactosAsignacionService:
                 HistorialLlamada.caso_id.is_(None)
             )
         )).scalars().first()
+
+        is_edit = False
+        if not historial:
+            # No hay pendiente → buscar el más reciente ya completado (re-edición)
+            historial = (await self.db.execute(
+                select(HistorialLlamada).where(
+                    HistorialLlamada.contacto_id == contacto_id,
+                    HistorialLlamada.comercial_id == user_id,
+                ).order_by(HistorialLlamada.updated_at.desc())
+            )).scalars().first()
+            is_edit = True
+
         if not historial:
             raise HTTPException(404, "Registro de historial no encontrado")
 
-        # Get Case
-        caso = (await self.db.execute(
+        # Get previous and new case info
+        caso_anterior = None
+        if is_edit and historial.caso_id:
+            caso_anterior = (await self.db.execute(
+                select(CasoLlamada).where(CasoLlamada.id == historial.caso_id)
+            )).scalars().first()
+
+        caso_nuevo = (await self.db.execute(
             select(CasoLlamada).where(CasoLlamada.id == caso_id)
         )).scalars().first()
-        is_positive = caso.gestionable if caso else False
+        is_positive = caso_nuevo.gestionable if caso_nuevo else False
+        was_positive = (caso_anterior.gestionable if caso_anterior else False) if is_edit else False
 
         # Check if client exists
         cliente_existe = (await self.db.execute(
@@ -421,7 +441,10 @@ class ContactosAsignacionService:
             historial.comentario = comentario
             historial.updated_at = func.now()
 
-            if cliente_existe:
+            if is_edit and was_positive and not is_positive and cliente_existe:
+                mensaje = f"⚠️ Se cambió a caso negativo pero el prospecto (ID: {cliente_existe.id}) sigue activo en cartera."
+
+            elif cliente_existe and not is_edit:
                 mensaje = f"Nota: Este cliente ya está siendo gestionado (ID: {cliente_existe.id})"
 
             if is_positive and not cliente_existe:
@@ -437,10 +460,9 @@ class ContactosAsignacionService:
                 )
                 self.db.add(nuevo_cliente)
                 await self.db.flush()
-                # Contacto se mantiene ASIGNADO (visible), se finalizará con el lote
 
             elif not is_positive:
-                # Solo liberar EN_GESTION -> DISPONIBLE (el asignado se queda ASIGNADO)
+                # Solo liberar EN_GESTION → DISPONIBLE (el asignado se queda ASIGNADO)
                 await self.db.execute(update(ClienteContacto).where(
                     ClienteContacto.ruc == contact.ruc,
                     ClienteContacto.estado_id == estado_en_gestion_id,
