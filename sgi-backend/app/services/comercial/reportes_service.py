@@ -172,7 +172,7 @@ class ReportesLlamadasService:
         
         dt_inicio = datetime.combine(fecha_inicio, datetime.min.time())
         dt_fin = datetime.combine(fecha_fin, datetime.max.time())
-        condicion_fecha = and_(Inbox.fecha_recepcion >= dt_inicio, Inbox.fecha_recepcion <= dt_fin)
+        condicion_fecha = and_(Inbox.created_at >= dt_inicio, Inbox.created_at <= dt_fin)
 
         condiciones = [condicion_fecha]
 
@@ -208,11 +208,11 @@ class ReportesLlamadasService:
 
         # 2. Leads por hora del día
         stmt_hora = select(
-            extract('hour', Inbox.fecha_recepcion).label('hora'),
+            extract('hour', Inbox.created_at).label('hora'),
             func.count().label('total')
         ).where(condicion_base).group_by(
-            extract('hour', Inbox.fecha_recepcion)
-        ).order_by(extract('hour', Inbox.fecha_recepcion))
+            extract('hour', Inbox.created_at)
+        ).order_by(extract('hour', Inbox.created_at))
         result_hora = await self.db.execute(stmt_hora)
         por_hora = [{"hora": int(row.hora), "total": row.total} for row in result_hora.all()]
 
@@ -235,11 +235,11 @@ class ReportesLlamadasService:
 
         # 4. Leads por día (tendencia)
         stmt_dia = select(
-            func.cast(Inbox.fecha_recepcion, Date).label('fecha'),
+            func.cast(Inbox.created_at, Date).label('fecha'),
             func.count().label('total')
         ).where(condicion_base).group_by(
-            func.cast(Inbox.fecha_recepcion, Date)
-        ).order_by(func.cast(Inbox.fecha_recepcion, Date))
+            func.cast(Inbox.created_at, Date)
+        ).order_by(func.cast(Inbox.created_at, Date))
         result_dia = await self.db.execute(stmt_dia)
         por_dia = [{"fecha": row.fecha.isoformat() if row.fecha else None, "total": row.total} for row in result_dia.all()]
 

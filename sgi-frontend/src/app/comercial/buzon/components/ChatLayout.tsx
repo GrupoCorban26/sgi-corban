@@ -36,7 +36,7 @@ export default function ChatLayout() {
             await convertMutation.mutateAsync({ id: selectedId, clienteId: newClienteId });
             toast.success('Lead convertido y enlazado exitosamente');
             setIsModalClienteOpen(false);
-            // No deseleccionar: el lead sigue visible con estado CIERRE
+            // No deseleccionar: el lead sigue visible con estado CERRADO
         } catch (error) {
             toast.error('Cliente creado pero hubo un error al enlazar el lead.');
         }

@@ -145,7 +145,7 @@ export function SectionBuzon() {
                                 <tr className="text-gray-600 text-xs uppercase text-left">
                                     <th className="px-6 py-4 font-semibold">ASESOR</th>
                                     <th className="px-6 py-4 font-semibold text-center">ASIGNADOS</th>
-                                    <th className="px-6 py-4 font-semibold text-center">CONVERTIDOS</th>
+                                    <th className="px-6 py-4 font-semibold text-center">CERRADOS</th>
                                     <th className="px-6 py-4 font-semibold text-center">DESCARTADOS</th>
                                     <th className="px-6 py-4 font-semibold text-center">EN GESTION</th>
                                     <th className="px-6 py-4 font-semibold text-center w-32">TIEMPO RESP.</th>

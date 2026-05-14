@@ -321,7 +321,7 @@ class LeadWebService:
                     )
                     self.db.add(nuevo_contacto)
 
-        lead.estado = "CONVERTIDO"
+        lead.estado = "CERRADO"
         lead.cliente_convertido_id = cliente_id
         lead.fecha_gestion = datetime.now()
 

@@ -841,23 +841,23 @@ class ClientesService:
             if telefonos:
                 # Buscar inbox entries que coincidan con esos teléfonos
                 stmt_inbox = select(
-                    Inbox.fecha_recepcion,
+                    Inbox.created_at,
                     Inbox.mensaje_inicial,
                     Inbox.nombre_whatsapp,
                     Inbox.estado,
                 ).where(
                     and_(
                         Inbox.telefono.in_(telefonos),
-                        Inbox.estado.in_(['CIERRE', 'CONVERTIDO']),
+                        Inbox.estado == 'CERRADO',
                     )
-                ).order_by(Inbox.fecha_recepcion.asc())
+                ).order_by(Inbox.created_at.asc())
                 result_inbox = await self.db.execute(stmt_inbox)
                 for row in result_inbox.all():
                     eventos.append({
-                        "fecha": row.fecha_recepcion,
+                        "fecha": row.created_at,
                         "accion": "WhatsApp",
                         "motivo": "Lead recibido",
-                        "estado": estado_en_fecha(row.fecha_recepcion),
+                        "estado": estado_en_fecha(row.created_at),
                         "comentario": row.mensaje_inicial or row.nombre_whatsapp or "-",
                     })
 

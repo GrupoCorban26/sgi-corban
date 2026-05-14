@@ -245,7 +245,7 @@ async def _process_webhook(payload: WhatsAppWebhookPayload, slug: str | None):
                         query_inbox = select(Inbox).where(
                             and_(
                                 Inbox.telefono == from_num_norm,
-                                Inbox.estado.not_in(['CIERRE', 'DESCARTADO', 'CONVERTIDO'])
+                                Inbox.estado.not_in(['CERRADO', 'DESCARTADO'])
                             )
                         ).order_by(Inbox.id.desc())
                         result_inbox = await db.execute(query_inbox)
@@ -257,20 +257,72 @@ async def _process_webhook(payload: WhatsAppWebhookPayload, slug: str | None):
                         if not inbox and msg_type in ("text", "interactive", "location", "image", "document", "video", "audio", "sticker"):
                             new_inbox = Inbox(
                                 telefono=from_num_norm,
-                                mensaje_inicial=incoming.message_text if msg_type == "text" else "Interacción inicial",
                                 nombre_whatsapp=contact_name,
                                 estado="BOT",
-                                modo="BOT",
                                 bot_config_id=bot_config_id,  # MULTI-BOT
                                 origen_lead=origen_lead,
                                 referral_source_id=referral_source_id,
-                                referral_headline=referral_headline,
-                                fecha_recepcion=datetime.utcnow()
+                                referral_headline=referral_headline
                             )
                             db.add(new_inbox)
                             await db.commit()
                             await db.refresh(new_inbox)
+                            
+                            # Registrar en historial
+                            from app.services.comercial.historial_inbox_service import HistorialInboxService
+                            historial_svc = HistorialInboxService(db)
+                            await historial_svc.registrar_cambio(new_inbox.id, estado_nuevo="BOT")
+                            
                             inbox = new_inbox
+
+                            # ==========================================
+                            # AUTO-DERIVAR si el teléfono está en cartera
+                            # (cliente CERRADO que regresa → asignar a su comercial)
+                            # ==========================================
+                            try:
+                                from app.models.comercial import ClienteContacto, Cliente
+                                query_contacto = select(ClienteContacto).where(
+                                    and_(
+                                        ClienteContacto.telefono == from_num_norm,
+                                        ClienteContacto.is_active == True
+                                    )
+                                )
+                                result_contacto = await db.execute(query_contacto)
+                                contacto_cartera = result_contacto.scalars().first()
+
+                                if contacto_cartera and contacto_cartera.ruc:
+                                    query_cliente = select(Cliente).where(
+                                        and_(
+                                            Cliente.ruc == contacto_cartera.ruc,
+                                            Cliente.is_active == True
+                                        )
+                                    )
+                                    result_cliente = await db.execute(query_cliente)
+                                    cliente_cartera = result_cliente.scalars().first()
+
+                                    if cliente_cartera and cliente_cartera.comercial_encargado_id:
+                                        # Asignar directamente al comercial de la cartera
+                                        inbox.asignado_a = cliente_cartera.comercial_encargado_id
+                                        inbox.ultimo_estado = 'PENDIENTE'
+                                        inbox.tipo_asignacion = 'CARTERA'
+                                        inbox.tipo_interes = 'CLIENTE_RECURRENTE'
+                                        await db.commit()
+
+                                        # Registrar cambio de estado
+                                        await historial_svc.registrar_cambio(
+                                            inbox.id,
+                                            estado_nuevo='PENDIENTE',
+                                            estado_anterior='BOT'
+                                        )
+
+                                        logger.info(
+                                            f"Lead CERRADO regresó: tel={from_num_norm}, "
+                                            f"auto-asignado a comercial_id={cliente_cartera.comercial_encargado_id} "
+                                            f"(cartera: {cliente_cartera.razon_social})"
+                                        )
+                            except Exception as e:
+                                logger.warning(f"Error buscando cartera para {from_num_norm}: {e}")
+
                         elif inbox and referral and inbox.origen_lead == "ORGANICO" and origen_lead == "CAMPAÑA":
                             # Si el inbox ya existía pero ahora llega con referral, actualizar
                             inbox.origen_lead = origen_lead
@@ -282,7 +334,6 @@ async def _process_webhook(payload: WhatsAppWebhookPayload, slug: str | None):
                         if inbox:
                             await chat_svc.save_message(ChatMessageCreate(
                                 inbox_id=inbox.id,
-                                telefono=from_number,
                                 direccion='ENTRANTE',
                                 remitente_tipo='CLIENTE',
                                 contenido=incoming.message_text,
@@ -291,19 +342,17 @@ async def _process_webhook(payload: WhatsAppWebhookPayload, slug: str | None):
                                 whatsapp_msg_id=msg_id
                             ))
 
-                            # Actualizar timestamp del último mensaje del cliente (ventana 24h)
-                            inbox.ultimo_mensaje_cliente_at = datetime.now()
                             # Asegurar bot_config_id si el inbox existía sin uno
                             if bot_config_id and not inbox.bot_config_id:
                                 inbox.bot_config_id = bot_config_id
                             await db.commit()
 
-                        # If mode is ASESOR, skip bot
-                        if inbox and inbox.modo == 'ASESOR':
+                        # If mode is not BOT, skip bot
+                        if inbox and inbox.estado != 'BOT':
                             continue
 
                         # Procesar con el bot
-                        response = await service.process_message(incoming)
+                        response = await service.process_message(incoming, inbox.id)
 
                         if response.action == "ignore":
                             continue

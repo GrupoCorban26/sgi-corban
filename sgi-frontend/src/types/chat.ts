@@ -1,7 +1,6 @@
 export interface ChatMessage {
     id: number;
     inbox_id: number;
-    telefono: string;
     direccion: 'ENTRANTE' | 'SALIENTE';
     remitente_tipo: 'CLIENTE' | 'COMERCIAL' | 'BOT';
     remitente_id: number | null;
@@ -19,14 +18,12 @@ export interface ChatConversationPreview {
     telefono: string;
     nombre_whatsapp: string | null;
     estado: string;
-    modo: 'BOT' | 'ASESOR';
     ultimo_mensaje_at: string | null;
     mensajes_no_leidos: number;
     ultimo_mensaje_preview: string | null;
     asignado_a: number | null;
     nombre_asignado: string | null;
     ventana_abierta: boolean;
-    escalado_a_directo: boolean;
 }
 
 export interface SendMessageRequest {

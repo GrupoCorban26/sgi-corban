@@ -6,7 +6,7 @@ estadísticas unificadas de 3 niveles: General, Por Canal, Comparativo.
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, case, and_, extract
+from sqlalchemy import func, case, and_, extract, literal_column
 from sqlalchemy.orm import selectinload
 from app.models.comercial_inbox import Inbox
 from app.models.lead_web import LeadWeb
@@ -55,7 +55,7 @@ class AnalyticsBuzonService:
         total_web = datos_web["total"]
         total_global = total_wa + total_web
 
-        convertidos_wa = datos_wa["cierre"]
+        convertidos_wa = datos_wa["cerrados"]
         convertidos_web = datos_web["convertidos"]
         total_convertidos = convertidos_wa + convertidos_web
 
@@ -105,7 +105,7 @@ class AnalyticsBuzonService:
                 "pendientes": datos_wa["pendientes"],
                 "en_gestion": datos_wa["en_gestion"],
                 "cotizados": datos_wa["cotizados"],
-                "cierre": datos_wa["cierre"],
+                "cerrados": datos_wa["cerrados"],
                 "descartados": datos_wa["descartados"],
                 "tasa_conversion": round(
                     (convertidos_wa / total_wa * 100) if total_wa > 0 else 0, 1
@@ -193,8 +193,8 @@ class AnalyticsBuzonService:
         """Conteos y agregaciones del modelo Inbox."""
 
         base_filter = and_(
-            Inbox.fecha_recepcion >= fecha_desde,
-            Inbox.fecha_recepcion <= fecha_hasta,
+            Inbox.created_at >= fecha_desde,
+            Inbox.created_at <= fecha_hasta,
         )
 
         # Conteos por estado en una sola query
@@ -204,14 +204,9 @@ class AnalyticsBuzonService:
             func.sum(case((Inbox.estado == "PENDIENTE", 1), else_=0)).label("pendientes"),
             func.sum(case((Inbox.estado == "EN_GESTION", 1), else_=0)).label("en_gestion"),
             func.sum(case((Inbox.estado == "COTIZADO", 1), else_=0)).label("cotizados"),
-            func.sum(case((Inbox.estado == "CIERRE", 1), else_=0)).label("cierre"),
+            func.sum(case((Inbox.estado == "CERRADO", 1), else_=0)).label("cerrados"),
             func.sum(case((Inbox.estado == "DESCARTADO", 1), else_=0)).label("descartados"),
-            func.avg(
-                case(
-                    (Inbox.tiempo_respuesta_segundos.isnot(None), Inbox.tiempo_respuesta_segundos),
-                    else_=None,
-                )
-            ).label("tiempo_promedio"),
+            literal_column("0").label("tiempo_promedio"),
         ).where(base_filter)
 
         if comercial_ids is not None:
@@ -254,7 +249,7 @@ class AnalyticsBuzonService:
             "pendientes": row.pendientes or 0,
             "en_gestion": row.en_gestion or 0,
             "cotizados": row.cotizados or 0,
-            "cierre": row.cierre or 0,
+            "cerrados": row.cerrados or 0,
             "descartados": row.descartados or 0,
             "tiempo_promedio": float(row.tiempo_promedio) if row.tiempo_promedio else None,
             "motivos_descarte": motivos_lista,
@@ -269,7 +264,7 @@ class AnalyticsBuzonService:
             select(
                 Inbox.asignado_a,
                 func.count().label("total"),
-                func.sum(case((Inbox.estado == "CIERRE", 1), else_=0)).label("convertidos"),
+                func.sum(case((Inbox.estado == "CERRADO", 1), else_=0)).label("convertidos"),
                 func.sum(case((Inbox.estado == "DESCARTADO", 1), else_=0)).label("descartados"),
             )
             .where(and_(base_filter, Inbox.asignado_a.isnot(None)))
@@ -322,7 +317,7 @@ class AnalyticsBuzonService:
             func.sum(case((LeadWeb.estado == "NUEVO", 1), else_=0)).label("nuevos"),
             func.sum(case((LeadWeb.estado == "PENDIENTE", 1), else_=0)).label("pendientes"),
             func.sum(case((LeadWeb.estado == "EN_GESTION", 1), else_=0)).label("en_gestion"),
-            func.sum(case((LeadWeb.estado == "CONVERTIDO", 1), else_=0)).label("convertidos"),
+            func.sum(case((LeadWeb.estado == "CERRADO", 1), else_=0)).label("convertidos"),
             func.sum(case((LeadWeb.estado == "DESCARTADO", 1), else_=0)).label("descartados"),
             func.avg(
                 case(
@@ -406,7 +401,7 @@ class AnalyticsBuzonService:
             select(
                 LeadWeb.asignado_a,
                 func.count().label("total"),
-                func.sum(case((LeadWeb.estado == "CONVERTIDO", 1), else_=0)).label(
+                func.sum(case((LeadWeb.estado == "CERRADO", 1), else_=0)).label(
                     "convertidos"
                 ),
                 func.sum(case((LeadWeb.estado == "DESCARTADO", 1), else_=0)).label(
@@ -456,19 +451,19 @@ class AnalyticsBuzonService:
         # WhatsApp por mes
         query_wa = (
             select(
-                extract("year", Inbox.fecha_recepcion).label("anio"),
-                extract("month", Inbox.fecha_recepcion).label("mes"),
+                extract("year", Inbox.created_at).label("anio"),
+                extract("month", Inbox.created_at).label("mes"),
                 func.count().label("total"),
             )
             .where(
                 and_(
-                    Inbox.fecha_recepcion >= fecha_desde,
-                    Inbox.fecha_recepcion <= fecha_hasta,
+                    Inbox.created_at >= fecha_desde,
+                    Inbox.created_at <= fecha_hasta,
                 )
             )
             .group_by(
-                extract("year", Inbox.fecha_recepcion),
-                extract("month", Inbox.fecha_recepcion),
+                extract("year", Inbox.created_at),
+                extract("month", Inbox.created_at),
             )
         )
         if comercial_ids is not None:
@@ -543,8 +538,8 @@ class AnalyticsBuzonService:
         """Rendimiento por comercial comparando ambos canales."""
 
         base_filter_wa = and_(
-            Inbox.fecha_recepcion >= fecha_desde,
-            Inbox.fecha_recepcion <= fecha_hasta,
+            Inbox.created_at >= fecha_desde,
+            Inbox.created_at <= fecha_hasta,
             Inbox.asignado_a.isnot(None),
         )
         base_filter_web = and_(

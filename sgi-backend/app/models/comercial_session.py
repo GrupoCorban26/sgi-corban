@@ -9,7 +9,7 @@ class ConversationSession(Base):
     __table_args__ = {"schema": "comercial"}
 
     id = Column(Integer, primary_key=True, index=True)
-    telefono = Column(String(20), nullable=False, index=True)
+    inbox_id = Column(Integer, ForeignKey("comercial.inbox.id"), nullable=True, index=True)
     estado = Column(String(50), nullable=False, default="MENU")
     datos = Column(Text, nullable=True)  # JSON string (NVARCHAR compatible)
     bot_config_id = Column(Integer, ForeignKey("comercial.whatsapp_bot_config.id"), nullable=True)

@@ -83,7 +83,7 @@ export default function LeadWebDetalle({
                 request: { crear_prospecto: true }
             });
             toast.success('Lead convertido a prospecto');
-            onEstadoCambiado('CONVERTIDO');
+            onEstadoCambiado('CERRADO');
         } catch {
             toast.error('Error al convertir el lead');
         }
@@ -129,7 +129,7 @@ export default function LeadWebDetalle({
         });
     };
 
-    const isCerrado = lead.estado === 'CONVERTIDO' || lead.estado === 'DESCARTADO';
+    const isCerrado = lead.estado === 'CERRADO' || lead.estado === 'DESCARTADO';
 
     return (
         <div className="flex flex-col h-full">
@@ -324,9 +324,9 @@ export default function LeadWebDetalle({
 
             {/* Estado cerrado */}
             {isCerrado && (
-                <div className={`px-5 py-4 ${lead.estado === 'CONVERTIDO' ? 'bg-green-50' : 'bg-slate-50'}`}>
-                    <p className={`text-sm font-semibold text-center ${lead.estado === 'CONVERTIDO' ? 'text-green-700' : 'text-slate-500'}`}>
-                        {lead.estado === 'CONVERTIDO' ? '✅ Lead convertido a cliente' : '❌ Lead descartado'}
+                <div className={`px-5 py-4 ${lead.estado === 'CERRADO' ? 'bg-green-50' : 'bg-slate-50'}`}>
+                    <p className={`text-sm font-semibold text-center ${lead.estado === 'CERRADO' ? 'text-green-700' : 'text-slate-500'}`}>
+                        {lead.estado === 'CERRADO' ? '✅ Lead cerrado como cliente' : '❌ Lead descartado'}
                     </p>
                     {lead.fecha_gestion && (
                         <p className="text-xs text-center text-slate-400 mt-1">

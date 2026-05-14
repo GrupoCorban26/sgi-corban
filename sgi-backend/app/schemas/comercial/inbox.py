@@ -4,7 +4,6 @@ from datetime import datetime
 
 class InboxBase(BaseModel):
     telefono: str
-    mensaje_inicial: Optional[str] = None
     nombre_whatsapp: Optional[str] = None
 
 class InboxCreate(InboxBase):
@@ -23,9 +22,6 @@ class InboxResponse(InboxBase):
     asignado_a: Optional[int]
     estado: str
     tipo_interes: Optional[str] = None
-    tipo_asignacion: Optional[str] = None
-    fecha_recepcion: datetime
-    fecha_gestion: Optional[datetime] = None
 
     # Resolved via JOIN in service
     nombre_asignado: Optional[str] = None

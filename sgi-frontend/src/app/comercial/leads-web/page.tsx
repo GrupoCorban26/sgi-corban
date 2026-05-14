@@ -12,7 +12,7 @@ const ESTADOS_FILTRO: { value: EstadoLeadWeb | ''; label: string }[] = [
     { value: 'NUEVO', label: 'Nuevos' },
     { value: 'PENDIENTE', label: 'Pendientes' },
     { value: 'EN_GESTION', label: 'En Gestión' },
-    { value: 'CONVERTIDO', label: 'Convertidos' },
+    { value: 'CERRADO', label: 'Cerrados' },
     { value: 'DESCARTADO', label: 'Descartados' },
 ];
 

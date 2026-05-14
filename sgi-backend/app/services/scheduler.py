@@ -26,7 +26,7 @@ PET = timezone(timedelta(hours=-5))
 HORA_RESET = time(8, 0)  # 8:00 AM
 
 # Configuración de auto-asignación de leads sin respuesta
-TIMEOUT_LEADS_SIN_RESPUESTA_MINUTOS = 15  # 15 minutos
+TIMEOUT_LEADS_SIN_RESPUESTA_MINUTOS = 10  # 10 minutos
 INTERVALO_VERIFICACION_MINUTOS = 1  # Cada minuto
 
 # Configuración de auto-derivación de cotizaciones abandonadas
@@ -72,71 +72,36 @@ async def _reset_disponibilidad_buzon():
 
 
 async def _asignar_leads_sin_respuesta():
-    """Asigna un asesor a leads con estado NUEVO sin respuesta después del timeout.
+    """Asigna un asesor a leads BOT sin respuesta después del timeout.
     
     Busca registros en Inbox con:
-    - estado = 'NUEVO' (el bot envió bienvenida pero el cliente no respondió)
+    - estado = 'BOT' (el bot envió bienvenida pero el cliente no respondió)
     - sin asignado_a (no tiene asesor)
-    - creado hace más de TIMEOUT_LEADS_SIN_RESPUESTA_MINUTOS (15 min)
+    - creado hace más de TIMEOUT_LEADS_SIN_RESPUESTA_MINUTOS
     
-    También busca sesiones de bot activas (MENU, COTIZAR_REQUERIMIENTOS, 
-    COTIZAR_CONFIRMAR) con más de 15 min de inactividad.
-    
-    Los asigna a un asesor por Round Robin SIN enviar mensaje al cliente,
-    para que el asesor pueda contactarlos manualmente desde el inbox.
+    Los asigna a un asesor por Round Robin SIN enviar mensaje al cliente.
     """
     try:
         async with AsyncSessionLocal() as db:
             limite = datetime.now() - timedelta(minutes=TIMEOUT_LEADS_SIN_RESPUESTA_MINUTOS)
             
-            # 1. Buscar leads NUEVO sin asesor y con más de 15 min de antigüedad
+            # Buscar leads BOT sin asesor y con más de 10 min de antigüedad
             query = select(Inbox).where(
                 and_(
-                    Inbox.estado == 'NUEVO',
+                    Inbox.ultimo_estado == 'BOT',
                     Inbox.asignado_a.is_(None),
-                    Inbox.fecha_recepcion <= limite
+                    Inbox.created_at <= limite
                 )
-            ).order_by(Inbox.fecha_recepcion.asc())
+            ).order_by(Inbox.created_at.asc())
             
             result = await db.execute(query)
             leads_sin_respuesta = list(result.scalars().all())
-            
-            # 2. Buscar sesiones de bot activas con >15 min de inactividad
-            #    (cliente quedó en un flujo del bot pero dejó de interactuar)
-            estados_bot_activos = ['MENU', 'COTIZAR_REQUERIMIENTOS', 'COTIZAR_CONFIRMAR']
-            query_sessions = select(ConversationSession).where(
-                and_(
-                    ConversationSession.estado.in_(estados_bot_activos),
-                    ConversationSession.updated_at <= limite
-                )
-            )
-            result_sessions = await db.execute(query_sessions)
-            sesiones_inactivas = result_sessions.scalars().all()
-            
-            for session in sesiones_inactivas:
-                # Buscar inbox NUEVO asociado a esta sesión
-                tel_session = session.telefono.replace(" ", "").replace("+", "")
-                if tel_session.startswith("51"):
-                    tel_session = tel_session[2:]
-                    
-                query_inbox_session = select(Inbox).where(
-                    and_(
-                        Inbox.telefono == tel_session,
-                        Inbox.estado == 'NUEVO',
-                        Inbox.asignado_a.is_(None)
-                    )
-                )
-                result_inbox_s = await db.execute(query_inbox_session)
-                inbox_session = result_inbox_s.scalars().first()
-                
-                if inbox_session and inbox_session not in leads_sin_respuesta:
-                    leads_sin_respuesta.append(inbox_session)
             
             if not leads_sin_respuesta:
                 return
             
             logger.info(
-                f"[SCHEDULER] Encontrados {len(leads_sin_respuesta)} leads sin respuesta "
+                f"[SCHEDULER] Encontrados {len(leads_sin_respuesta)} leads BOT sin respuesta "
                 f"(más de {TIMEOUT_LEADS_SIN_RESPUESTA_MINUTOS} min). Asignando asesores..."
             )
             
@@ -189,11 +154,10 @@ async def _asignar_leads_sin_respuesta():
             for lead in leads_sin_respuesta:
                 asesor = pool_sorted[next_index]
                 
-                # Verificar si el cliente aún tiene una sesión activa del bot
-                # (aún está interactuando, no interrumpir)
+                # Verificar si aún tiene sesión de bot activa (no expirada)
                 query_session_activa = select(ConversationSession).where(
                     and_(
-                        ConversationSession.telefono.like(f"%{lead.telefono}%"),
+                        ConversationSession.inbox_id == lead.id,
                         or_(
                             ConversationSession.expires_at.is_(None),
                             ConversationSession.expires_at > datetime.now()
@@ -202,40 +166,29 @@ async def _asignar_leads_sin_respuesta():
                 )
                 result_session = await db.execute(query_session_activa)
                 if result_session.scalars().first():
-                    # Cliente aún en conversación activa con el bot, no interrumpir
-                    continue
-                
-                # Verificar si el teléfono ya tiene un lead PENDIENTE asignado
-                # (pudo haber sido asignado manualmente entre tanto)
-                query_existente = select(Inbox).where(
-                    and_(
-                        Inbox.telefono == lead.telefono,
-                        Inbox.estado == 'PENDIENTE',
-                        Inbox.asignado_a.isnot(None)
-                    )
-                )
-                result_existente = await db.execute(query_existente)
-                if result_existente.scalars().first():
-                    # Ya tiene un lead asignado, saltar
+                    # Sesión activa → el auto_derivar_sesiones_abandonadas lo manejará
                     continue
                 
                 lead.asignado_a = asesor.id
-                lead.estado = 'PENDIENTE'
-                lead.fecha_asignacion = datetime.now()
-                lead.modo = 'ASESOR'  # Modo ASESOR para que el asesor pueda responder directamente
-                lead.tipo_interes = 'SIN_RESPUESTA'
+                lead.ultimo_estado = 'PENDIENTE'
                 
-                # Limpiar sesiones del bot para este teléfono
+                if not lead.tipo_interes:
+                    lead.tipo_interes = 'SIN_RESPUESTA'
+                
+                # Limpiar sesiones expiradas del bot para este inbox
                 stmt_delete_sessions = select(ConversationSession).where(
-                    ConversationSession.telefono.like(f"%{lead.telefono}%")
+                    ConversationSession.inbox_id == lead.id
                 )
-                result_sessions = await db.execute(stmt_delete_sessions)
-                for session in result_sessions.scalars().all():
-                    await db.delete(session)
+                result_sessions_del = await db.execute(stmt_delete_sessions)
+                for sess in result_sessions_del.scalars().all():
+                    await db.delete(sess)
                 
-                # Actualizar mensaje_inicial si es genérico
-                if not lead.mensaje_inicial or lead.mensaje_inicial == "Interacción inicial":
-                    lead.mensaje_inicial = "[Auto-asignado] Cliente no respondió al bot después de 15 min"
+                # Registrar en historial
+                from app.services.comercial.historial_inbox_service import HistorialInboxService
+                historial_svc = HistorialInboxService(db)
+                await historial_svc.registrar_cambio(
+                    lead.id, estado_nuevo='PENDIENTE', estado_anterior='BOT'
+                )
                 
                 nombre_asesor = (
                     f"{asesor.empleado.nombres} {asesor.empleado.apellido_paterno}"
@@ -314,7 +267,7 @@ async def _scheduler_cotizaciones_abandonadas():
             await asyncio.sleep(INTERVALO_COTIZACIONES_MINUTOS * 60)
             async with AsyncSessionLocal() as db:
                 chatbot_svc = ChatbotService(db)
-                await chatbot_svc.auto_derivar_cotizaciones_abandonadas()
+                await chatbot_svc.auto_derivar_sesiones_abandonadas()
         except asyncio.CancelledError:
             logger.info("[SCHEDULER] Tarea de derivación de cotizaciones detenida.")
             break

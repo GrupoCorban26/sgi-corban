@@ -76,13 +76,13 @@ export default function ConversationItem({ conv, isSelected, onClick }: Props) {
                     `}>
                         {initial}
                     </div>
-                    {/* Indicador de modo */}
+                    {/* Indicador de estado */}
                     <div className={`
                         absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full border-2 border-white
                         flex items-center justify-center
-                        ${conv.modo === 'BOT' ? 'bg-blue-500' : 'bg-purple-500'}
+                        ${conv.estado === 'BOT' ? 'bg-blue-500' : 'bg-purple-500'}
                     `}>
-                        {conv.modo === 'BOT'
+                        {conv.estado === 'BOT'
                             ? <Bot size={10} className="text-white" />
                             : <Headset size={10} className="text-white" />
                         }
@@ -124,13 +124,7 @@ export default function ConversationItem({ conv, isSelected, onClick }: Props) {
                             <span className={`w-1.5 h-1.5 rounded-full ${colors.dot}`} />
                             {estadoLabel}
                         </span>
-                        {conv.escalado_a_directo && (
-                            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-semibold bg-orange-50 text-orange-600">
-                                <Smartphone size={10} className="flex-shrink-0" />
-                                Celular
-                            </span>
-                        )}
-                        {conv.modo === 'ASESOR' && (
+                        {conv.estado !== 'BOT' && (
                             <span className={`
                                 inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-semibold
                                 ${conv.ventana_abierta

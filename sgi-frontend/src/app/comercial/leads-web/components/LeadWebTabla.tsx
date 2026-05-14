@@ -10,7 +10,7 @@ const ESTADO_BADGE: Record<string, { bg: string; text: string; label: string }> 
     NUEVO: { bg: 'bg-blue-50 border-blue-100', text: 'text-blue-700', label: 'Nuevo' },
     PENDIENTE: { bg: 'bg-amber-50 border-amber-100', text: 'text-amber-700', label: 'Pendiente' },
     EN_GESTION: { bg: 'bg-emerald-50 border-emerald-100', text: 'text-emerald-700', label: 'En Gestión' },
-    CONVERTIDO: { bg: 'bg-green-50 border-green-100', text: 'text-green-700', label: 'Convertido' },
+    CERRADO: { bg: 'bg-green-50 border-green-100', text: 'text-green-700', label: 'Cerrado' },
     DESCARTADO: { bg: 'bg-slate-50 border-slate-200', text: 'text-slate-500', label: 'Descartado' },
 };
 

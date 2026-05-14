@@ -6,7 +6,7 @@ canales de captación y métricas operativas.
 import logging
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, case, and_, extract, or_, text
+from sqlalchemy import func, case, and_, extract, or_, text, literal_column
 from app.models.comercial import Cliente, ClienteContacto, Cita, CasoLlamada
 from app.models.historial_llamadas import HistorialLlamada
 from app.models.comercial_inbox import Inbox
@@ -209,8 +209,8 @@ class AnalyticsService:
 
         # Condición base de fechas
         condicion_fecha = and_(
-            Inbox.fecha_recepcion >= dt_inicio,
-            Inbox.fecha_recepcion <= dt_fin
+            Inbox.created_at >= dt_inicio,
+            Inbox.created_at <= dt_fin
         )
         
         # Filtro de comerciales para los totales generales
@@ -229,11 +229,11 @@ class AnalyticsService:
 
         # Convertidos — filtrado por fecha_cierre (fecha de cierre real)
         condicion_fecha_cierre = and_(
-            Inbox.fecha_cierre >= dt_inicio,
-            Inbox.fecha_cierre <= dt_fin
+            Inbox.updated_at >= dt_inicio,
+            Inbox.updated_at <= dt_fin
         )
         stmt_convertidos = select(func.count()).select_from(Inbox).where(
-            and_(condicion_fecha_cierre, Inbox.estado == 'CIERRE')
+            and_(condicion_fecha_cierre, Inbox.estado == 'CERRADO')
         )
         if filtro_aplicable and comerciales_ids_validos:
             stmt_convertidos = stmt_convertidos.where(Inbox.asignado_a.in_(comerciales_ids_validos))
@@ -256,14 +256,14 @@ class AnalyticsService:
         total_sin_respuesta = (await self.db.execute(stmt_sin_respuesta)).scalar() if total_leads > 0 else 0
 
         # Tiempo promedio de respuesta en segundos (calculado usando horario laboral)
-        stmt_avg = select(Inbox.fecha_recepcion, Inbox.fecha_gestion)\
+        stmt_avg = select(Inbox.created_at, Inbox.updated_at)\
                    .select_from(Inbox)\
-                   .where(and_(condicion_fecha, Inbox.fecha_gestion != None))
+                   .where(and_(condicion_fecha, Inbox.updated_at != None))
         if filtro_aplicable and comerciales_ids_validos:
             stmt_avg = stmt_avg.where(Inbox.asignado_a.in_(comerciales_ids_validos))
             
         result_tiempos = (await self.db.execute(stmt_avg)).all()
-        tiempos_segundos = [calcular_segundos_horario_laboral(r.fecha_recepcion, r.fecha_gestion) for r in result_tiempos]
+        tiempos_segundos = [calcular_segundos_horario_laboral(r.created_at, r.updated_at) for r in result_tiempos]
         avg_tiempo = sum(tiempos_segundos) / len(tiempos_segundos) if tiempos_segundos else 0
 
         # Tasa de conversión y abandono
@@ -302,12 +302,12 @@ class AnalyticsService:
 
             # Convertidos — por fecha de cierre real
             cond_cierre_com = and_(
-                Inbox.fecha_cierre >= dt_inicio,
-                Inbox.fecha_cierre <= dt_fin,
+                Inbox.updated_at >= dt_inicio,
+                Inbox.updated_at <= dt_fin,
                 Inbox.asignado_a == uid
             )
             convertidos = (await self.db.execute(
-                select(func.count()).select_from(Inbox).where(and_(cond_cierre_com, Inbox.estado == 'CIERRE'))
+                select(func.count()).select_from(Inbox).where(and_(cond_cierre_com, Inbox.estado == 'CERRADO'))
             )).scalar() or 0
 
             # Descartados
@@ -323,11 +323,11 @@ class AnalyticsService:
             )).scalar() or 0
 
             # Tiempo promedio respuesta en horario laboral
-            stmt_avg_com = select(Inbox.fecha_recepcion, Inbox.fecha_gestion)\
+            stmt_avg_com = select(Inbox.created_at, Inbox.updated_at)\
                            .select_from(Inbox)\
-                           .where(and_(cond_com, Inbox.fecha_gestion != None))
+                           .where(and_(cond_com, Inbox.updated_at != None))
             result_tiempos_com = (await self.db.execute(stmt_avg_com)).all()
-            tiempos_com = [calcular_segundos_horario_laboral(r.fecha_recepcion, r.fecha_gestion) for r in result_tiempos_com]
+            tiempos_com = [calcular_segundos_horario_laboral(r.created_at, r.updated_at) for r in result_tiempos_com]
             avg_resp = sum(tiempos_com) / len(tiempos_com) if tiempos_com else 0
 
 
@@ -356,8 +356,8 @@ class AnalyticsService:
 
         # Condición base de fechas
         condicion = and_(
-            Inbox.fecha_recepcion >= dt_inicio,
-            Inbox.fecha_recepcion <= dt_fin,
+            Inbox.created_at >= dt_inicio,
+            Inbox.created_at <= dt_fin,
         )
 
         # Columnas base (sin origen_lead que puede no existir aún)
@@ -366,11 +366,11 @@ class AnalyticsService:
             Inbox.nombre_whatsapp,
             Inbox.estado,
             Inbox.tipo_interes,
-            Inbox.comentario_descarte,
-            func.coalesce(MotivoDescarteInbox.nombre, '').label("motivo_descarte"),
-            Inbox.fecha_recepcion,
-            Inbox.fecha_gestion,
-            Inbox.fecha_cierre,
+            literal_column("''").label("comentario_descarte"),
+            literal_column("''").label("motivo_descarte"),
+            Inbox.created_at,
+            Inbox.updated_at,
+            Inbox.updated_at,
             Empleado.nombres.label("comercial"),
         ]
 
@@ -382,9 +382,8 @@ class AnalyticsService:
                 select(*columnas)
                 .outerjoin(Usuario, Inbox.asignado_a == Usuario.id)
                 .outerjoin(Empleado, Usuario.empleado_id == Empleado.id)
-                .outerjoin(MotivoDescarteInbox, Inbox.motivo_descarte_id == MotivoDescarteInbox.id)
                 .where(condicion)
-                .order_by(Inbox.fecha_recepcion.desc())
+                .order_by(Inbox.created_at.desc())
             )
             if comercial_ids is not None:
                 stmt = stmt.where(Inbox.asignado_a.in_(comercial_ids))
@@ -399,9 +398,8 @@ class AnalyticsService:
                 select(*columnas_base)
                 .outerjoin(Usuario, Inbox.asignado_a == Usuario.id)
                 .outerjoin(Empleado, Usuario.empleado_id == Empleado.id)
-                .outerjoin(MotivoDescarteInbox, Inbox.motivo_descarte_id == MotivoDescarteInbox.id)
                 .where(condicion)
-                .order_by(Inbox.fecha_recepcion.desc())
+                .order_by(Inbox.created_at.desc())
             )
             if comercial_ids is not None:
                 stmt = stmt.where(Inbox.asignado_a.in_(comercial_ids))
@@ -427,9 +425,9 @@ class AnalyticsService:
             'EN_GESTION': 'En Gestión',
             'SEGUIMIENTO': 'Seguimiento',
             'COTIZADO': 'Cotizado',
-            'CIERRE': 'Cierre',
-            'DESCARTADO': 'Descartado',
-            'CONVERTIDO': 'Convertido',
+            'CIERRE': 'Cerrado',
+            'CERRADO': 'Cerrado',
+            'CONVERTIDO': 'Cerrado',
         }
 
         return [
@@ -442,9 +440,9 @@ class AnalyticsService:
                 "origen": (row.origen_lead or "ORGANICO") if tiene_origen else "ORGANICO",
                 "motivo_descarte": row._mapping.get("motivo_descarte") or "",
                 "comentario_descarte": row.comentario_descarte or "",
-                "fecha_recepcion": (row.fecha_recepcion - timedelta(hours=5)).strftime("%Y-%m-%d %H:%M") if row.fecha_recepcion else "",
-                "fecha_gestion": (row.fecha_gestion - timedelta(hours=5)).strftime("%Y-%m-%d %H:%M") if row.fecha_gestion else "",
-                "fecha_cierre": (row.fecha_cierre - timedelta(hours=5)).strftime("%Y-%m-%d %H:%M") if row.fecha_cierre else "",
+                "fecha_recepcion": (row.created_at - timedelta(hours=5)).strftime("%Y-%m-%d %H:%M") if row.created_at else "",
+                "fecha_gestion": (row.updated_at - timedelta(hours=5)).strftime("%Y-%m-%d %H:%M") if row.updated_at else "",
+                "fecha_cierre": (row.updated_at - timedelta(hours=5)).strftime("%Y-%m-%d %H:%M") if row.updated_at else "",
                 "comercial": (row._mapping.get("comercial").split()[0] if row._mapping.get("comercial") else "Sin asignar"),
             }
             for row in rows

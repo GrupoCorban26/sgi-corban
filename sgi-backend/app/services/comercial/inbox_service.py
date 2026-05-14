@@ -31,14 +31,14 @@ class InboxService:
         query_inbox = select(Inbox).where(
             and_(
                 Inbox.telefono == phone, 
-                Inbox.estado.in_(['PENDIENTE', 'NUEVO', 'BOT'])
+                Inbox.ultimo_estado.in_(['PENDIENTE', 'NUEVO', 'BOT'])
             )
         ).order_by(Inbox.id.desc())
         result_inbox = await self.db.execute(query_inbox)
         existing_inbox = result_inbox.scalars().first()
         
         if existing_inbox:
-            if existing_inbox.estado == 'PENDIENTE':
+            if existing_inbox.ultimo_estado == 'PENDIENTE':
                 # Return existing assignment if already assigned
                 query_user = select(Usuario).options(selectinload(Usuario.empleado)).where(Usuario.id == existing_inbox.asignado_a)
                 result_user = await self.db.execute(query_user)
@@ -124,7 +124,7 @@ class InboxService:
                 counts = {}
                 for c in all_commercials:
                     count_query = select(func.count()).select_from(Inbox).where(
-                        and_(Inbox.asignado_a == c.id, Inbox.estado == 'PENDIENTE')
+                        and_(Inbox.asignado_a == c.id, Inbox.ultimo_estado == 'PENDIENTE')
                     )
                     result_count = await self.db.execute(count_query)
                     counts[c.id] = result_count.scalar() or 0
@@ -160,35 +160,37 @@ class InboxService:
                     assigned_user = commercials_sorted[0]
         
         # 5. Create or Update Inbox Entry
-        if existing_inbox and existing_inbox.estado in ('NUEVO', 'BOT'):
+        if existing_inbox and existing_inbox.ultimo_estado in ('NUEVO', 'BOT'):
             new_lead = existing_inbox
+            estado_anterior = new_lead.ultimo_estado
             new_lead.asignado_a = assigned_user.id
-            new_lead.estado = 'PENDIENTE'
-            new_lead.fecha_asignacion = datetime.now()
-            new_lead.tiempo_respuesta_segundos = None
-            new_lead.fecha_primera_respuesta = None
             new_lead.tipo_interes = data.tipo_interes
             # MULTI-BOT: Asignar bot_config_id si aún no tiene
             if data.bot_config_id and not new_lead.bot_config_id:
                 new_lead.bot_config_id = data.bot_config_id
-            # Update the original message if None or generic
-            if not new_lead.mensaje_inicial or new_lead.mensaje_inicial == "Interacción inicial":
-                new_lead.mensaje_inicial = data.mensaje
+            
+            await self.db.commit()
+            
+            from app.services.comercial.historial_inbox_service import HistorialInboxService
+            historial_svc = HistorialInboxService(self.db)
+            await historial_svc.registrar_cambio(new_lead.id, estado_nuevo='PENDIENTE', estado_anterior=estado_anterior)
         else:
             new_lead = Inbox(
                 telefono=phone,
-                mensaje_inicial=data.mensaje,
                 nombre_whatsapp=data.nombre_display,
                 asignado_a=assigned_user.id,
-                fecha_asignacion=datetime.now(),
-                fecha_recepcion=datetime.utcnow(),
-                estado='PENDIENTE',
+                ultimo_estado='PENDIENTE',
                 tipo_interes=data.tipo_interes,
                 bot_config_id=data.bot_config_id,  # MULTI-BOT
             )
             self.db.add(new_lead)
+            await self.db.commit()
+            await self.db.refresh(new_lead)
             
-        await self.db.commit()
+            from app.services.comercial.historial_inbox_service import HistorialInboxService
+            historial_svc = HistorialInboxService(self.db)
+            await historial_svc.registrar_cambio(new_lead.id, estado_nuevo='PENDIENTE')
+            
         await self.db.refresh(new_lead)
         
         # Notificar al comercial de la asignación
@@ -224,7 +226,7 @@ class InboxService:
         query = select(Inbox).where(
             and_(
                 Inbox.asignado_a == user_id,
-                Inbox.estado == 'PENDIENTE'
+                Inbox.ultimo_estado == 'PENDIENTE'
             )
         ).options(
             selectinload(Inbox.usuario_asignado)
@@ -232,13 +234,13 @@ class InboxService:
                 .selectinload(Empleado.activos_asignados)
                 .selectinload(EmpleadoActivo.activo)
                 .selectinload(Activo.linea_instalada)
-        ).order_by(Inbox.fecha_recepcion.desc())
+        ).order_by(Inbox.created_at.desc())
         result = await self.db.execute(query)
         return result.scalars().all()
 
     async def get_all_leads(self, comercial_ids: list = None, filtro_comercial_id: int = None):
         query = select(Inbox).where(
-            Inbox.estado == 'PENDIENTE'
+            Inbox.ultimo_estado == 'PENDIENTE'
         ).options(
             selectinload(Inbox.usuario_asignado)
                 .selectinload(Usuario.empleado)
@@ -256,7 +258,7 @@ class InboxService:
         if query is None:
             return []
             
-        query = query.order_by(Inbox.fecha_recepcion.desc())
+        query = query.order_by(Inbox.created_at.desc())
         result = await self.db.execute(query)
         return result.scalars().all()
 
@@ -264,7 +266,7 @@ class InboxService:
         query = select(func.count()).select_from(Inbox).where(
             and_(
                 Inbox.asignado_a == user_id,
-                Inbox.estado == 'PENDIENTE'
+                Inbox.ultimo_estado == 'PENDIENTE'
             )
         )
         result = await self.db.execute(query)
@@ -290,11 +292,9 @@ class InboxService:
     async def convert_lead(self, lead_id: int, client_id: int):
         lead = await self.db.get(Inbox, lead_id)
         if lead:
-            lead.estado = 'CIERRE'
-            lead.modo = 'BOT'
-            lead.fecha_cierre = datetime.now()
-            if not lead.fecha_gestion:
-                lead.fecha_gestion = datetime.now()
+            from app.services.comercial.historial_inbox_service import HistorialInboxService
+            historial_svc = HistorialInboxService(self.db)
+            await historial_svc.registrar_cambio(lead.id, estado_nuevo='CERRADO')
             
             # Trazabilidad: vincular el cliente con su lead de origen
             cliente = None
@@ -355,14 +355,20 @@ class InboxService:
     async def discard_lead(self, lead_id: int, request_data: dict = None):
         lead = await self.db.get(Inbox, lead_id)
         if lead:
-            lead.estado = 'DESCARTADO'
-            lead.modo = 'BOT'
-            if not lead.fecha_gestion:
-                lead.fecha_gestion = datetime.now()
-            
+            motivo_id = None
+            comentario = None
             if request_data:
-                lead.motivo_descarte_id = request_data.get('motivo_descarte_id')
-                lead.comentario_descarte = request_data.get('comentario_descarte')
+                motivo_id = request_data.get('motivo_descarte_id')
+                comentario = request_data.get('comentario_descarte')
+                
+            from app.services.comercial.historial_inbox_service import HistorialInboxService
+            historial_svc = HistorialInboxService(self.db)
+            await historial_svc.registrar_cambio(
+                lead.id, 
+                estado_nuevo='DESCARTADO',
+                motivo_descarte_id=motivo_id,
+                comentario=comentario
+            )
             
             # Solo enviar mensaje si el frontend lo solicita (default: True)
             enviar_mensaje = request_data.get('enviar_mensaje', True) if request_data else True
@@ -383,32 +389,6 @@ class InboxService:
             await self.db.commit()
             return True
         return False
-
-    async def registrar_primera_respuesta(self, lead_id: int):
-        """Registra la primera respuesta del comercial y calcula el tiempo de respuesta."""
-        lead = await self.db.get(Inbox, lead_id)
-        if lead and not lead.fecha_primera_respuesta:
-            lead.fecha_primera_respuesta = datetime.now()
-            base_date = lead.fecha_asignacion or lead.fecha_recepcion
-            if base_date:
-                base_date_naive = base_date.replace(tzinfo=None) if base_date.tzinfo else base_date
-                lead.tiempo_respuesta_segundos = calcular_segundos_horario_laboral(
-                    base_date_naive, datetime.now()
-                )
-            await self.db.commit()
-            return True
-        return False
-
-    async def escalar_a_directo(self, lead_id: int) -> bool:
-        """Marca que el comercial compartió su número corporativo con el cliente."""
-        lead = await self.db.get(Inbox, lead_id)
-        if lead and not lead.escalado_a_directo:
-            lead.escalado_a_directo = True
-            lead.fecha_escalacion = datetime.now()
-            await self.db.commit()
-            return True
-        return False
-
     async def asignar_manual(self, lead_id: int, comercial_id: int) -> dict:
         """Asigna manualmente un lead NUEVO a un comercial específico (sin enviar mensaje al cliente)."""
         from sqlalchemy.orm import selectinload
@@ -419,8 +399,8 @@ class InboxService:
         if not lead:
             raise Exception("Lead no encontrado")
         
-        if lead.estado not in ('NUEVO', 'PENDIENTE', 'BOT'):
-            raise Exception(f"Solo se pueden asignar leads en estado BOT, NUEVO o PENDIENTE (actual: {lead.estado})")
+        if lead.ultimo_estado not in ('NUEVO', 'PENDIENTE', 'BOT'):
+            raise Exception(f"Solo se pueden asignar leads en estado BOT, NUEVO o PENDIENTE (actual: {lead.ultimo_estado})")
         
         # Verificar que el comercial existe y está activo
         query_user = select(Usuario).options(selectinload(Usuario.empleado)).where(
@@ -432,10 +412,10 @@ class InboxService:
             raise Exception("Comercial no encontrado o inactivo")
         
         # Asignar el lead
+        estado_anterior = lead.ultimo_estado
         lead.asignado_a = comercial_id
-        lead.estado = 'PENDIENTE'
-        lead.fecha_asignacion = datetime.now()
-        lead.modo = 'ASESOR'  # Para que el bot no interfiera
+        lead.ultimo_estado = 'PENDIENTE'
+        lead.tipo_asignacion = 'MANUAL'
         
         if not lead.tipo_interes:
             lead.tipo_interes = 'ASIGNACION_MANUAL'
@@ -449,6 +429,11 @@ class InboxService:
             await self.db.delete(session)
         
         await self.db.commit()
+        
+        from app.services.comercial.historial_inbox_service import HistorialInboxService
+        historial_svc = HistorialInboxService(self.db)
+        await historial_svc.registrar_cambio(lead.id, estado_nuevo='PENDIENTE', estado_anterior=estado_anterior, created_by=comercial_id)
+        
         await self.db.refresh(lead)
         
         nombre = f"{user.empleado.nombres} {user.empleado.apellido_paterno}" if user.empleado else user.correo_corp
@@ -472,6 +457,5 @@ class InboxService:
             "lead_id": lead.id,
             "asignado_a": comercial_id,
             "nombre_asignado": nombre,
-            "estado": lead.estado,
-            "modo": lead.modo
+            "estado": lead.ultimo_estado
         }

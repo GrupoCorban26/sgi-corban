@@ -62,7 +62,7 @@ from app.services.comercial.bot_messages import (
 
 logger = logging.getLogger(__name__)
 
-SESSION_TIMEOUT_MINUTES = 30
+SESSION_TIMEOUT_MINUTES = 10
 
 
 # ==========================================
@@ -103,7 +103,7 @@ class ChatbotService:
     # PUNTO DE ENTRADA PRINCIPAL
     # =====================================================================
 
-    async def process_message(self, data: WhatsAppIncoming) -> WhatsAppResponse:
+    async def process_message(self, data: WhatsAppIncoming, inbox_id: int) -> WhatsAppResponse:
         """Procesa un mensaje entrante y retorna la respuesta del bot."""
 
         # 1. Normalizar teléfono
@@ -114,14 +114,11 @@ class ChatbotService:
         # 2. Limpieza oportunista de sesiones expiradas
         await self._cleanup_expired_sessions()
 
-        # 3. Verificar si tiene un lead activo con asesor asignado
-        lead_activo = await self._get_lead_activo(phone)
-        if lead_activo and lead_activo.asignado_a:
-            # El webhook ya guardó el mensaje en chat; bot no responde
-            return WhatsAppResponse(action="no_action", messages=[])
+        # 3. (La verificación de lead activo se hace en el webhook,
+        #     que ya filtra por estado != 'BOT' antes de llegar aquí)
 
         # 4. Obtener sesión activa del bot
-        session = await self._get_active_session(phone)
+        session = await self._get_active_session(inbox_id)
 
         # 5. Comandos globales
         text_lower = data.message_text.strip().lower()
@@ -145,24 +142,13 @@ class ChatbotService:
         if not session:
             if button_id in ("btn_asesor", "btn_cotizar", "btn_carga"):
                 # Presionó un botón del menú → crear sesión y procesar
-                session = await self._create_session(phone, "MENU")
+                session = await self._create_session(inbox_id, "MENU")
             elif text_lower:
-                # Texto libre sin sesión → crear sesión MENU y procesar
-                # como si estuviera en el menú (detectará intención o derivará)
-                session = await self._create_session(phone, "MENU")
-
-                # Enviar bienvenida primero, luego el handler derivará
-                bienvenida = self._send_menu()
-
-                # Procesar el texto para derivar al comercial
-                derivacion = await self._handle_menu(session, data, phone)
-
-                # Combinar: enviar bienvenida + respuesta de derivación
-                all_messages = bienvenida.messages + derivacion.messages
-                return WhatsAppResponse(
-                    action=derivacion.action,
-                    messages=all_messages,
-                )
+                # Texto libre sin sesión → crear sesión MENU y mostrar
+                # solo la bienvenida con botones. NO derivar automáticamente.
+                # El usuario debe elegir una opción del menú.
+                session = await self._create_session(inbox_id, "MENU")
+                return self._send_menu()
             else:
                 # Sin texto y sin botón (ej. sticker solo) → mostrar bienvenida
                 return self._send_menu()
@@ -246,13 +232,8 @@ class ChatbotService:
                     msg_asignado_fuera=MSG_CARGA_LISTA_ASIGNADO_FUERA_HORARIO,
                 )
 
-            # Sin intención clara → derivar a comercial
-            return await self._derivar_a_comercial(
-                session, data, phone, tipo_interes="ASESORIA",
-                mensaje_contexto="Solicita hablar con un asesor",
-                msg_asignado=MSG_ASESOR_ASIGNADO,
-                msg_asignado_fuera=MSG_ASESOR_ASIGNADO_FUERA_HORARIO,
-            )
+            # Sin intención clara → re-mostrar menú para que elija una opción
+            return self._send_menu(es_regreso=True)
 
         # Fallback: reenviar menú
         return self._send_menu()
@@ -396,15 +377,19 @@ class ChatbotService:
             )
             result = await inbox_service.distribute_lead(distribute_data)
             inbox_id = result.get("lead_id")
+            nombre_asesor = result.get("assigned_to", {}).get("nombre", "nuestro equipo")
 
             await self._update_session(session, "ATENDIDO", {"inbox_id": inbox_id})
 
             if en_horario:
-                # Derivación completamente silenciosa: no enviar nada al cliente.
-                return WhatsAppResponse(action="no_action")
+                texto = msg_asignado.format(nombre=nombre_asesor)
+                return WhatsAppResponse(
+                    action="send_text",
+                    messages=[BotMessage(type="text", content=texto)],
+                )
             else:
                 texto = msg_asignado_fuera.format(
-                    nombre="nuestro equipo", horario=MSG_HORARIO_INFO
+                    nombre=nombre_asesor, horario=MSG_HORARIO_INFO
                 )
                 return WhatsAppResponse(
                     action="send_text",
@@ -427,7 +412,7 @@ class ChatbotService:
         from app.services.comercial.whatsapp_service import WhatsAppService
 
         # Eliminar sesión activa si existe
-        session = await self._get_active_session(phone)
+        session = await self._get_active_session(inbox_id)
         if session:
             await self._delete_session(session)
 
@@ -454,16 +439,23 @@ class ChatbotService:
             logger.error(f"Error enviando despedida: {e}", exc_info=True)
 
     # =====================================================================
-    # AUTO-DERIVAR COTIZACIONES ABANDONADAS (llamado por scheduler)
+    # AUTO-DERIVAR SESIONES ABANDONADAS (llamado por scheduler)
     # =====================================================================
 
-    async def auto_derivar_cotizaciones_abandonadas(self):
-        """Busca sesiones COTIZAR_CONFIRMAR con más de 5 min sin actividad y las deriva."""
+    async def auto_derivar_sesiones_abandonadas(self):
+        """Busca TODAS las sesiones del bot expiradas y las deriva silenciosamente.
+
+        Aplica para cualquier estado (MENU, COTIZAR_REQUERIMIENTOS, COTIZAR_CONFIRMAR).
+        Timeout: SESSION_TIMEOUT_MINUTES (10 min) sin actividad.
+        No se envía ningún mensaje al cliente.
+        """
         try:
-            limite = datetime.now() - timedelta(minutes=5)
+            limite = datetime.now() - timedelta(minutes=SESSION_TIMEOUT_MINUTES)
             query = select(ConversationSession).where(
                 and_(
-                    ConversationSession.estado == "COTIZAR_CONFIRMAR",
+                    ConversationSession.estado.in_([
+                        "MENU", "COTIZAR_REQUERIMIENTOS", "COTIZAR_CONFIRMAR"
+                    ]),
                     ConversationSession.updated_at <= limite,
                 )
             )
@@ -472,76 +464,62 @@ class ChatbotService:
 
             for session in sesiones_abandonadas:
                 try:
-                    phone = session.telefono
-                    datos = self._get_session_data(session)
-                    requerimientos = datos.get("requerimientos", [])
-                    resumen = "\n".join(f"• {r}" for r in requerimientos) if requerimientos else "Cotización sin detalles"
+                    # Obtener inbox asociado
+                    inbox = await self.db.get(Inbox, session.inbox_id)
+                    if not inbox or inbox.ultimo_estado != 'BOT':
+                        # Inbox ya fue asignado o no existe → solo limpiar sesión
+                        await self.db.delete(session)
+                        await self.db.commit()
+                        continue
 
-                    # Distribuir lead — usar bot_config de la sesión si existe
+                    phone = inbox.telefono
+
+                    # Resolver bot_config para round-robin por equipo
                     bot_cfg = None
                     if session.bot_config_id:
                         bot_cfg = await self.db.get(WhatsAppBotConfig, session.bot_config_id)
-                    _token = bot_cfg.whatsapp_token if bot_cfg else self._wa_token
-                    _phone = bot_cfg.whatsapp_phone_id if bot_cfg else self._wa_phone_id
-                    _jefe = bot_cfg.jefe_comercial_id if bot_cfg else self._jefe_comercial_id
-                    _bcid = bot_cfg.id if bot_cfg else self._bot_config_id
+                    _jefe = bot_cfg.jefe_comercial_id if bot_cfg else None
+                    _bcid = bot_cfg.id if bot_cfg else None
 
+                    # Contexto según el estado de la sesión
+                    datos = self._get_session_data(session)
+                    if session.estado in ("COTIZAR_REQUERIMIENTOS", "COTIZAR_CONFIRMAR"):
+                        requerimientos = datos.get("requerimientos", [])
+                        resumen = "\n".join(f"• {r}" for r in requerimientos) if requerimientos else "Sin detalles"
+                        tipo_interes = "COTIZACION"
+                        mensaje_ctx = f"Cotización auto-derivada:\n{resumen}"
+                    else:
+                        tipo_interes = inbox.tipo_interes or "ASESORIA"
+                        mensaje_ctx = "Lead auto-derivado (sin respuesta al menú del bot)"
+
+                    # Distribuir vía round-robin
                     inbox_service = InboxService(self.db)
                     distribute_data = InboxDistribute(
                         telefono=phone,
-                        mensaje=f"Solicitud de cotización (auto-derivada):\n{resumen}",
-                        nombre_display="Cliente WhatsApp",
-                        tipo_interes="COTIZACION",
+                        mensaje=mensaje_ctx,
+                        nombre_display=inbox.nombre_whatsapp or "Cliente WhatsApp",
+                        tipo_interes=tipo_interes,
                         bot_config_id=_bcid,
                         jefe_comercial_id=_jefe,
                     )
                     result_dist = await inbox_service.distribute_lead(distribute_data)
-                    nombre_comercial = result_dist["assigned_to"]["nombre"]
+                    nombre_asesor = result_dist.get("assigned_to", {}).get("nombre", "un asesor")
 
-                    # Enviar mensaje al cliente
-                    from app.services.comercial.whatsapp_service import WhatsAppService
-
-                    en_horario = es_horario_laboral()
-                    if en_horario:
-                        texto = MSG_COTIZAR_DERIVADO.format(nombre=nombre_comercial)
-                    else:
-                        texto = MSG_COTIZAR_DERIVADO_FUERA_HORARIO.format(
-                            nombre=nombre_comercial, horario=MSG_HORARIO_INFO
-                        )
-
-                    await WhatsAppService.send_text(
-                        phone, texto, token=_token, phone_id=_phone,
-                    )
-
-                    # Guardar respuesta del bot en historial
-                    inbox_id = result_dist.get("lead_id")
-                    if inbox_id:
-                        chat_svc = ChatService(self.db)
-                        await chat_svc.save_message(ChatMessageCreate(
-                            inbox_id=inbox_id,
-                            telefono=phone,
-                            direccion="SALIENTE",
-                            remitente_tipo="BOT",
-                            contenido=texto,
-                            estado_envio="ENVIADO",
-                            tipo_contenido="text",
-                        ))
-
-                    # Eliminar sesión
+                    # Eliminar sesión del bot
                     await self.db.delete(session)
                     await self.db.commit()
 
                     logger.info(
-                        f"[CHATBOT] Cotización auto-derivada: tel={phone}, "
-                        f"asesor={nombre_comercial}"
+                        f"[AUTO-DERIVAR] Sesión '{session.estado}' derivada silenciosamente: "
+                        f"tel={phone}, asesor={nombre_asesor}"
                     )
                 except Exception as e:
                     logger.error(
-                        f"[CHATBOT] Error auto-derivando cotización {session.telefono}: {e}",
+                        f"[AUTO-DERIVAR] Error derivando sesión {session.id}: {e}",
                         exc_info=True,
                     )
         except Exception as e:
-            logger.error(f"[CHATBOT] Error en auto_derivar_cotizaciones: {e}", exc_info=True)
+            logger.error(f"[AUTO-DERIVAR] Error general: {e}", exc_info=True)
 
     # =====================================================================
     # HELPERS
@@ -616,11 +594,11 @@ class ChatbotService:
     # SESSION MANAGEMENT
     # =====================================================================
 
-    async def _get_active_session(self, phone: str):
-        """Obtiene la sesión activa (no expirada) para un teléfono."""
+    async def _get_active_session(self, inbox_id: int):
+        """Obtiene la sesión activa (no expirada) para un inbox."""
         query = select(ConversationSession).where(
             and_(
-                ConversationSession.telefono == phone,
+                ConversationSession.inbox_id == inbox_id,
                 or_(
                     ConversationSession.expires_at.is_(None),
                     ConversationSession.expires_at > datetime.now(),
@@ -630,10 +608,10 @@ class ChatbotService:
         result = await self.db.execute(query)
         return result.scalars().first()
 
-    async def _create_session(self, phone: str, estado: str, datos: dict = None):
-        """Crea una nueva sesión eliminando cualquier previa para el teléfono."""
+    async def _create_session(self, inbox_id: int, estado: str, datos: dict = None):
+        """Crea una nueva sesión eliminando cualquier previa para el inbox."""
         existing = await self.db.execute(
-            select(ConversationSession).where(ConversationSession.telefono == phone)
+            select(ConversationSession).where(ConversationSession.inbox_id == inbox_id)
         )
         for old_session in existing.scalars().all():
             await self.db.delete(old_session)
@@ -643,7 +621,7 @@ class ChatbotService:
             expires = datetime.now() + timedelta(minutes=SESSION_TIMEOUT_MINUTES)
 
         session = ConversationSession(
-            telefono=phone,
+            inbox_id=inbox_id,
             estado=estado,
             datos=json.dumps(datos) if datos else None,
             expires_at=expires,
@@ -684,17 +662,5 @@ class ChatbotService:
         except Exception as e:
             logger.warning(f"Error limpiando sesiones expiradas: {e}")
 
-    async def _get_lead_activo(self, phone: str):
-        """Busca un lead activo (PENDIENTE o EN_GESTION) para el teléfono."""
-        query = (
-            select(Inbox)
-            .where(
-                and_(
-                    Inbox.telefono == phone,
-                    Inbox.estado.in_(["PENDIENTE", "EN_GESTION"]),
-                )
-            )
-            .order_by(Inbox.id.desc())
-        )
-        result = await self.db.execute(query)
-        return result.scalars().first()
+    # _get_lead_activo eliminado: la verificación de lead activo
+    # se realiza en el webhook (whatsapp.py) antes de invocar al bot.

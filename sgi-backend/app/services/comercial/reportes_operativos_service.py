@@ -211,7 +211,7 @@ class ReportesOperativosService:
         conteo_tiempo = 0
 
         # === 1. INBOX (WhatsApp) ===
-        inbox_filters = [Inbox.fecha_recepcion >= start_date, Inbox.fecha_recepcion <= end_date]
+        inbox_filters = [Inbox.created_at >= start_date, Inbox.created_at <= end_date]
         if comercial_id:
             inbox_filters.append(Inbox.asignado_a == comercial_id)
             
@@ -233,7 +233,7 @@ class ReportesOperativosService:
             comercial_nombre = f"{row.nombres or ''} {row.apellido_paterno or ''}".strip() or row.correo_corp
             
             leads_recibidos += 1
-            if lead.estado in ("EN_GESTION", "COTIZADO", "CIERRE", "CONVERTIDO", "DESCARTADO"):
+            if lead.estado in ("EN_GESTION", "COTIZADO", "CERRADO", "DESCARTADO"):
                 leads_atendidos += 1
             if lead.estado == "DESCARTADO":
                 leads_descartados += 1
@@ -279,7 +279,7 @@ class ReportesOperativosService:
             comercial_nombre = f"{row.nombres or ''} {row.apellido_paterno or ''}".strip() or row.correo_corp
             
             leads_recibidos += 1
-            if lead.estado in ("EN_GESTION", "CONVERTIDO", "DESCARTADO"):
+            if lead.estado in ("EN_GESTION", "CERRADO", "DESCARTADO"):
                 leads_atendidos += 1
             if lead.estado == "DESCARTADO":
                 leads_descartados += 1

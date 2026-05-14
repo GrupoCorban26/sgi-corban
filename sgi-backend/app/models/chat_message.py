@@ -9,7 +9,6 @@ class ChatMessage(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     inbox_id = Column(Integer, ForeignKey("comercial.inbox.id"), nullable=False)
-    telefono = Column(String(20), nullable=False)
     direccion = Column(String(10), nullable=False) # 'ENTRANTE' | 'SALIENTE'
     remitente_tipo = Column(String(20), nullable=False) # 'CLIENTE' | 'COMERCIAL' | 'BOT'
     remitente_id = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=True)

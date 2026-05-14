@@ -120,7 +120,7 @@ async def _ejecutar_ventana_gracia(phone: str, from_number: str, contact_name: s
                 query_inbox = select(Inbox).where(
                     and_(
                         Inbox.telefono.like(f"%{phone_norm}%"),
-                        Inbox.estado.not_in(['CIERRE', 'DESCARTADO', 'CONVERTIDO'])
+                        Inbox.estado.not_in(['CERRADO', 'DESCARTADO'])
                     )
                 )
                 result_inbox = await db.execute(query_inbox)

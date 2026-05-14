@@ -4,7 +4,7 @@ Servicio del Dashboard consolidado de Reportes.
 import logging
 from datetime import date, timedelta, datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, and_, case, cast, Date
+from sqlalchemy import select, func, and_, case, cast, Date, literal_column
 from sqlalchemy.orm import selectinload
 
 from app.models.comercial_inbox import Inbox
@@ -149,7 +149,7 @@ class DashboardService:
         buzon_query = select(
             func.count(Inbox.id).label("total_leads"),
             func.sum(
-                case((Inbox.estado == "CONVERTIDO", 1), else_=0)
+                case((Inbox.estado == "CERRADO", 1), else_=0)
             ).label("total_convertidos"),
             func.sum(
                 case((Inbox.estado == "DESCARTADO", 1), else_=0)
@@ -157,16 +157,11 @@ class DashboardService:
             func.sum(
                 case((Inbox.estado.in_(["PENDIENTE", "EN_GESTION"]), 1), else_=0)
             ).label("total_en_gestion"),
-            func.avg(
-                case(
-                    (Inbox.tiempo_respuesta_segundos.isnot(None), Inbox.tiempo_respuesta_segundos),
-                    else_=None,
-                )
-            ).label("avg_tiempo_resp"),
+            literal_column("0").label("avg_tiempo_resp"),
         ).where(
             and_(
-                cast(Inbox.fecha_recepcion, Date) >= fecha_inicio,
-                cast(Inbox.fecha_recepcion, Date) <= fecha_fin,
+                cast(Inbox.created_at, Date) >= fecha_inicio,
+                cast(Inbox.created_at, Date) <= fecha_fin,
                 Inbox.estado != "BOT",
             )
         )
@@ -329,12 +324,12 @@ class DashboardService:
             Inbox.asignado_a.label("comercial_id"),
             func.count(Inbox.id).label("leads_asignados"),
             func.sum(
-                case((Inbox.estado == "CONVERTIDO", 1), else_=0)
+                case((Inbox.estado == "CERRADO", 1), else_=0)
             ).label("convertidos"),
         ).where(
             and_(
-                cast(Inbox.fecha_recepcion, Date) >= fecha_inicio,
-                cast(Inbox.fecha_recepcion, Date) <= fecha_fin,
+                cast(Inbox.created_at, Date) >= fecha_inicio,
+                cast(Inbox.created_at, Date) <= fecha_fin,
                 Inbox.estado != "BOT",
                 Inbox.asignado_a.isnot(None),
             )
@@ -424,16 +419,20 @@ class DashboardService:
     ) -> list[dict]:
         from app.models.comercial_catalogos import MotivoDescarteInbox
         
+        from app.models.historial_inbox import HistorialInbox
+        
         query = select(
             func.coalesce(MotivoDescarteInbox.nombre, 'Sin motivo').label("motivo"),
-            func.count(Inbox.id).label("cantidad")
-        ).select_from(Inbox).outerjoin(
-            MotivoDescarteInbox, Inbox.motivo_descarte_id == MotivoDescarteInbox.id
+            func.count(HistorialInbox.id).label("cantidad")
+        ).select_from(HistorialInbox).outerjoin(
+            MotivoDescarteInbox, HistorialInbox.motivo_descarte_id == MotivoDescarteInbox.id
+        ).join(
+            Inbox, HistorialInbox.inbox_id == Inbox.id
         ).where(
             and_(
-                cast(Inbox.fecha_recepcion, Date) >= fecha_inicio,
-                cast(Inbox.fecha_recepcion, Date) <= fecha_fin,
-                Inbox.estado == "DESCARTADO"
+                cast(HistorialInbox.created_at, Date) >= fecha_inicio,
+                cast(HistorialInbox.created_at, Date) <= fecha_fin,
+                HistorialInbox.estado == "DESCARTADO"
             )
         ).group_by(MotivoDescarteInbox.nombre)
 

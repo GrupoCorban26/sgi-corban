@@ -103,12 +103,12 @@ export default function ChatWindow({ selectedConv, onBack, onToggleInfo, showInf
                             <span className="text-slate-300">•</span>
                             <span className={`
                                 inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded
-                                ${selectedConv.modo === 'BOT'
+                                ${selectedConv.estado === 'BOT'
                                     ? 'bg-blue-50 text-blue-600'
                                     : 'bg-purple-50 text-purple-600'
                                 }
                             `}>
-                                {selectedConv.modo === 'BOT'
+                                {selectedConv.estado === 'BOT'
                                     ? <><Bot size={10} /> Bot</>
                                     : <><Headset size={10} /> Asesor</>
                                 }
@@ -118,7 +118,7 @@ export default function ChatWindow({ selectedConv, onBack, onToggleInfo, showInf
                 </div>
 
                 <div className="flex items-center gap-1.5 flex-shrink-0">
-                    {selectedConv.modo === 'BOT' && (
+                    {selectedConv.estado === 'BOT' && (
                         <button
                             onClick={handleTakeChat}
                             className="bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-2 rounded-lg text-xs font-semibold shadow-sm transition-all duration-200 flex items-center gap-1.5 hover:shadow-md"
@@ -169,7 +169,7 @@ export default function ChatWindow({ selectedConv, onBack, onToggleInfo, showInf
             </div>
 
             {/* Área de input */}
-            {selectedConv.modo === 'ASESOR' ? (
+            {selectedConv.estado !== 'BOT' ? (
                 selectedConv.ventana_abierta ? (
                     <ChatInput inboxId={selectedConv.inbox_id} disabled={false} />
                 ) : (

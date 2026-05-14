@@ -1,6 +1,6 @@
 // Tipos para Leads Web
 
-export type EstadoLeadWeb = 'NUEVO' | 'PENDIENTE' | 'EN_GESTION' | 'CONVERTIDO' | 'DESCARTADO';
+export type EstadoLeadWeb = 'NUEVO' | 'PENDIENTE' | 'EN_GESTION' | 'CERRADO' | 'DESCARTADO';
 
 export interface LeadWeb {
     id: number;

@@ -20,6 +20,7 @@ from .comercial import (
     Cliente, ClienteContacto, CasoLlamada, RegistroImportacion, Cita
 )
 from .comercial_inbox import Inbox
+from .historial_inbox import HistorialInbox
 from .lead_web import LeadWeb
 from .comercial_session import ConversationSession
 from .chat_message import ChatMessage

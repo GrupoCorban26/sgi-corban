@@ -4,7 +4,6 @@ from typing import List, Optional
 
 class ChatMessageBase(BaseModel):
     inbox_id: int
-    telefono: str
     direccion: str  # 'ENTRANTE' | 'SALIENTE'
     remitente_tipo: str  # 'CLIENTE' | 'COMERCIAL' | 'BOT'
     contenido: str
@@ -48,11 +47,9 @@ class ChatConversationPreview(BaseModel):
     telefono: str
     nombre_whatsapp: Optional[str] = None
     estado: str
-    modo: str
     ultimo_mensaje_at: Optional[datetime] = None
     mensajes_no_leidos: int = 0
     ultimo_mensaje_preview: Optional[str] = None
     asignado_a: Optional[int] = None
     nombre_asignado: Optional[str] = None
     ventana_abierta: bool = True
-    escalado_a_directo: bool = False

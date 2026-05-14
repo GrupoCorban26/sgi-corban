@@ -32,8 +32,7 @@ const ESTADO_LABELS: Record<string, string> = {
     'COTIZADO': 'Cotización Enviada',
     'SEGUIMIENTO': 'Seguimiento',
     'DESCARTADO': 'Descartado',
-    'CONVERTIDO': 'Convertido',
-    'CIERRE': 'Cerrado',
+    'CERRADO': 'Cerrado',
 };
 
 // Opciones disponibles según el estado actual (solo progresión hacia adelante)
@@ -53,7 +52,7 @@ const MOTIVOS_DESCARTE = [
 ];
 
 export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClick, onClose }: Props) {
-    const { changeEstado, releaseChat, descartarLead, escalarADirecto } = useChatActions();
+    const { changeEstado, releaseChat, descartarLead } = useChatActions();
     const { asignarManualMutation } = useInbox();
     const { data: comerciales = [] } = useComerciales();
     const [showDiscardModal, setShowDiscardModal] = useState(false);
@@ -102,7 +101,7 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
                 comercialId: selectedComercialId as number
             });
             toast.success('Lead asignado exitosamente');
-            onChangeConv({ ...selectedConv, estado: 'PENDIENTE', modo: 'ASESOR' });
+            onChangeConv({ ...selectedConv, estado: 'PENDIENTE' });
         } catch (error: unknown) {
             const axiosErr = error as { response?: { data?: { detail?: string } } };
             toast.error(axiosErr?.response?.data?.detail || 'Error al asignar');
@@ -132,7 +131,7 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
             return;
         }
         try {
-            await changeEstado.mutateAsync({ inboxId: selectedConv.inbox_id, nuevo_estado: 'CIERRE' });
+            await changeEstado.mutateAsync({ inboxId: selectedConv.inbox_id, nuevo_estado: 'CERRADO' });
             toast.success('Lead cerrado exitosamente');
             onChangeConv(null);
         } catch {
@@ -144,7 +143,7 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
         try {
             await releaseChat.mutateAsync(selectedConv.inbox_id);
             toast.success('Chat retornado al bot');
-            onChangeConv({ ...selectedConv, modo: 'BOT' });
+            onChangeConv({ ...selectedConv, estado: 'BOT' });
         } catch {
             toast.error('Error al retornar chat al bot');
         }
@@ -216,15 +215,15 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
                     {selectedConv.telefono}
                 </p>
 
-                {/* Modo actual */}
+                {/* Control actual */}
                 <div className={`
                     inline-flex items-center gap-1.5 mt-3 px-3 py-1.5 rounded-full text-xs font-semibold
-                    ${selectedConv.modo === 'BOT'
+                    ${selectedConv.estado === 'BOT'
                         ? 'bg-blue-50 text-blue-600 border border-blue-100'
                         : 'bg-purple-50 text-purple-600 border border-purple-100'
                     }
                 `}>
-                    {selectedConv.modo === 'BOT'
+                    {selectedConv.estado === 'BOT'
                         ? <><Bot size={12} /> Gestionado por Bot</>
                         : <><Headset size={12} /> Gestionado por Asesor</>
                     }
@@ -242,7 +241,7 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
                 <select
                     value={selectedConv.estado}
                     onChange={handleEstadoChange}
-                    disabled={selectedConv.estado === 'CIERRE' || selectedConv.estado === 'DESCARTADO' || selectedConv.estado === 'CONVERTIDO'}
+                    disabled={selectedConv.estado === 'CERRADO' || selectedConv.estado === 'DESCARTADO'}
                     className="w-full bg-slate-50 border border-slate-200 text-slate-700 rounded-xl px-3 py-2.5 text-sm font-medium
                         focus:outline-none focus:ring-2 focus:ring-emerald-200 focus:border-emerald-400
                         disabled:opacity-50 disabled:cursor-not-allowed transition-all cursor-pointer"
@@ -310,41 +309,11 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
                     </label>
                 </div>
 
-                {/* Toggle Gestionando por celular */}
-                {['PENDIENTE', 'EN_GESTION', 'COTIZADO'].includes(selectedConv.estado) && (
-                    selectedConv.escalado_a_directo ? (
-                        <div className="w-full py-2.5 px-4 bg-orange-50 rounded-xl text-sm border border-orange-200">
-                            <div className="flex items-center gap-2">
-                                <Smartphone size={15} className="text-orange-600" />
-                                <span className="font-semibold text-orange-700">Gestionado por celular</span>
-                            </div>
-                        </div>
-                    ) : (
-                        <button
-                            onClick={async () => {
-                                try {
-                                    await escalarADirecto.mutateAsync(selectedConv.inbox_id);
-                                    toast.success('Marcado como gestionado por celular');
-                                    onChangeConv({ ...selectedConv, escalado_a_directo: true });
-                                } catch {
-                                    toast.error('Error al escalar');
-                                }
-                            }}
-                            disabled={escalarADirecto.isPending}
-                            className="w-full py-2.5 px-4 bg-orange-50 hover:bg-orange-100 text-orange-700 rounded-xl text-sm font-medium
-                                flex items-center justify-center gap-2 transition-all border border-orange-200 hover:border-orange-300
-                                disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            <Smartphone size={15} />
-                            {escalarADirecto.isPending ? 'Procesando...' : '📱 Gestionando por celular'}
-                        </button>
-                    )
-                )}
-
-                {selectedConv.modo === 'ASESOR' && (
+                {selectedConv.estado !== 'BOT' && (
                     <button
                         onClick={handleRelease}
-                        className="w-full py-2.5 px-4 bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl text-sm font-medium
+                        disabled={selectedConv.estado === 'CERRADO' || selectedConv.estado === 'DESCARTADO'}
+                        className="w-full py-2.5 px-4 bg-slate-50 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-slate-50 text-slate-700 rounded-xl text-sm font-medium
                             flex items-center justify-center gap-2 transition-all border border-slate-200 hover:border-slate-300"
                     >
                         <Bot size={15} /> Devolver al Bot
@@ -353,8 +322,9 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
 
                 <button
                     onClick={handleConvertir}
-                    className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold
-                        flex items-center justify-center gap-2 shadow-sm shadow-emerald-200 hover:shadow-md transition-all"
+                    disabled={selectedConv.estado === 'CERRADO' || selectedConv.estado === 'DESCARTADO'}
+                    className="w-full py-2.5 px-4 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-emerald-600 text-white rounded-xl text-sm font-semibold
+                        flex items-center justify-center gap-2 shadow-sm shadow-emerald-200 hover:shadow-md disabled:shadow-none transition-all"
                 >
                     <CheckCircle2 size={15} /> Cerrar como Cliente
                 </button>

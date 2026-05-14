@@ -14,13 +14,18 @@ import { NextRequest, NextResponse } from 'next/server';
  */
 
 const API_URL = process.env.API_URL || 'http://localhost:8000/api/v1';
+const BACKEND_BASE = process.env.BACKEND_BASE_URL || 'http://localhost:8000';
 
 async function proxyRequest(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
     const { path } = await params;
     const targetPath = path.join('/');
 
+    // Archivos estáticos (uploads/) están montados en la raíz del backend,
+    // no bajo /api/v1. Usar BACKEND_BASE en vez de API_URL.
+    const baseUrl = targetPath.startsWith('uploads/') ? BACKEND_BASE : API_URL;
+
     // Construir URL destino con query params
-    const url = new URL(`${API_URL}/${targetPath}`);
+    const url = new URL(`${baseUrl}/${targetPath}`);
     req.nextUrl.searchParams.forEach((value, key) => {
         url.searchParams.append(key, value);
     });

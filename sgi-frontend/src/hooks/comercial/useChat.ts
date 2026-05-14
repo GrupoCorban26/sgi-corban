@@ -73,7 +73,6 @@ export const useChatActions = () => {
             const optimisticMsg: ChatMessage = {
                 id: Date.now(),
                 inbox_id: newMsg.inboxId,
-                telefono: '...',
                 direccion: 'SALIENTE',
                 remitente_tipo: 'COMERCIAL',
                 remitente_id: null,
@@ -159,15 +158,7 @@ export const useChatActions = () => {
         }
     });
 
-    const escalarADirecto = useMutation({
-        mutationFn: async (inboxId: number) => {
-            const { data } = await api.post(`/comercial/inbox/${inboxId}/escalar`);
-            return data;
-        },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['chat-conversations'] });
-        }
-    });
+
 
     return {
         sendMessage,
@@ -175,7 +166,6 @@ export const useChatActions = () => {
         releaseChat,
         changeEstado,
         markAsRead,
-        descartarLead,
-        escalarADirecto
+        descartarLead
     };
 };

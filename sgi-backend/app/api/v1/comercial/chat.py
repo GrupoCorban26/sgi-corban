@@ -184,7 +184,6 @@ async def send_message(
     # Save to db
     msg_create = ChatMessageCreate(
         inbox_id=inbox_id,
-        telefono=inbox.telefono,
         direccion='SALIENTE',
         remitente_tipo='COMERCIAL',
         remitente_id=current_user.id,
@@ -202,7 +201,7 @@ async def take_chat(
     """Tomar control del chat (cambia modo a ASESOR)."""
     chat_svc = ChatService(db)
     inbox = await chat_svc.take_chat(inbox_id, current_user.id)
-    return {"status": "success", "modo": inbox.modo, "estado": inbox.estado}
+    return {"status": "success", "estado": inbox.estado}
 
 @router.post("/{inbox_id}/release")
 async def release_chat(
@@ -232,7 +231,7 @@ async def release_chat(
     bot_svc = ChatbotService(db, bot_config=bot_cfg)
     await bot_svc.send_despedida(telefono, inbox.id)
 
-    return {"status": "success", "modo": inbox.modo}
+    return {"status": "success"}
 
 @router.post("/{inbox_id}/mark-read")
 async def mark_messages_read(
@@ -255,4 +254,4 @@ async def change_lead_estado(
     """Cambiar el estado del lead."""
     chat_svc = ChatService(db)
     inbox = await chat_svc.change_estado(inbox_id, request.nuevo_estado)
-    return {"status": "success", "estado": inbox.estado, "modo": inbox.modo}
+    return {"status": "success", "estado": inbox.estado}
