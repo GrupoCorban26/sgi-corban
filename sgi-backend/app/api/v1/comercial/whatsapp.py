@@ -13,6 +13,7 @@ from app.schemas.comercial.chat import ChatMessageCreate
 from app.models.comercial_inbox import Inbox
 from app.models.chat_message import ChatMessage
 from app.models.whatsapp_bot_config import WhatsAppBotConfig
+from app.models.seguridad import Usuario
 from app.database.db_connection import AsyncSessionLocal
 
 logger = logging.getLogger(__name__)
@@ -314,6 +315,54 @@ async def _process_webhook(payload: WhatsAppWebhookPayload, slug: str | None):
                                             estado_nuevo='PENDIENTE',
                                             estado_anterior='BOT'
                                         )
+
+                                        # ==========================================
+                                        # FIX: Enviar mensaje al cliente de cartera
+                                        # para que no quede sin respuesta
+                                        # ==========================================
+                                        try:
+                                            from app.services.comercial.bot_messages import (
+                                                MSG_CLIENTE_CARTERA_ASIGNADO,
+                                                MSG_CLIENTE_CARTERA_ASIGNADO_FUERA_HORARIO,
+                                                MSG_HORARIO_INFO,
+                                            )
+                                            from app.utils.horario_laboral import es_horario_laboral
+                                            from sqlalchemy.orm import selectinload as _sl
+
+                                            # Obtener nombre del asesor
+                                            _q = select(Usuario).options(_sl(Usuario.empleado)).where(
+                                                Usuario.id == cliente_cartera.comercial_encargado_id
+                                            )
+                                            _r = await db.execute(_q)
+                                            _asesor = _r.scalar_one_or_none()
+                                            _nombre = (
+                                                f"{_asesor.empleado.nombres} {_asesor.empleado.apellido_paterno}"
+                                                if _asesor and _asesor.empleado else "tu asesor"
+                                            )
+
+                                            if es_horario_laboral():
+                                                _texto = MSG_CLIENTE_CARTERA_ASIGNADO.format(nombre=_nombre)
+                                            else:
+                                                _texto = MSG_CLIENTE_CARTERA_ASIGNADO_FUERA_HORARIO.format(
+                                                    nombre=_nombre, horario=MSG_HORARIO_INFO
+                                                )
+
+                                            await WhatsAppService.send_text(
+                                                from_number, _texto,
+                                                token=wa_token, phone_id=wa_phone_id,
+                                            )
+
+                                            # Guardar en historial de chat
+                                            await chat_svc.save_message(ChatMessageCreate(
+                                                inbox_id=inbox.id,
+                                                telefono=from_number,
+                                                direccion='SALIENTE',
+                                                remitente_tipo='BOT',
+                                                contenido=_texto,
+                                                estado_envio='ENVIADO'
+                                            ))
+                                        except Exception as e_msg:
+                                            logger.warning(f"Error enviando mensaje cartera a {from_num_norm}: {e_msg}")
 
                                         logger.info(
                                             f"Lead CERRADO regresó: tel={from_num_norm}, "

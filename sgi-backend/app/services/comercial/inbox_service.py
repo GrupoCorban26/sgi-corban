@@ -420,9 +420,9 @@ class InboxService:
         if not lead.tipo_interes:
             lead.tipo_interes = 'ASIGNACION_MANUAL'
         
-        # Limpiar sesiones del bot para este teléfono
+        # Limpiar sesiones del bot para este inbox
         query_sessions = select(ConversationSession).where(
-            ConversationSession.telefono == lead.telefono
+            ConversationSession.inbox_id == lead.id
         )
         result_sessions = await self.db.execute(query_sessions)
         for session in result_sessions.scalars().all():

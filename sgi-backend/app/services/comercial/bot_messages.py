@@ -43,6 +43,14 @@ MSG_ASESOR_EXISTENTE_FUERA_HORARIO = (
     "{horario}"
 )
 
+# Auto-derivación por cartera (cliente recurrente que regresa)
+MSG_CLIENTE_CARTERA_ASIGNADO = "¡Hola! 👋 Qué gusto verte de nuevo. Tu asesor *{nombre}* se comunicará contigo en breve. 🚀"
+
+MSG_CLIENTE_CARTERA_ASIGNADO_FUERA_HORARIO = (
+    "¡Hola! 👋 Qué gusto verte de nuevo. Tu asesor *{nombre}* se comunicará contigo en breve. 🚀\n\n"
+    "{horario}"
+)
+
 
 # ==========================================
 # COTIZACIÓN

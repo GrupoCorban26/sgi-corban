@@ -408,8 +408,41 @@ class ChatbotService:
     # =====================================================================
 
     async def send_despedida(self, phone: str, inbox_id: int):
-        """Envía mensaje simple de despedida y limpia la sesión del bot."""
+        """Envía mensaje simple de despedida y limpia la sesión del bot.
+        
+        Incluye protección contra envíos duplicados: si ya se envió
+        una despedida en los últimos 5 minutos para este inbox, no se
+        envía otra.
+        """
         from app.services.comercial.whatsapp_service import WhatsAppService
+        from app.models.chat_message import ChatMessage
+
+        # ==========================================
+        # IDEMPOTENCIA: Verificar si ya se envió despedida reciente
+        # ==========================================
+        try:
+            limite_despedida = datetime.now() - timedelta(minutes=5)
+            query_despedida_reciente = select(ChatMessage).where(
+                and_(
+                    ChatMessage.inbox_id == inbox_id,
+                    ChatMessage.direccion == 'SALIENTE',
+                    ChatMessage.remitente_tipo == 'BOT',
+                    ChatMessage.contenido.contains('Fue un placer atenderte'),
+                    ChatMessage.created_at >= limite_despedida,
+                )
+            )
+            result_check = await self.db.execute(query_despedida_reciente)
+            if result_check.scalars().first():
+                logger.info(
+                    f"[DESPEDIDA] Ya se envió despedida reciente para inbox_id={inbox_id}. Omitiendo duplicado."
+                )
+                # Aún así limpiar la sesión si existe
+                session = await self._get_active_session(inbox_id)
+                if session:
+                    await self._delete_session(session)
+                return
+        except Exception as e:
+            logger.warning(f"Error verificando despedida duplicada: {e}")
 
         # Eliminar sesión activa si existe
         session = await self._get_active_session(inbox_id)
