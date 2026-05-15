@@ -53,3 +53,4 @@ class ChatConversationPreview(BaseModel):
     asignado_a: Optional[int] = None
     nombre_asignado: Optional[str] = None
     ventana_abierta: bool = True
+    gestion_celular: bool = False
