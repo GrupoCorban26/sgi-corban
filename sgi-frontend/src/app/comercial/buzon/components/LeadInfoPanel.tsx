@@ -62,11 +62,13 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
     const [selectedComercialId, setSelectedComercialId] = useState<number | ''>('');
     const [isAssigning, setIsAssigning] = useState(false);
     const [isSupervisor, setIsSupervisor] = useState(false);
+    const [celularConfirmado, setCelularConfirmado] = useState(selectedConv.gestion_celular ?? false);
 
     // Resetear selección al cambiar de lead
     useEffect(() => {
         setSelectedComercialId('');
-    }, [selectedConv.inbox_id]);
+        setCelularConfirmado(selectedConv.gestion_celular ?? false);
+    }, [selectedConv.inbox_id, selectedConv.gestion_celular]);
 
     useEffect(() => {
         setIsMounted(true);
@@ -322,17 +324,17 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
 
                 {/* Botón: Gestionando por Celular */}
                 {selectedConv.estado !== 'BOT' && selectedConv.estado !== 'CERRADO' && selectedConv.estado !== 'DESCARTADO' && (
-                    selectedConv.gestion_celular ? (
-                        <div className="w-full py-2.5 px-4 bg-amber-100 text-amber-800 rounded-xl text-sm font-medium flex items-center justify-center gap-2 border border-amber-200 cursor-default opacity-80">
-                            <Smartphone size={15} /> Confirmado en Celular
+                    celularConfirmado ? (
+                        <div className="w-full py-2.5 px-4 bg-emerald-100 text-emerald-800 rounded-xl text-sm font-medium flex items-center justify-center gap-2 border border-emerald-200 cursor-default">
+                            <Smartphone size={15} /> ✅ Confirmado en Celular
                         </div>
                     ) : (
                         <button
                             onClick={async () => {
                                 try {
                                     await marcarGestionCelular.mutateAsync(selectedConv.inbox_id);
+                                    setCelularConfirmado(true);
                                     toast.success('Lead marcado como gestionado por celular corporativo');
-                                    onChangeConv({ ...selectedConv, gestion_celular: true });
                                 } catch {
                                     toast.error('Error al confirmar gestión por celular');
                                 }
