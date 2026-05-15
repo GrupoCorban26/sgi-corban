@@ -298,7 +298,12 @@ class ChatService:
         inbox.gestion_celular = True
         
         historial_svc = HistorialInboxService(self.db)
-        await historial_svc.registrar_cambio(inbox.id, inbox.ultimo_estado, "Confirmada atención desde celular corporativo")
+        await historial_svc.registrar_cambio(
+            inbox_id=inbox.id, 
+            estado_nuevo=inbox.ultimo_estado, 
+            estado_anterior=inbox.ultimo_estado,
+            comentario="Confirmada atención desde celular corporativo"
+        )
         
         await self.db.commit()
         await self.db.refresh(inbox)
