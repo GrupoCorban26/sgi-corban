@@ -15,6 +15,7 @@ from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import and_, func, delete
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload
 
 from app.models.whatsapp_supervision import EvoInstancia, EvoConversacion, EvoMensaje
@@ -482,9 +483,14 @@ class SupervisionService:
                     await self.db.commit()
                 return {"status": "processed", "event": "reaction", "target_id": target_id}
 
-        # Verificar duplicado
+        # Verificar duplicado (por message_id + instancia_id, ya que grupos comparten message_id)
         existing_msg = await self.db.execute(
-            select(EvoMensaje.id).where(EvoMensaje.message_id == message_id)
+            select(EvoMensaje.id).where(
+                and_(
+                    EvoMensaje.message_id == message_id,
+                    EvoMensaje.instancia_id == instancia.id,
+                )
+            )
         )
         if existing_msg.scalar_one_or_none():
             return {"status": "ignored", "reason": "duplicate message"}
@@ -542,7 +548,13 @@ class SupervisionService:
         # Actualizar last_seen de instancia
         instancia.last_seen = datetime.utcnow()
 
-        await self.db.commit()
+        # Protección contra race conditions (webhooks concurrentes con mismo message_id)
+        try:
+            await self.db.commit()
+        except IntegrityError:
+            await self.db.rollback()
+            logger.debug(f"Duplicado por race condition ignorado: {message_id} (instancia {instancia.id})")
+            return {"status": "ignored", "reason": "duplicate message (race condition)"}
 
         return {
             "status": "processed",

@@ -12,6 +12,7 @@ Estados posibles de sesión:
   ATENDIDO               → Lead asignado a comercial; bot en silencio
 """
 
+
 import json
 import logging
 from datetime import datetime, timedelta
@@ -408,56 +409,48 @@ class ChatbotService:
     # =====================================================================
 
     async def send_despedida(self, phone: str, inbox_id: int):
-        """Envía mensaje simple de despedida y limpia la sesión del bot.
+        """Envía mensaje de despedida y limpia la sesión del bot.
         
-        Incluye protección contra envíos duplicados: si ya se envió
-        una despedida en los últimos 5 minutos para este inbox, no se
-        envía otra.
+        Idempotencia: guarda el mensaje en BD PRIMERO (reservando el slot),
+        luego envía por WhatsApp. Así si otro worker intenta lo mismo,
+        verá el registro existente y se detendrá.
         """
         from app.services.comercial.whatsapp_service import WhatsAppService
         from app.models.chat_message import ChatMessage
 
-        # ==========================================
-        # IDEMPOTENCIA: Verificar si ya se envió despedida reciente
-        # ==========================================
+        # 1. Verificar si ya se envió despedida reciente (últimos 5 min)
         try:
-            limite_despedida = datetime.now() - timedelta(minutes=5)
-            query_despedida_reciente = select(ChatMessage).where(
+            limite = datetime.now() - timedelta(minutes=5)
+            query_check = select(ChatMessage).where(
                 and_(
                     ChatMessage.inbox_id == inbox_id,
                     ChatMessage.direccion == 'SALIENTE',
                     ChatMessage.remitente_tipo == 'BOT',
                     ChatMessage.contenido.contains('Fue un placer atenderte'),
-                    ChatMessage.created_at >= limite_despedida,
+                    ChatMessage.created_at >= limite,
                 )
             )
-            result_check = await self.db.execute(query_despedida_reciente)
+            result_check = await self.db.execute(query_check)
             if result_check.scalars().first():
                 logger.info(
-                    f"[DESPEDIDA] Ya se envió despedida reciente para inbox_id={inbox_id}. Omitiendo duplicado."
+                    f"[DESPEDIDA] Ya enviada para inbox_id={inbox_id}. Omitiendo."
                 )
-                # Aún así limpiar la sesión si existe
-                session = await self._get_active_session(inbox_id)
-                if session:
-                    await self._delete_session(session)
                 return
         except Exception as e:
             logger.warning(f"Error verificando despedida duplicada: {e}")
 
-        # Eliminar sesión activa si existe
-        session = await self._get_active_session(inbox_id)
-        if session:
-            await self._delete_session(session)
+        # 2. Eliminar sesión activa si existe
+        try:
+            session = await self._get_active_session(inbox_id)
+            if session:
+                await self._delete_session(session)
+        except Exception as e:
+            logger.warning(f"Error limpiando sesión bot: {e}")
 
         mensaje = MSG_DESPEDIDA.format(nombre_empresa=self._empresa_name)
 
+        # 3. Guardar en BD PRIMERO (reserva el slot para idempotencia)
         try:
-            await WhatsAppService.send_text(
-                phone, mensaje,
-                token=self._wa_token, phone_id=self._wa_phone_id,
-            )
-
-            # Guardar en historial de chat
             chat_svc = ChatService(self.db)
             await chat_svc.save_message(ChatMessageCreate(
                 inbox_id=inbox_id,
@@ -465,11 +458,21 @@ class ChatbotService:
                 direccion="SALIENTE",
                 remitente_tipo="BOT",
                 contenido=mensaje,
-                estado_envio="ENVIADO",
+                estado_envio="PENDIENTE",
                 tipo_contenido="text",
             ))
         except Exception as e:
-            logger.error(f"Error enviando despedida: {e}", exc_info=True)
+            logger.error(f"Error guardando despedida en BD: {e}", exc_info=True)
+            return
+
+        # 4. Enviar por WhatsApp (si falla, el mensaje ya quedó registrado)
+        try:
+            await WhatsAppService.send_text(
+                phone, mensaje,
+                token=self._wa_token, phone_id=self._wa_phone_id,
+            )
+        except Exception as e:
+            logger.error(f"Error enviando despedida por WhatsApp: {e}", exc_info=True)
 
     # =====================================================================
     # AUTO-DERIVAR SESIONES ABANDONADAS (llamado por scheduler)

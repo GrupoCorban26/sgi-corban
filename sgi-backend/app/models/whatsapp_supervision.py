@@ -91,7 +91,7 @@ class EvoMensaje(Base):
     __table_args__ = (
         Index("ix_evo_msg_conv_timestamp", "conversacion_id", "timestamp"),
         Index("ix_evo_msg_instancia", "instancia_id"),
-        Index("ix_evo_msg_message_id", "message_id", unique=True),
+        Index("ix_evo_msg_message_id_instancia", "message_id", "instancia_id", unique=True),
         {"schema": "whatsapp_evo"},
     )
 
