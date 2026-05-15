@@ -136,6 +136,12 @@ export default function ConversationItem({ conv, isSelected, onClick }: Props) {
                                 {conv.ventana_abierta ? '24h activa' : '24h expirada'}
                             </span>
                         )}
+                        {conv.gestion_celular && (
+                            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md font-semibold bg-amber-50 text-amber-600">
+                                <Smartphone size={10} className="flex-shrink-0" />
+                                Celular
+                            </span>
+                        )}
                         {conv.nombre_asignado && (
                             <span className="inline-flex items-center gap-1 text-[10px] text-slate-400 font-medium truncate">
                                 <Headset size={10} className="flex-shrink-0" />
