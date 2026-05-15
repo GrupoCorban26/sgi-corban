@@ -215,20 +215,27 @@ class AnalyticsBuzonService:
         resultado = await self.db.execute(query_conteos)
         row = resultado.one()
 
-        # Motivos de descarte
+        # Motivos de descarte (via historial_inbox → motivo_descarte_inbox)
+        from app.models.historial_inbox import HistorialInbox
+        from app.models.comercial_catalogos import MotivoDescarteInbox
+
         query_motivos = (
             select(
-                Inbox.motivo_descarte.label("name"),
+                MotivoDescarteInbox.nombre.label("name"),
                 func.count().label("value"),
             )
+            .select_from(HistorialInbox)
+            .join(MotivoDescarteInbox, HistorialInbox.motivo_descarte_id == MotivoDescarteInbox.id)
+            .join(Inbox, Inbox.id == HistorialInbox.inbox_id)
             .where(
                 and_(
-                    base_filter,
-                    Inbox.estado == "DESCARTADO",
-                    Inbox.motivo_descarte.isnot(None),
+                    Inbox.created_at >= fecha_desde,
+                    Inbox.created_at <= fecha_hasta,
+                    HistorialInbox.estado == "DESCARTADO",
+                    HistorialInbox.motivo_descarte_id.isnot(None),
                 )
             )
-            .group_by(Inbox.motivo_descarte)
+            .group_by(MotivoDescarteInbox.nombre)
             .order_by(func.count().desc())
         )
         if comercial_ids is not None:

@@ -212,6 +212,10 @@ class AnalyticsComercialService:
         """
         inicio_mes, fin_mes = self._parse_periodo(periodo)
         
+        # Obtener mapa de estados
+        estados_result = await self.db.execute(select(EstadoCliente.id, EstadoCliente.nombre))
+        em = {row.nombre: row.id for row in estados_result.all()}
+        
         # 1. Pipeline global para embudo (de todos los activos)
         q_funnel = select(
             func.sum(case((Cliente.estado_id == em.get('PROSPECTO', 0), 1), else_=0)).label('prospectos'),
