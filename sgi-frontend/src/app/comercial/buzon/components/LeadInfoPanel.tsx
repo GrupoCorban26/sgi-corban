@@ -321,7 +321,7 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
                 )}
 
                 {/* Botón: Gestionando por Celular */}
-                {selectedConv.estado !== 'BOT' && selectedConv.estado !== 'CERRADO' && selectedConv.estado !== 'DESCARTADO' && !selectedConv.ventana_abierta && (
+                {selectedConv.estado !== 'BOT' && selectedConv.estado !== 'CERRADO' && selectedConv.estado !== 'DESCARTADO' && (
                     selectedConv.gestion_celular ? (
                         <div className="w-full py-2.5 px-4 bg-amber-100 text-amber-800 rounded-xl text-sm font-medium flex items-center justify-center gap-2 border border-amber-200 cursor-default opacity-80">
                             <Smartphone size={15} /> Confirmado en Celular
