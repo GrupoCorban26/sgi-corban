@@ -27,6 +27,9 @@ class Inbox(Base):
     referral_source_id = Column(String(100), nullable=True)   # ID del anuncio de Meta
     referral_headline = Column(String(300), nullable=True)    # Título del anuncio
 
+    # Flag de gestión en celular (cuando expira ventana de 24h)
+    gestion_celular = Column(Boolean, default=False, nullable=False, server_default='0')
+
     # Relationships
     usuario_asignado = relationship("app.models.seguridad.Usuario", foreign_keys=[asignado_a])
     mensajes = relationship("app.models.chat_message.ChatMessage", back_populates="inbox", cascade="all, delete-orphan")

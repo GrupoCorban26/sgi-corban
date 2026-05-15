@@ -255,3 +255,14 @@ async def change_lead_estado(
     chat_svc = ChatService(db)
     inbox = await chat_svc.change_estado(inbox_id, request.nuevo_estado)
     return {"status": "success", "estado": inbox.estado}
+
+@router.post("/{inbox_id}/gestion-celular")
+async def marcar_gestion_celular(
+    inbox_id: int,
+    current_user: Usuario = Depends(get_current_user_obj),
+    db: AsyncSession = Depends(get_db)
+):
+    """Marcar que el comercial está gestionando este lead desde su celular corporativo (ventana 24h expirada)."""
+    chat_svc = ChatService(db)
+    inbox = await chat_svc.marcar_gestion_celular(inbox_id)
+    return {"status": "success", "gestion_celular": inbox.gestion_celular}

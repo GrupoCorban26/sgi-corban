@@ -52,7 +52,7 @@ const MOTIVOS_DESCARTE = [
 ];
 
 export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClick, onClose }: Props) {
-    const { changeEstado, releaseChat, descartarLead } = useChatActions();
+    const { changeEstado, releaseChat, descartarLead, marcarGestionCelular } = useChatActions();
     const { asignarManualMutation } = useInbox();
     const { data: comerciales = [] } = useComerciales();
     const [showDiscardModal, setShowDiscardModal] = useState(false);
@@ -318,6 +318,32 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
                     >
                         <Bot size={15} /> Devolver al Bot
                     </button>
+                )}
+
+                {/* Botón: Gestionando por Celular */}
+                {selectedConv.estado !== 'BOT' && selectedConv.estado !== 'CERRADO' && selectedConv.estado !== 'DESCARTADO' && !selectedConv.ventana_abierta && (
+                    selectedConv.gestion_celular ? (
+                        <div className="w-full py-2.5 px-4 bg-amber-100 text-amber-800 rounded-xl text-sm font-medium flex items-center justify-center gap-2 border border-amber-200 cursor-default opacity-80">
+                            <Smartphone size={15} /> Confirmado en Celular
+                        </div>
+                    ) : (
+                        <button
+                            onClick={async () => {
+                                try {
+                                    await marcarGestionCelular.mutateAsync(selectedConv.inbox_id);
+                                    toast.success('Lead marcado como gestionado por celular corporativo');
+                                    onChangeConv({ ...selectedConv, gestion_celular: true });
+                                } catch {
+                                    toast.error('Error al confirmar gestión por celular');
+                                }
+                            }}
+                            disabled={marcarGestionCelular.isPending}
+                            className="w-full py-2.5 px-4 bg-amber-50 hover:bg-amber-100 text-amber-700 rounded-xl text-sm font-medium
+                                flex items-center justify-center gap-2 transition-all border border-amber-200 hover:border-amber-300"
+                        >
+                            <Smartphone size={15} /> Confirmar Gestión en Celular
+                        </button>
+                    )
                 )}
 
                 <button

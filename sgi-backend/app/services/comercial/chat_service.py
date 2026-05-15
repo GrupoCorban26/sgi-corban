@@ -72,7 +72,8 @@ class ChatService:
                 "ultimo_mensaje_preview": latest_msg[:50] + "..." if latest_msg and len(latest_msg) > 50 else latest_msg,
                 "asignado_a": ibx.asignado_a,
                 "nombre_asignado": await self._get_nombre_asignado(ibx.asignado_a),
-                "ventana_abierta": ventana
+                "ventana_abierta": ventana,
+                "gestion_celular": ibx.gestion_celular
             })
         return previews
 
@@ -144,7 +145,8 @@ class ChatService:
                 "ultimo_mensaje_preview": latest_msg[:50] + "..." if latest_msg and len(latest_msg) > 50 else latest_msg,
                 "asignado_a": ibx.asignado_a,
                 "nombre_asignado": await self._get_nombre_asignado(ibx.asignado_a),
-                "ventana_abierta": ventana
+                "ventana_abierta": ventana,
+                "gestion_celular": ibx.gestion_celular
             })
         return previews
 
@@ -200,6 +202,9 @@ class ChatService:
             
             # Si el cliente escribe en un lead cerrado, el bot lo reactiva
             if msg_in.direccion == 'ENTRANTE':
+                # Si el cliente vuelve a hablar, se reinicia el flag celular ya que la ventana 24h se reabre
+                if inbox.gestion_celular:
+                    inbox.gestion_celular = False
                 if inbox.ultimo_estado == 'CERRADO':
                     await historial_svc.registrar_cambio(inbox.id, 'BOT')
                     
@@ -282,4 +287,19 @@ class ChatService:
             await self.db.commit()
             await self.db.refresh(inbox)
             
+        return inbox
+
+    async def marcar_gestion_celular(self, inbox_id: int) -> Inbox:
+        """Marca un lead como gestionado por el celular corporativo."""
+        inbox = await self.db.get(Inbox, inbox_id)
+        if not inbox:
+            raise HTTPException(status_code=404, detail="Inbox not found")
+            
+        inbox.gestion_celular = True
+        
+        historial_svc = HistorialInboxService(self.db)
+        await historial_svc.registrar_cambio(inbox.id, inbox.ultimo_estado, "Confirmada atención desde celular corporativo")
+        
+        await self.db.commit()
+        await self.db.refresh(inbox)
         return inbox

@@ -24,6 +24,7 @@ export interface ChatConversationPreview {
     asignado_a: number | null;
     nombre_asignado: string | null;
     ventana_abierta: boolean;
+    gestion_celular?: boolean;
 }
 
 export interface SendMessageRequest {

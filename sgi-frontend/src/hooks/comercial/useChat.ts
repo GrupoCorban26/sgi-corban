@@ -160,12 +160,23 @@ export const useChatActions = () => {
 
 
 
+    const marcarGestionCelular = useMutation({
+        mutationFn: async (inboxId: number) => {
+            const { data } = await api.post(`${CHAT_URL}/${inboxId}/gestion-celular`);
+            return data;
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['chat-conversations'] });
+        }
+    });
+
     return {
         sendMessage,
         takeChat,
         releaseChat,
         changeEstado,
         markAsRead,
-        descartarLead
+        descartarLead,
+        marcarGestionCelular
     };
 };

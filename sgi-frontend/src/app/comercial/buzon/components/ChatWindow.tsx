@@ -3,7 +3,7 @@ import { ChatConversationPreview } from '@/types/chat';
 import { useChatMessages, useChatActions } from '@/hooks/comercial/useChat';
 import MessageBubble from './MessageBubble';
 import ChatInput from './ChatInput';
-import { ArrowLeft, Bot, UserPlus, Loader2, Info, MessageSquare, Headset, AlertCircle } from 'lucide-react';
+import { ArrowLeft, Bot, UserPlus, Loader2, Info, MessageSquare, Headset, AlertCircle, Smartphone } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface Props {
@@ -173,12 +173,23 @@ export default function ChatWindow({ selectedConv, onBack, onToggleInfo, showInf
                 selectedConv.ventana_abierta ? (
                     <ChatInput inboxId={selectedConv.inbox_id} disabled={false} />
                 ) : (
-                    <div className="bg-amber-50/95 backdrop-blur-sm px-4 py-3 text-center border-t border-amber-200 z-10 flex-shrink-0">
+                    <div className={`${selectedConv.gestion_celular ? 'bg-emerald-50/95 border-emerald-200 text-emerald-700' : 'bg-amber-50/95 border-amber-200 text-amber-700'} backdrop-blur-sm px-4 py-3 text-center border-t z-10 flex-shrink-0`}>
                         <div className="flex items-center justify-center gap-2">
-                            <AlertCircle size={16} className="text-amber-600 flex-shrink-0" />
-                            <p className="text-sm text-amber-700 font-medium">
-                                ⚠️ La ventana de 24h ha expirado. Contacta al cliente desde tu celular corporativo.
-                            </p>
+                            {selectedConv.gestion_celular ? (
+                                <>
+                                    <Smartphone size={16} className="text-emerald-600 flex-shrink-0" />
+                                    <p className="text-sm font-medium">
+                                        Gestión confirmada desde el celular corporativo.
+                                    </p>
+                                </>
+                            ) : (
+                                <>
+                                    <AlertCircle size={16} className="text-amber-600 flex-shrink-0" />
+                                    <p className="text-sm font-medium">
+                                        ⚠️ La ventana de 24h ha expirado. Contacta al cliente desde tu celular corporativo.
+                                    </p>
+                                </>
+                            )}
                         </div>
                     </div>
                 )
