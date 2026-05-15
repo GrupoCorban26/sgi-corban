@@ -113,6 +113,14 @@ export default function ChatWindow({ selectedConv, onBack, onToggleInfo, showInf
                                     : <><Headset size={10} /> Asesor</>
                                 }
                             </span>
+                            {selectedConv.gestion_celular && (
+                                <>
+                                    <span className="text-slate-300">•</span>
+                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-600">
+                                        <Smartphone size={10} /> Celular
+                                    </span>
+                                </>
+                            )}
                         </div>
                     </div>
                 </div>
@@ -169,27 +177,28 @@ export default function ChatWindow({ selectedConv, onBack, onToggleInfo, showInf
             </div>
 
             {/* Área de input */}
+            {/* Banner de gestión celular — visible siempre que esté confirmado */}
+            {selectedConv.estado !== 'BOT' && selectedConv.gestion_celular && (
+                <div className="bg-emerald-50/95 backdrop-blur-sm px-4 py-2 text-center border-t border-emerald-200 z-10 flex-shrink-0">
+                    <div className="flex items-center justify-center gap-2 text-emerald-700">
+                        <Smartphone size={14} className="text-emerald-600 flex-shrink-0" />
+                        <p className="text-xs font-medium">
+                            ✅ Gestión confirmada desde el celular corporativo
+                        </p>
+                    </div>
+                </div>
+            )}
+
             {selectedConv.estado !== 'BOT' ? (
                 selectedConv.ventana_abierta ? (
                     <ChatInput inboxId={selectedConv.inbox_id} disabled={false} />
                 ) : (
-                    <div className={`${selectedConv.gestion_celular ? 'bg-emerald-50/95 border-emerald-200 text-emerald-700' : 'bg-amber-50/95 border-amber-200 text-amber-700'} backdrop-blur-sm px-4 py-3 text-center border-t z-10 flex-shrink-0`}>
-                        <div className="flex items-center justify-center gap-2">
-                            {selectedConv.gestion_celular ? (
-                                <>
-                                    <Smartphone size={16} className="text-emerald-600 flex-shrink-0" />
-                                    <p className="text-sm font-medium">
-                                        Gestión confirmada desde el celular corporativo.
-                                    </p>
-                                </>
-                            ) : (
-                                <>
-                                    <AlertCircle size={16} className="text-amber-600 flex-shrink-0" />
-                                    <p className="text-sm font-medium">
-                                        ⚠️ La ventana de 24h ha expirado. Contacta al cliente desde tu celular corporativo.
-                                    </p>
-                                </>
-                            )}
+                    <div className="bg-amber-50/95 backdrop-blur-sm px-4 py-3 text-center border-t border-amber-200 z-10 flex-shrink-0">
+                        <div className="flex items-center justify-center gap-2 text-amber-700">
+                            <AlertCircle size={16} className="text-amber-600 flex-shrink-0" />
+                            <p className="text-sm font-medium">
+                                ⚠️ La ventana de 24h ha expirado. Contacta al cliente desde tu celular corporativo.
+                            </p>
                         </div>
                     </div>
                 )
