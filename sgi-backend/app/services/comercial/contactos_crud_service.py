@@ -5,7 +5,8 @@ Responsabilidad única: crear, leer, actualizar, eliminar y listar contactos.
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, or_, case, update, and_
-from app.models.comercial import ClienteContacto, Cliente, CasoLlamada, RegistroImportacion, LoteContactos
+from app.models.comercial import ClienteContacto, Cliente, CasoLlamada
+from app.models.comercial_base import BaseContacto
 from app.models.comercial_catalogos import EstadoContacto
 from app.models.historial_llamadas import HistorialLlamada
 
@@ -128,25 +129,12 @@ class ContactosCrudService:
         # 2. Query Principal
         offset = (page - 1) * page_size
         
-        # Subquery para obtener razon_social de importaciones sin multiplicar filas
-        import_rs_subq = (
-            select(RegistroImportacion.razon_social)
-            .where(RegistroImportacion.ruc == ClienteContacto.ruc)
-            .limit(1)
-            .correlate(ClienteContacto)
-            .scalar_subquery()
-            .label("import_rs")
-        )
-        
         stmt = select(
             ClienteContacto, 
             Cliente.razon_social.label("cliente_rs"), 
-            import_rs_subq,
-            EstadoContacto.nombre.label("estado_nombre"),
-            LoteContactos.nombre.label("lote_nombre")
+            EstadoContacto.nombre.label("estado_nombre")
         ).outerjoin(Cliente, ClienteContacto.ruc == Cliente.ruc) \
          .outerjoin(EstadoContacto, ClienteContacto.estado_id == EstadoContacto.id) \
-         .outerjoin(LoteContactos, ClienteContacto.lote_id == LoteContactos.id) \
          .where(ClienteContacto.is_active == True)
 
         if search:
@@ -171,7 +159,7 @@ class ContactosCrudService:
         data_list = []
         for row in rows:
             cc = row[0]
-            razon_social = row[1] or row[2] or "Sin razón social"
+            razon_social = row[1] or "Sin razón social"
             
             # TODO: Add logic to fetch latest call if necessary, 
             # for now returning defaults for removed columns
@@ -184,8 +172,8 @@ class ContactosCrudService:
                 "correo": cc.correo,
                 "contestado": "N/A",
                 "caso": "N/A",
-                "estado": row[3], # estado_nombre
-                "lote_nombre": row[4],  # lote_nombre
+                "estado": row[2], # estado_nombre
+                "lote_nombre": "N/A",  # removido
                 "asignado_a": "N/A",
                 "fecha_asignacion": cc.created_at,
                 "created_at": cc.created_at
@@ -235,56 +223,43 @@ class ContactosCrudService:
             return query
 
         # 1. Total Repartido (ASIGNADO + GESTIONADO)
-        stmt_repartido = select(func.count()).select_from(ClienteContacto).join(
-            EstadoContacto, ClienteContacto.estado_id == EstadoContacto.id
-        ).where(
-            EstadoContacto.nombre.in_(['ASIGNADO', 'GESTIONADO']),
-            ClienteContacto.is_active == True
+        stmt_repartido = select(func.count(BaseContacto.id)).select_from(BaseContacto).where(
+            BaseContacto.estado.in_(['ASIGNADO', 'GESTIONADO'])
         )
-        stmt_repartido = aplicar_filtro_fecha(stmt_repartido, ClienteContacto.created_at)
+        stmt_repartido = aplicar_filtro_fecha(stmt_repartido, BaseContacto.created_at)
         total_repartido = (await self.db.execute(stmt_repartido)).scalar() or 0
         
         # Para las siguientes métricas, usamos FECHA DE LLAMADA de la tabla HistorialLlamada
         
-        # 2. Total Gestionados (Denominador estadístico general)
-        stmt_gestionados = select(func.count(func.distinct(HistorialLlamada.contacto_id))).select_from(HistorialLlamada).join(
-            CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id
+        # 2. Total Gestionados (Denominador contactabilidad: Contactos únicos llamados en estado GESTIONADO)
+        stmt_gestionados = select(func.count(func.distinct(HistorialLlamada.base_id))).select_from(HistorialLlamada).join(
+            BaseContacto, HistorialLlamada.base_id == BaseContacto.id
         ).where(
-            CasoLlamada.contestado == True
+            BaseContacto.estado == 'GESTIONADO'
         )
         stmt_gestionados = aplicar_filtro_fecha(stmt_gestionados, HistorialLlamada.created_at)
         total_gestionados = (await self.db.execute(stmt_gestionados)).scalar() or 0
-
-        # [MODIFICADO] 2b. Total Gestionables (Denominador para Tasa de Contactabilidad)
-        stmt_gestionables = select(func.count(func.distinct(HistorialLlamada.contacto_id))).select_from(HistorialLlamada).join(
-            CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id
-        ).where(
-            CasoLlamada.gestionable == True
-        )
-        stmt_gestionables = aplicar_filtro_fecha(stmt_gestionables, HistorialLlamada.created_at)
-        total_gestionables = (await self.db.execute(stmt_gestionables)).scalar() or 0
         
-        # 3. Contestados (Numerador contactabilidad)
-        stmt_contestados = select(func.count(func.distinct(HistorialLlamada.contacto_id))).select_from(HistorialLlamada).join(
+        # 3. Contestados (Numerador contactabilidad: Contactos únicos contestados en estado GESTIONADO)
+        stmt_contestados = select(func.count(func.distinct(HistorialLlamada.base_id))).select_from(HistorialLlamada).join(
             CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id
         ).join(
-            EstadoContacto, HistorialLlamada.estado_id == EstadoContacto.id
+            BaseContacto, HistorialLlamada.base_id == BaseContacto.id
         ).where(
-            EstadoContacto.nombre == 'GESTIONADO',
+            BaseContacto.estado == 'GESTIONADO',
             CasoLlamada.contestado == True
         )
         stmt_contestados = aplicar_filtro_fecha(stmt_contestados, HistorialLlamada.created_at)
         total_contestados = (await self.db.execute(stmt_contestados)).scalar() or 0
         
-        # 4. Positivos (Numerador eficiencia)
-        casos_positivos = ['Contestó - Interesado', 'Contestó - Solicita cotización']
-        stmt_positivos = select(func.count(func.distinct(HistorialLlamada.contacto_id))).select_from(HistorialLlamada).join(
+        # 4. Positivos (Numerador eficiencia/éxito: Contactos únicos positivos en estado GESTIONADO)
+        stmt_positivos = select(func.count(func.distinct(HistorialLlamada.base_id))).select_from(HistorialLlamada).join(
             CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id
         ).join(
-            EstadoContacto, HistorialLlamada.estado_id == EstadoContacto.id
+            BaseContacto, HistorialLlamada.base_id == BaseContacto.id
         ).where(
-            EstadoContacto.nombre == 'GESTIONADO',
-            CasoLlamada.nombre.in_(casos_positivos)
+            BaseContacto.estado == 'GESTIONADO',
+            CasoLlamada.gestionable == True
         )
         stmt_positivos = aplicar_filtro_fecha(stmt_positivos, HistorialLlamada.created_at)
         total_positivos = (await self.db.execute(stmt_positivos)).scalar() or 0
@@ -296,9 +271,9 @@ class ContactosCrudService:
         ).select_from(HistorialLlamada).join(
             CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id
         ).join(
-            EstadoContacto, HistorialLlamada.estado_id == EstadoContacto.id
+            BaseContacto, HistorialLlamada.base_id == BaseContacto.id
         ).where(
-            EstadoContacto.nombre == 'GESTIONADO',
+            BaseContacto.estado == 'GESTIONADO',
             CasoLlamada.nombre.isnot(None)
         ).group_by(CasoLlamada.nombre)
         
@@ -308,8 +283,8 @@ class ContactosCrudService:
         casos_distribucion = [{"name": row[0], "value": row[1]} for row in casos_result.all()]
         
         # Calculos
-        # Tasa Contactabilidad = Contestados / Gestionables (antes Gestionados)
-        tasa_contactabilidad = (total_contestados / total_gestionables * 100) if total_gestionables > 0 else 0
+        # Tasa Contactabilidad = Contestados / Gestionados (Llamados)
+        tasa_contactabilidad = (total_contestados / total_gestionados * 100) if total_gestionados > 0 else 0
         
         # Tasa Éxito = Positivos / Contestados
         tasa_positivos = (total_positivos / total_contestados * 100) if total_contestados > 0 else 0

@@ -9,7 +9,9 @@ from app.models.comercial_catalogos import EstadoCliente, OrigenCliente, MedioGe
 from app.models.cliente_historial import ClienteHistorial
 from app.models.cliente_gestion import ClienteGestion
 from app.models.historial_llamadas import HistorialLlamada
+from app.models.comercial_base import BaseContacto
 from app.models.comercial_inbox import Inbox
+from app.models.chat_message import ChatMessage
 from app.models.administrativo import Empleado
 from app.models.seguridad import Usuario
 from datetime import datetime, timedelta, date
@@ -118,29 +120,31 @@ class ClientesService:
             .scalar_subquery()
         )
 
-        # Llamadas de base (historial_llamadas vía contacto → RUC)
+        # Llamadas de base (historial_llamadas vía BaseContacto → RUC del comercial asignado)
         subq_ll_comentario = (
             select(HistorialLlamada.comentario)
-            .join(ClienteContacto, HistorialLlamada.contacto_id == ClienteContacto.id)
+            .join(BaseContacto, HistorialLlamada.base_id == BaseContacto.id)
             .where(
-                ClienteContacto.ruc == Cliente.ruc,
+                BaseContacto.ruc == Cliente.ruc,
+                HistorialLlamada.comercial_id == Cliente.comercial_encargado_id,
                 HistorialLlamada.caso_id.isnot(None),
                 HistorialLlamada.comentario.isnot(None),
             )
-            .order_by(func.coalesce(HistorialLlamada.updated_at, HistorialLlamada.created_at).desc())
+            .order_by(HistorialLlamada.created_at.desc())
             .limit(1)
             .correlate(Cliente)
             .scalar_subquery()
         )
         subq_ll_fecha = (
-            select(func.coalesce(HistorialLlamada.updated_at, HistorialLlamada.created_at))
-            .join(ClienteContacto, HistorialLlamada.contacto_id == ClienteContacto.id)
+            select(HistorialLlamada.created_at)
+            .join(BaseContacto, HistorialLlamada.base_id == BaseContacto.id)
             .where(
-                ClienteContacto.ruc == Cliente.ruc,
+                BaseContacto.ruc == Cliente.ruc,
+                HistorialLlamada.comercial_id == Cliente.comercial_encargado_id,
                 HistorialLlamada.caso_id.isnot(None),
                 HistorialLlamada.comentario.isnot(None),
             )
-            .order_by(func.coalesce(HistorialLlamada.updated_at, HistorialLlamada.created_at).desc())
+            .order_by(HistorialLlamada.created_at.desc())
             .limit(1)
             .correlate(Cliente)
             .scalar_subquery()
@@ -385,11 +389,37 @@ class ClientesService:
         """Crea un nuevo cliente y registra el evento inicial en el historial."""
         try:
             if cliente.ruc:
-                existing = await self.db.execute(
-                    select(Cliente).where(Cliente.ruc == cliente.ruc, Cliente.is_active == True)
+                stmt_existing = (
+                    select(Cliente, Usuario)
+                    .outerjoin(Usuario, Cliente.comercial_encargado_id == Usuario.id)
+                    .where(Cliente.ruc == cliente.ruc, Cliente.is_active == True)
                 )
-                if existing.scalar():
-                    raise HTTPException(status_code=400, detail="Ya existe un cliente con ese RUC")
+                res_existing = await self.db.execute(stmt_existing)
+                row_existing = res_existing.first()
+                if row_existing:
+                    db_cliente, db_comercial = row_existing
+                    if db_comercial:
+                        # Obtener el nombre del empleado asociado al usuario
+                        stmt_emp = select(Empleado).where(Empleado.id == db_comercial.empleado_id)
+                        res_emp = await self.db.execute(stmt_emp)
+                        emp = res_emp.scalar()
+                        nombre_comercial = f"{emp.nombres} {emp.apellido_paterno}" if emp else db_comercial.correo_corp
+                        
+                        if db_comercial.id != comercial_id:
+                            raise HTTPException(
+                                status_code=400,
+                                detail=f"Este cliente ya está registrado en la cartera de {nombre_comercial}. Por favor, coordina con tu supervisor para solicitar la reasignación."
+                            )
+                        else:
+                            raise HTTPException(
+                                status_code=400,
+                                detail="Este cliente ya está registrado en tu cartera. Por favor, usa la opción 'Vincular con Cliente' para asociar este chat."
+                            )
+                    else:
+                        raise HTTPException(
+                            status_code=400,
+                            detail="Este cliente ya existe en el sistema sin un asesor asignado. Por favor, usa la opción 'Vincular con Cliente' para asociar este chat."
+                        )
 
             # Si no se especifica estado, usar PROSPECTO
             estado_id = cliente.estado_id
@@ -426,6 +456,9 @@ class ClientesService:
             await self.db.commit()
             await self.db.refresh(nuevo_cliente)
             return {"success": 1, "message": "Cliente creado exitosamente", "id": nuevo_cliente.id}
+        except HTTPException as he:
+            await self.db.rollback()
+            raise he
         except Exception as e:
             await self.db.rollback()
             raise HTTPException(status_code=400, detail=f"Error al crear cliente: {str(e)}")
@@ -721,6 +754,7 @@ class ClientesService:
             select(
                 Cliente.id, Cliente.ruc, Cliente.razon_social, Cliente.estado_id,
                 Cliente.origen_id, Cliente.created_at,
+                Cliente.comercial_encargado_id,
                 OrigenCliente.nombre.label("origen_nombre"),
                 EstadoCliente.nombre.label("estado_actual"),
             )
@@ -766,22 +800,22 @@ class ClientesService:
 
         eventos: list[dict] = []
 
-        # 3. Fuente: Llamadas de base (historial_llamadas vía RUC)
+        # 3. Fuente: Llamadas de base (historial_llamadas vía RUC del comercial asignado)
         if cli.ruc:
             stmt_llamadas = (
                 select(
-                    HistorialLlamada.updated_at,
-                    HistorialLlamada.created_at.label("hl_created"),
+                    HistorialLlamada.created_at,
                     HistorialLlamada.comentario,
                     CasoLlamada.nombre.label("caso_nombre"),
-                    ClienteContacto.telefono.label("contacto_telefono"),
-                    ClienteContacto.nombre.label("contacto_nombre"),
+                    BaseContacto.telefono.label("contacto_telefono"),
+                    BaseContacto.nombre.label("contacto_nombre"),
                 )
-                .join(ClienteContacto, HistorialLlamada.contacto_id == ClienteContacto.id)
+                .join(BaseContacto, HistorialLlamada.base_id == BaseContacto.id)
                 .outerjoin(CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id)
                 .where(
                     and_(
-                        ClienteContacto.ruc == cli.ruc,
+                        BaseContacto.ruc == cli.ruc,
+                        HistorialLlamada.comercial_id == cli.comercial_encargado_id,
                         HistorialLlamada.caso_id.isnot(None),  # solo gestionados
                     )
                 )
@@ -789,7 +823,7 @@ class ClientesService:
             )
             result_ll = await self.db.execute(stmt_llamadas)
             for row in result_ll.all():
-                fecha = row.updated_at or row.hl_created
+                fecha = row.created_at
                 eventos.append({
                     "fecha": fecha,
                     "accion": "Llamada",
@@ -839,16 +873,26 @@ class ClientesService:
             telefonos = [r.telefono for r in result_tel.all() if r.telefono]
 
             if telefonos:
+                # Subquery to get the first message content
+                subq_first_msg = (
+                    select(ChatMessage.contenido)
+                    .where(ChatMessage.inbox_id == Inbox.id)
+                    .order_by(ChatMessage.created_at.asc())
+                    .limit(1)
+                    .correlate(Inbox)
+                    .scalar_subquery()
+                )
+
                 # Buscar inbox entries que coincidan con esos teléfonos
                 stmt_inbox = select(
                     Inbox.created_at,
-                    Inbox.mensaje_inicial,
+                    subq_first_msg.label("mensaje_inicial"),
                     Inbox.nombre_whatsapp,
-                    Inbox.estado,
+                    Inbox.ultimo_estado.label("estado"),
                 ).where(
                     and_(
                         Inbox.telefono.in_(telefonos),
-                        Inbox.estado == 'CERRADO',
+                        Inbox.ultimo_estado == 'CERRADO',
                     )
                 ).order_by(Inbox.created_at.asc())
                 result_inbox = await self.db.execute(stmt_inbox)

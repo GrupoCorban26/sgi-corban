@@ -91,7 +91,7 @@ class AuditoriaSeguridad(Base):
     detalle = Column(String(500)) # Ej: "Se asignó el rol SUPER_ADMIN"
     realizado_por = Column(Integer, ForeignKey("seg.usuarios.id"), nullable=False)
     ip_address = Column(String(45))
-    fecha_evento = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    fecha_evento = Column(DateTime(timezone=True), server_default=func.now(), default=func.now(), nullable=False)
 
     usuario_afectado = relationship("Usuario", foreign_keys=[usuario_afectado_id])
     usuario_responsable = relationship("Usuario", foreign_keys=[realizado_por])

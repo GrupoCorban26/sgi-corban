@@ -4,37 +4,7 @@ from sqlalchemy.sql import func
 from .base import Base
 
 
-class LoteContactos(Base):
-    __tablename__ = "lotes_contactos"
-    __table_args__ = {"schema": "comercial"}
 
-    id = Column(Integer, primary_key=True, index=True)
-    nombre = Column(String(150), nullable=False)
-    is_active = Column(Boolean, default=True, nullable=False)
-    created_by = Column(Integer, ForeignKey("seg.usuarios.id"))
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-
-    # Relationships
-    usuario_creador = relationship("app.models.seguridad.Usuario", foreign_keys=[created_by])
-
-
-class RegistroImportacion(Base):
-    __tablename__ = "registro_importaciones"
-    __table_args__ = {"schema": "comercial"}
-
-    id = Column(Integer, primary_key=True, index=True)
-    ruc = Column(String(11), index=True)
-    razon_social = Column(String(250))
-    sector = Column(String(500))
-    score = Column(Numeric(5, 1))
-    agentes_distintos = Column(Integer, default=0)
-    total_embarques = Column(Integer)
-    meses_activos = Column(Integer)
-    fob_promedio = Column(Numeric(15, 2))
-    via_predominante = Column(String(50))
-    paises_principales = Column(String(500))
-    ultima_importacion = Column(String(10))
-    dias_desde_ultima = Column(Integer)
 
 
 class CasoLlamada(Base):
@@ -75,6 +45,7 @@ class Cliente(Base):
     origen = relationship("app.models.comercial_catalogos.OrigenCliente")
     usuario_creador = relationship("app.models.seguridad.Usuario", foreign_keys=[created_by])
     usuario_modificador = relationship("app.models.seguridad.Usuario", foreign_keys=[updated_by])
+    contactos = relationship("ClienteContacto", back_populates="cliente")
 
 
 class ClienteContacto(Base):
@@ -82,6 +53,7 @@ class ClienteContacto(Base):
     __table_args__ = {"schema": "comercial"}
 
     id = Column(Integer, primary_key=True, index=True)
+    cliente_id = Column(Integer, ForeignKey("comercial.clientes.id"), nullable=True, index=True)
     ruc = Column(String(11), nullable=False, index=True)
     nombre = Column(String(150))
     cargo = Column(String(100))
@@ -89,7 +61,7 @@ class ClienteContacto(Base):
     correo = Column(String(100))
     origen = Column(String(30))
     estado_id = Column(Integer, ForeignKey("comercial.estado_contacto.id"), index=True)
-    lote_id = Column(Integer, ForeignKey("comercial.lotes_contactos.id"), index=True)
+    lote_id = Column(Integer, index=True)
     is_principal = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -97,7 +69,7 @@ class ClienteContacto(Base):
 
     # Relationships
     estado = relationship("app.models.comercial_catalogos.EstadoContacto")
-    lote = relationship("LoteContactos")
+    cliente = relationship("Cliente", back_populates="contactos")
 
 
 class Cita(Base):

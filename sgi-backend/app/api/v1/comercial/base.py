@@ -1,31 +1,57 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List, Optional
 from app.database.db_connection import get_db
-from app.core.security import get_current_active_auth
-from app.services.comercial.base_comercial_service import BaseComercialService
+from app.core.security import get_current_user_id, get_current_active_auth
+from app.core.dependencies import require_permission
+from app.services.comercial.lotes_base_service import LotesBaseService
+from app.services.comercial.contactos_asignacion_service import ContactosAsignacionService
 
 router = APIRouter(
     prefix="/base",
     tags=["Base Comercial"]
 )
 
-@router.get("/")
-async def get_base_comercial(
-    page: int = Query(1, gt=0),
-    page_size: int = Query(20, gt=0, le=100),
-    search: str = Query(None),
+@router.post("/cargar", dependencies=[Depends(require_permission("contactos.crear"))])
+async def cargar_base(
+    empresa: Optional[str] = Query(None, description="Filtro opcional por empresa (CORBAN | EBL)"),
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(get_current_active_auth)
+    user_id: int = Depends(get_current_user_id)
 ):
-    """Retorna el merge entre registro_importaciones y cliente_contactos con stats."""
-    service = BaseComercialService(db)
-    return await service.get_base_con_stats(page, page_size, search)
+    """El comercial extrae 50 contactos DISPONIBLES."""
+    service = LotesBaseService(db)
+    return await service.cargar_base(user_id, empresa)
 
-@router.get("/stats")
-async def get_base_stats(
+
+@router.get("/mis-contactos", dependencies=[Depends(require_permission("contactos.listar"))])
+async def get_mis_contactos_asignados(
     db: AsyncSession = Depends(get_db),
-    _: dict = Depends(get_current_active_auth)
+    user_id: int = Depends(get_current_user_id)
 ):
-    """Estadísticas de la base comercial."""
-    service = BaseComercialService(db)
-    return await service.get_stats()
+    """Obtiene los contactos asignados al comercial actual."""
+    service = ContactosAsignacionService(db)
+    return await service.get_mis_contactos_asignados(user_id)
+
+
+@router.post("/{base_id}/feedback", dependencies=[Depends(require_permission("contactos.editar"))])
+async def actualizar_feedback(
+    base_id: int,
+    caso_id: int = Query(..., description="ID del caso de llamada"),
+    comentario: str = Query(..., min_length=1, description="Comentario de la llamada"),
+    nuevo_intento: bool = Query(False, description="True para registrar un nuevo intento de llamada"),
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """Actualiza el feedback de la llamada o registra un nuevo intento."""
+    service = ContactosAsignacionService(db)
+    return await service.actualizar_feedback(base_id, caso_id, comentario, user_id, nuevo_intento)
+
+
+@router.post("/enviar-feedback", dependencies=[Depends(require_permission("contactos.editar"))])
+async def enviar_feedback_lote(
+    db: AsyncSession = Depends(get_db),
+    user_id: int = Depends(get_current_user_id)
+):
+    """Finaliza el lote de gestión actual."""
+    service = ContactosAsignacionService(db)
+    return await service.enviar_feedback_lote(user_id)

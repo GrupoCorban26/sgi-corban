@@ -152,13 +152,13 @@ export default function FeedbackRow({
       </td>
 
       {/* Caso */}
-      <td className="px-3 py-2">
+      <td className="py-2">
         {isLocked ? (
           <span className="inline-flex items-center px-3 py-1.5 text-xs font-medium rounded-xl bg-indigo-100 text-indigo-700 max-w-[180px] truncate">
             {contacto.caso_nombre || '—'}
           </span>
         ) : fb.contesto === null ? (
-          <span className="text-xs text-gray-400 italic px-2">Primero contestó</span>
+          <span className="text-xs text-gray-400 italic">Primero contestó</span>
         ) : (
           <select
             value={fb.caso_id}

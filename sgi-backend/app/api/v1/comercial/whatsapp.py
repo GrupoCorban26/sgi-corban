@@ -291,10 +291,10 @@ async def _process_webhook(payload: WhatsAppWebhookPayload, slug: str | None):
                                 result_contacto = await db.execute(query_contacto)
                                 contacto_cartera = result_contacto.scalars().first()
 
-                                if contacto_cartera and contacto_cartera.ruc:
+                                if contacto_cartera and contacto_cartera.cliente_id:
                                     query_cliente = select(Cliente).where(
                                         and_(
-                                            Cliente.ruc == contacto_cartera.ruc,
+                                            Cliente.id == contacto_cartera.cliente_id,
                                             Cliente.is_active == True
                                         )
                                     )

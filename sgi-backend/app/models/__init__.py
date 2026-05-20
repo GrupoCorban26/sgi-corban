@@ -17,7 +17,7 @@ from .comercial_catalogos import (
     EstadoContacto, EstadoCita, MotivoDescarteInbox
 )
 from .comercial import (
-    Cliente, ClienteContacto, CasoLlamada, RegistroImportacion, Cita
+    Cliente, ClienteContacto, CasoLlamada, Cita
 )
 from .comercial_inbox import Inbox
 from .historial_inbox import HistorialInbox
