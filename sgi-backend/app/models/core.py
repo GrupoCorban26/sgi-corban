@@ -58,7 +58,6 @@ class ConfiguracionHistorial(Base):
     valor_nuevo = Column(String(500))
     motivo_cambio = Column(String(200))
     modificado_por = Column(Integer, ForeignKey("seg.usuarios.id"))
-    fecha_cambio = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    fecha_cambio = Column(DateTime(timezone=True), server_default=func.now(), default=func.now(), nullable=False)
     
     configuracion = relationship("Configuracion", backref="historial_cambios")
-

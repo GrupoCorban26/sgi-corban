@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import calendar
 
 from app.models.comercial import Cliente
-from app.models.comercial import ClienteContacto, LoteContactos
+from app.models.comercial import ClienteContacto
 from app.models.comercial_catalogos import EstadoCliente
 from app.models.comercial_inbox import Inbox
 from app.models.lead_web import LeadWeb
@@ -47,25 +47,15 @@ class ReportesOperativosService:
         if comercial_id:
             filters.append(Cliente.comercial_encargado_id == comercial_id)
 
-        # Subquery para obtener el nombre del lote del contacto principal del cliente
-        lote_subq = (
-            select(LoteContactos.nombre)
-            .select_from(ClienteContacto)
-            .join(LoteContactos, ClienteContacto.lote_id == LoteContactos.id)
-            .where(ClienteContacto.ruc == Cliente.ruc, ClienteContacto.is_active == True)
-            .limit(1)
-            .correlate(Cliente)
-            .scalar_subquery()
-            .label('lote_nombre')
-        )
+        # Subquery para lote desactivada temporalmente
+        # lote_subq = ...
 
         # Consulta principal
         query = select(
             Cliente,
             EstadoCliente.nombre.label('estado_nombre'),
             Usuario.correo_corp,
-            Empleado.nombres, Empleado.apellido_paterno,
-            lote_subq
+            Empleado.nombres, Empleado.apellido_paterno
         ).outerjoin(
             EstadoCliente, Cliente.estado_id == EstadoCliente.id
         ).outerjoin(
@@ -104,7 +94,7 @@ class ReportesOperativosService:
                 estado=row.estado_nombre,
                 fecha_ingreso=cliente.created_at,
                 comercial_nombre=comercial_nombre,
-                lote_nombre=row.lote_nombre
+                lote_nombre="N/A"
             ))
 
         porc_contactabilidad = (leads_contactados / total_leads * 100) if total_leads > 0 else 0.0

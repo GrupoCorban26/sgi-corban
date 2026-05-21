@@ -7,7 +7,8 @@ import pandas as pd
 from fastapi.responses import StreamingResponse
 
 from app.models.historial_llamadas import HistorialLlamada
-from app.models.comercial import ClienteContacto, RegistroImportacion, CasoLlamada
+from app.models.comercial import ClienteContacto, CasoLlamada
+from app.models.comercial_base import BaseContacto
 from app.models.comercial_inbox import Inbox
 from app.models.seguridad import Usuario
 from app.models.administrativo import Empleado
@@ -25,17 +26,16 @@ class ReportesLlamadasService:
         stmt = (
             select(
                 HistorialLlamada.id,
-                ClienteContacto.ruc.label("ruc"),
-                RegistroImportacion.razon_social,
-                ClienteContacto.telefono,
+                BaseContacto.ruc.label("ruc"),
+                BaseContacto.razon_social,
+                BaseContacto.telefono,
                 CasoLlamada.contestado.label("contesto"),
                 CasoLlamada.nombre.label("caso_nombre"),
                 HistorialLlamada.comentario,
                 func.concat(Empleado.nombres, ' ', Empleado.apellido_paterno).label("comercial_nombre"),
                 HistorialLlamada.created_at.label("fecha_llamada")
             )
-            .join(ClienteContacto, HistorialLlamada.contacto_id == ClienteContacto.id)
-            .outerjoin(RegistroImportacion, ClienteContacto.ruc == RegistroImportacion.ruc)
+            .join(BaseContacto, HistorialLlamada.base_id == BaseContacto.id)
             .join(CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id)
             .join(Usuario, HistorialLlamada.comercial_id == Usuario.id)
             .join(Empleado, Usuario.empleado_id == Empleado.id)
@@ -89,17 +89,16 @@ class ReportesLlamadasService:
         # Mismo query pero sin paginación
         stmt = (
             select(
-                ClienteContacto.ruc.label("RUC"),
-                RegistroImportacion.razon_social.label("Razón Social"),
-                ClienteContacto.telefono.label("Teléfono"),
+                BaseContacto.ruc.label("RUC"),
+                BaseContacto.razon_social.label("Razón Social"),
+                BaseContacto.telefono.label("Teléfono"),
                 CasoLlamada.contestado.label("Contestó"),
                 CasoLlamada.nombre.label("Caso"),
                 HistorialLlamada.comentario.label("Comentario"),
                 func.concat(Empleado.nombres, ' ', Empleado.apellido_paterno).label("Comercial"),
                 HistorialLlamada.created_at.label("Fecha y Hora")
             )
-            .join(ClienteContacto, HistorialLlamada.contacto_id == ClienteContacto.id)
-            .outerjoin(RegistroImportacion, ClienteContacto.ruc == RegistroImportacion.ruc)
+            .join(BaseContacto, HistorialLlamada.base_id == BaseContacto.id)
             .join(CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id)
             .join(Usuario, HistorialLlamada.comercial_id == Usuario.id)
             .join(Empleado, Usuario.empleado_id == Empleado.id)

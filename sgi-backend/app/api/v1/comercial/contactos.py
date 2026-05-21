@@ -13,18 +13,7 @@ router = APIRouter(
 )
 
 
-@router.post("/upload", dependencies=[Depends(require_permission("importaciones.cargar"))])
-async def upload_contactos(
-    file: UploadFile = File(...),
-    db: AsyncSession = Depends(get_db),
-    _: dict = Depends(get_current_active_auth)
-):
-    """Carga masiva de contactos desde Excel."""
-    if not file.filename.endswith(('.xls', '.xlsx')):
-        raise HTTPException(status_code=400, detail="File must be an Excel file")
-    
-    service = ContactosService(db)
-    return await service.process_excel_contactos(file)
+
 
 
 @router.get("/ruc/{ruc}", response_model=List[ContactoResponse], dependencies=[Depends(require_permission("contactos.listar"))])

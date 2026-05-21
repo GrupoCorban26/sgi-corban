@@ -16,8 +16,8 @@ class Inbox(Base):
     tipo_interes = Column(String(30), nullable=True)  # ASESORIA, COTIZACION, CARGA_LISTA
     tipo_asignacion = Column(String(20), nullable=True)
 
-    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), default=func.now(), onupdate=func.now(), nullable=False)
 
     # Bot de origen (multi-bot)
     bot_config_id = Column(Integer, ForeignKey("comercial.whatsapp_bot_config.id"), nullable=True)

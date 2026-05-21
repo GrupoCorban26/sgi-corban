@@ -2,12 +2,11 @@
 
 import { useState } from 'react';
 import {
-  Database, Upload, Loader2, Filter, RefreshCw
+  Database, Upload, Loader2, RefreshCw
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useBaseComercial } from '@/hooks/comercial/useBaseComercial';
 import { ContactoAsignado, CasoLlamada } from '@/types/base-comercial';
-import { MultiSelect } from '@/components/ui/MultiSelect';
 import ModalContactosCliente from '../cartera/components/modal-contactos-cliente';
 import BaseStatsBar from './components/BaseStatsBar';
 import FeedbackRow from './components/FeedbackRow';
@@ -20,7 +19,7 @@ interface FeedbackState {
 
 export default function BaseComercialPage() {
   const {
-    contactos, filtros, casos,
+    contactos, casos,
     isLoading, isLoadingContactos,
     tieneContactosSinGuardar, tieneContactos,
     cargarBase, isCargarBaseLoading,
@@ -28,10 +27,7 @@ export default function BaseComercialPage() {
     refetch
   } = useBaseComercial();
 
-  // Filtro de país
-  const [paisSeleccionado, setPaisSeleccionado] = useState<string[]>([]);
-  const [partidaSeleccionada, setPartidaSeleccionada] = useState<string[]>([]);
-  const [showFiltros, setShowFiltros] = useState(false);
+
 
   // Feedback local para todos los contactos
   const [feedbackLocal, setFeedbackLocal] = useState<{ [key: number]: FeedbackState }>({});
@@ -64,10 +60,7 @@ export default function BaseComercialPage() {
   // Handlers
   const handleCargarBase = async () => {
     try {
-      const result = await cargarBase({
-        paisOrigen: paisSeleccionado.length > 0 ? paisSeleccionado : undefined,
-        partidaArancelaria: partidaSeleccionada.length > 0 ? partidaSeleccionada : undefined
-      });
+      const result = await cargarBase({});
 
       let mensaje = `¡${result.cantidad} contactos cargados!`;
       if (result.contactos_liberados && result.contactos_liberados > 0) {
@@ -83,7 +76,6 @@ export default function BaseComercialPage() {
       }
 
       toast.success(mensaje);
-      setShowFiltros(false);
     } catch (error: unknown) {
       const err = error as { response?: { data?: { detail?: string } } };
       toast.error(err?.response?.data?.detail || 'Error al cargar base');
@@ -127,12 +119,6 @@ export default function BaseComercialPage() {
         </div>
         <div className="flex gap-3">
           <button
-            onClick={() => setShowFiltros(!showFiltros)}
-            className="flex items-center gap-2 px-4 py-2.5 border border-gray-300 rounded-xl text-sm font-medium hover:bg-white transition-colors"
-          >
-            <Filter size={18} /> Filtros
-          </button>
-          <button
             onClick={handleCargarBase}
             disabled={tieneContactosSinGuardar || isCargarBaseLoading}
             className="cursor-pointer flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-400 text-white px-4 py-2.5 rounded-xl text-sm font-medium shadow-md shadow-indigo-200 transition-all disabled:cursor-not-allowed"
@@ -144,34 +130,7 @@ export default function BaseComercialPage() {
         </div>
       </div>
 
-      {/* Filtros Panel */}
-      {showFiltros && (
-        <div className="bg-white border border-gray-200 rounded-xl p-4 shadow-sm">
-          <h3 className="font-semibold text-gray-700 mb-3">Filtrar antes de cargar</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">País de Origen</label>
-              <MultiSelect
-                options={Array.isArray(filtros?.paises) ? filtros.paises.map(p => ({ value: p.pais, label: p.pais, count: p.cantidad })) : []}
-                selectedValues={paisSeleccionado}
-                onChange={setPaisSeleccionado}
-                placeholder="Seleccionar países..."
-                searchPlaceholder="Buscar país..."
-              />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-gray-500 uppercase mb-1 block">Sector</label>
-              <MultiSelect
-                options={filtros.sectores ? filtros.sectores.map((p: any) => ({ value: p.sector, label: p.sector, count: p.cantidad })) : []}
-                selectedValues={partidaSeleccionada}
-                onChange={setPartidaSeleccionada}
-                placeholder="Seleccionar sectores..."
-                searchPlaceholder="Buscar sector..."
-              />
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Stats */}
       {tieneContactos && <BaseStatsBar contactos={contactos} />}

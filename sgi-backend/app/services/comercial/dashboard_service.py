@@ -13,6 +13,7 @@ from app.models.comercial import CasoLlamada, Cliente
 from app.models.cliente_gestion import ClienteGestion
 from app.models.seguridad import Usuario
 from app.models.administrativo import Empleado
+from app.utils.horario_laboral import calcular_segundos_horario_laboral
 
 logger = logging.getLogger(__name__)
 
@@ -155,9 +156,8 @@ class DashboardService:
                 case((Inbox.estado == "DESCARTADO", 1), else_=0)
             ).label("total_descartados"),
             func.sum(
-                case((Inbox.estado.in_(["PENDIENTE", "EN_GESTION"]), 1), else_=0)
+                case((Inbox.estado.in_(["PENDIENTE", "EN_GESTION", "COTIZADO", "SEGUIMIENTO"]), 1), else_=0)
             ).label("total_en_gestion"),
-            literal_column("0").label("avg_tiempo_resp"),
         ).where(
             and_(
                 cast(Inbox.created_at, Date) >= fecha_inicio,
@@ -176,7 +176,21 @@ class DashboardService:
         total_convertidos = row_buzon.total_convertidos or 0
         total_descartados = row_buzon.total_descartados or 0
         total_en_gestion = row_buzon.total_en_gestion or 0
-        avg_tiempo_resp = row_buzon.avg_tiempo_resp or 0
+
+        # Calcular tiempo de respuesta real (en segundos usando horario laboral)
+        tiempos_query = select(Inbox.created_at, Inbox.updated_at).where(
+            and_(
+                cast(Inbox.created_at, Date) >= fecha_inicio,
+                cast(Inbox.created_at, Date) <= fecha_fin,
+                Inbox.estado != "BOT",
+            )
+        )
+        if filtro_ids is not None:
+            tiempos_query = tiempos_query.where(Inbox.asignado_a.in_(filtro_ids))
+
+        result_tiempos = (await self.db.execute(tiempos_query)).all()
+        tiempos_segundos = [calcular_segundos_horario_laboral(r.created_at, r.updated_at) for r in result_tiempos]
+        avg_tiempo_resp = sum(tiempos_segundos) / len(tiempos_segundos) if tiempos_segundos else 0
         pct_conversion = round((total_convertidos / total_leads * 100), 1) if total_leads > 0 else 0
 
         # =============================================
