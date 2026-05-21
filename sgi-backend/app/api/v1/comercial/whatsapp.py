@@ -203,7 +203,7 @@ async def _process_webhook(payload: WhatsAppWebhookPayload, slug: str | None):
 
                             if media_id:
                                 from app.services.comercial.media_service import MediaService
-                                resultado_media = await MediaService.descargar_media(media_id)
+                                resultado_media = await MediaService.descargar_media(media_id, token=wa_token)
                                 if resultado_media:
                                     media_url = resultado_media["ruta_relativa"]
 
@@ -291,10 +291,10 @@ async def _process_webhook(payload: WhatsAppWebhookPayload, slug: str | None):
                                 result_contacto = await db.execute(query_contacto)
                                 contacto_cartera = result_contacto.scalars().first()
 
-                                if contacto_cartera and contacto_cartera.cliente_id:
+                                if contacto_cartera and contacto_cartera.ruc:
                                     query_cliente = select(Cliente).where(
                                         and_(
-                                            Cliente.id == contacto_cartera.cliente_id,
+                                            Cliente.ruc == contacto_cartera.ruc,
                                             Cliente.is_active == True
                                         )
                                     )
