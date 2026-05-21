@@ -276,33 +276,11 @@ async def _scheduler_cotizaciones_abandonadas():
             await asyncio.sleep(60)
 
 
-async def _scheduler_bases_abandonadas():
-    """Loop que ejecuta la liberación de bases abandonadas (1 vez al día)."""
-    logger.info("[SCHEDULER] Tarea de liberación de bases abandonadas iniciada.")
-    from app.services.comercial.contactos_asignacion_service import ContactosAsignacionService
-    
-    while True:
-        try:
-            # Ejecutar a la medianoche PET
-            segundos = await _calcular_segundos_hasta_hora(time(0, 0))
-            await asyncio.sleep(segundos)
-            async with AsyncSessionLocal() as db:
-                svc = ContactosAsignacionService(db)
-                await svc.liberar_contactos_abandonados()
-        except asyncio.CancelledError:
-            logger.info("[SCHEDULER] Tarea de bases abandonadas detenida.")
-            break
-        except Exception as e:
-            logger.error(f"[SCHEDULER] Error liberando bases: {e}", exc_info=True)
-            await asyncio.sleep(3600)
-
-
 async def iniciar_scheduler():
     """Inicia todas las tareas programadas del sistema."""
     logger.info("[SCHEDULER] Iniciando todas las tareas programadas...")
     await asyncio.gather(
         _scheduler_reset_disponibilidad(),
         _scheduler_leads_sin_respuesta(),
-        _scheduler_cotizaciones_abandonadas(),
-        _scheduler_bases_abandonadas()
+        _scheduler_cotizaciones_abandonadas()
     )

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import {
-  CalendarPlus, Phone, Briefcase, MessageSquare,
+  CalendarPlus, Phone, Users, CalendarCheck,
   ArrowRight, Sparkles
 } from 'lucide-react';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
@@ -12,10 +12,10 @@ import RecordatorioLlamadas from '@/components/comercial/RecordatorioLlamadas';
 import UpcomingAppointments from '@/components/comercial/UpcomingAppointments';
 import ModalCita from '@/components/comercial/ModalCita';
 
-interface StatsResumen {
-  llamadas_base: number;
-  gestiones_cartera: number;
-  leads_asignados: number;
+interface QuickStats {
+  clientes_cartera: number;
+  llamadas_pendientes: number;
+  citas_hoy: number;
 }
 
 function getGreeting(): string {
@@ -37,7 +37,7 @@ function getFormattedDate(): string {
 export default function ComercialDashboardContent() {
   const { user } = useCurrentUser();
   const [isCitaOpen, setIsCitaOpen] = useState(false);
-  const [stats, setStats] = useState<StatsResumen>({ llamadas_base: 0, gestiones_cartera: 0, leads_asignados: 0 });
+  const [stats, setStats] = useState<QuickStats>({ clientes_cartera: 0, llamadas_pendientes: 0, citas_hoy: 0 });
 
   useEffect(() => {
     if (user) {
@@ -47,8 +47,15 @@ export default function ComercialDashboardContent() {
 
   const fetchQuickStats = async () => {
     try {
-      const { data } = await api.get<StatsResumen>('/comercial/reportes/stats/resumen');
-      setStats(data);
+      const [statsRes, remindersRes] = await Promise.all([
+        api.get('/clientes/stats').catch(() => ({ data: { total_clientes: 0 } })),
+        api.get('/clientes/recordatorios', { params: { days: 0 } }).catch(() => ({ data: [] })),
+      ]);
+      setStats({
+        clientes_cartera: statsRes.data?.total_clientes || 0,
+        llamadas_pendientes: remindersRes.data?.length || 0,
+        citas_hoy: 0,
+      });
     } catch {
       // Silent fail
     }
@@ -92,23 +99,24 @@ export default function ComercialDashboardContent() {
       {/* Quick Stats */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <StatCard
-          icon={<Phone size={22} />}
-          label="Llamadas Base"
-          value={stats.llamadas_base}
+          icon={<Users size={22} />}
+          label="Clientes en Cartera"
+          value={stats.clientes_cartera}
           gradient="from-blue-500 to-cyan-500"
           shadowColor="shadow-blue-200/60"
         />
         <StatCard
-          icon={<Briefcase size={22} />}
-          label="Gestión Cartera"
-          value={stats.gestiones_cartera}
-          gradient="from-emerald-500 to-teal-500"
-          shadowColor="shadow-emerald-200/60"
+          icon={<Phone size={22} />}
+          label="Llamadas Pendientes Hoy"
+          value={stats.llamadas_pendientes}
+          gradient="from-amber-500 to-orange-500"
+          shadowColor="shadow-amber-200/60"
+          highlight={stats.llamadas_pendientes > 0}
         />
         <StatCard
-          icon={<MessageSquare size={22} />}
-          label="Leads"
-          value={stats.leads_asignados}
+          icon={<CalendarCheck size={22} />}
+          label="Citas Programadas"
+          value={stats.citas_hoy}
           gradient="from-violet-500 to-purple-500"
           shadowColor="shadow-violet-200/60"
         />
@@ -132,11 +140,12 @@ interface StatCardProps {
   value: number;
   gradient: string;
   shadowColor: string;
+  highlight?: boolean;
 }
 
-function StatCard({ icon, label, value, gradient, shadowColor }: StatCardProps) {
+function StatCard({ icon, label, value, gradient, shadowColor, highlight }: StatCardProps) {
   return (
-    <div className="group relative bg-white rounded-2xl border border-gray-100 p-5 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5">
+    <div className={`group relative bg-white rounded-2xl border border-gray-100 p-5 transition-all duration-300 hover:shadow-lg hover:-translate-y-0.5 ${highlight ? 'ring-2 ring-amber-200' : ''}`}>
       <div className="flex items-center gap-4">
         <div className={`p-3 rounded-xl bg-gradient-to-br ${gradient} text-white shadow-lg ${shadowColor} transition-transform duration-300 group-hover:scale-110`}>
           {icon}
@@ -146,6 +155,14 @@ function StatCard({ icon, label, value, gradient, shadowColor }: StatCardProps) 
           <p className="text-2xl font-bold text-gray-900 tabular-nums">{value}</p>
         </div>
       </div>
+      {highlight && (
+        <div className="absolute top-3 right-3">
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+          </span>
+        </div>
+      )}
     </div>
   );
 }

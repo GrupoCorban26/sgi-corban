@@ -308,7 +308,7 @@ class InboxService:
                         cliente.origen_id = origen_res.scalar()
                         
             # Crear ClienteContacto principal con el teléfono del lead
-            if cliente and lead.telefono:
+            if cliente and cliente.ruc and lead.telefono:
                 phone = lead.telefono.replace(" ", "").replace("+", "")
                 if phone.startswith("51"):
                     phone = phone[2:]
@@ -316,7 +316,7 @@ class InboxService:
                 existing_contact = await self.db.execute(
                     select(ClienteContacto).where(
                         and_(
-                            ClienteContacto.cliente_id == cliente.id,
+                            ClienteContacto.ruc == cliente.ruc,
                             ClienteContacto.telefono.like(f"%{phone}%"),
                             ClienteContacto.is_active == True
                         )
@@ -324,10 +324,10 @@ class InboxService:
                 )
                 contacto_existente = existing_contact.scalars().first()
                 
-                # Desmarcar temporalmente cualquier otro como principal para este cliente si vamos a asentar este
+                # Desmarcar temporalmente cualquier otro como principal para este ruc si vamos a asentar este
                 await self.db.execute(
                     update(ClienteContacto).where(
-                        ClienteContacto.cliente_id == cliente.id
+                        ClienteContacto.ruc == cliente.ruc
                     ).values(is_principal=False)
                 )
                 
@@ -338,7 +338,6 @@ class InboxService:
                     estado_contacto_id = estado_contacto_result.scalar()
 
                     nuevo_contacto = ClienteContacto(
-                        cliente_id=cliente.id,
                         ruc=cliente.ruc,
                         nombre=lead.nombre_whatsapp or "Contacto WhatsApp",
                         telefono=phone,

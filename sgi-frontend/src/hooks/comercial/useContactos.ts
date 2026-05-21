@@ -54,7 +54,9 @@ export const useContactos = () => {
         await contactosService.delete(id);
     };
 
-
+    const upload = async (file: File) => {
+        return await contactosService.upload(file);
+    };
 
     const assignBatch = async () => {
         setLoading(true);
@@ -76,6 +78,7 @@ export const useContactos = () => {
         create,
         update,
         remove,
+        upload,
         assignBatch,
         getKpisGestion: contactosService.getKpisGestion
     };

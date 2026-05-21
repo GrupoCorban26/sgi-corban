@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Plus, Save, Loader2, Phone, Mail, User, Briefcase, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { ModalBase, ModalHeader, ModalFooter, useModalContext } from '@/components/ui/modal';
-import { useQueryClient } from '@tanstack/react-query';
 
 import api from '@/lib/axios';
 
@@ -50,7 +49,6 @@ const maskPhone = (phone: string): string => {
 // ============================================
 function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
     const { handleClose } = useModalContext();
-    const queryClient = useQueryClient();
 
     const [contactos, setContactos] = useState<Contacto[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -164,9 +162,6 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
                 delete newRows[contacto.id];
                 return newRows;
             });
-            // Invalidar queries de React Query en lugar de hacer reload completo
-            queryClient.invalidateQueries({ queryKey: ['mis-contactos'] });
-            queryClient.invalidateQueries({ queryKey: ['clientes'] });
             loadContactos();
         } catch (error) {
             console.error('Error updating contact:', error);
@@ -179,16 +174,7 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
     // Refrescar padre al cerrar el modal si hubo cambios en los contactos principales
     const onModalClose = () => {
         // En un mundo ideal el padre reaccionaría, acá forzamos reload para Cartera.
-        // Pero si estamos en la base comercial (/comercial/base), evitamos el reload para no perder el feedback local.
-        const isBaseComercial = typeof window !== 'undefined' && window.location.pathname.includes('/comercial/base');
-        
-        // Invalidar queries de React Query para refrescar en background
-        queryClient.invalidateQueries({ queryKey: ['mis-contactos'] });
-        queryClient.invalidateQueries({ queryKey: ['clientes'] });
-
-        if (!isBaseComercial) {
-            setTimeout(() => { if (typeof window !== 'undefined') window.location.reload(); }, 1000); 
-        }
+        setTimeout(() => { if (typeof window !== 'undefined') window.location.reload(); }, 1000); 
         handleClose();
     };
 
@@ -213,9 +199,6 @@ function ModalContent({ ruc, razonSocial, isOpen }: ModalContentProps) {
             toast.success('Contacto agregado');
             setShowNewRow(false);
             setNewContacto({ nombre: '', cargo: '', telefono: '', correo: '', is_principal: false });
-            // Invalidar queries de React Query en lugar de hacer reload completo
-            queryClient.invalidateQueries({ queryKey: ['mis-contactos'] });
-            queryClient.invalidateQueries({ queryKey: ['clientes'] });
             loadContactos();
         } catch (error) {
             console.error('Error creating contact:', error);

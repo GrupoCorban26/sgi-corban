@@ -11,7 +11,7 @@ Esta clase actúa como fachada para mantener la compatibilidad con los endpoints
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import UploadFile
 
-
+from app.services.comercial.contactos_excel_service import ContactosExcelService
 from app.services.comercial.contactos_crud_service import ContactosCrudService
 from app.services.comercial.contactos_asignacion_service import ContactosAsignacionService
 
@@ -24,11 +24,17 @@ class ContactosService:
     
     def __init__(self, db: AsyncSession):
         self.db = db
-
+        self._excel_service = ContactosExcelService(db)
         self._crud_service = ContactosCrudService(db)
         self._asignacion_service = ContactosAsignacionService(db)
 
+    # =========================================================================
+    # PROCESAMIENTO DE EXCEL (delegado a ContactosExcelService)
+    # =========================================================================
 
+    async def process_excel_contactos(self, file: UploadFile):
+        """Procesa Excel de contactos con BULK INSERT y UPDATE."""
+        return await self._excel_service.process_excel_contactos(file)
 
     # =========================================================================
     # CRUD BÁSICO (delegado a ContactosCrudService)

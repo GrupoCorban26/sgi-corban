@@ -6,14 +6,12 @@ import { ChatConversationPreview } from '@/types/chat';
 import { useChatConversations } from '@/hooks/comercial/useChat';
 import { useInbox } from '@/hooks/comercial/useInbox';
 import ModalCliente from '../../cartera/components/modal-cliente';
-import ModalVincularCliente from './ModalVincularCliente';
 import { toast } from 'sonner';
 
 export default function ChatLayout() {
     const [selectedId, setSelectedId] = useState<number | null>(null);
     const [showInfoPanel, setShowInfoPanel] = useState(false);
     const [isModalClienteOpen, setIsModalClienteOpen] = useState(false);
-    const [isModalVincularOpen, setIsModalVincularOpen] = useState(false);
     const { data: conversations = [] } = useChatConversations();
     const { convertMutation } = useInbox();
 
@@ -41,18 +39,6 @@ export default function ChatLayout() {
             // No deseleccionar: el lead sigue visible con estado CERRADO
         } catch (error) {
             toast.error('Cliente creado pero hubo un error al enlazar el lead.');
-        }
-    };
-
-    const handleClienteVinculado = async (clienteId: number) => {
-        if (!selectedId) return;
-        try {
-            await convertMutation.mutateAsync({ id: selectedId, clienteId });
-            toast.success('Lead vinculado exitosamente');
-            setIsModalVincularOpen(false);
-        } catch (error) {
-            toast.error('Error al vincular el lead.');
-            throw error;
         }
     };
 
@@ -103,7 +89,6 @@ export default function ChatLayout() {
                             selectedConv={selectedConv}
                             onChangeConv={(conv) => setSelectedId(conv?.inbox_id || null)}
                             onCerrarClick={() => setIsModalClienteOpen(true)}
-                            onVincularClick={() => setIsModalVincularOpen(true)}
                             onClose={() => setShowInfoPanel(false)}
                         />
                     </div>
@@ -118,12 +103,6 @@ export default function ChatLayout() {
                 initialData={{
                     razon_social: selectedConv?.nombre_whatsapp || ''
                 }}
-            />
-
-            <ModalVincularCliente
-                isOpen={isModalVincularOpen}
-                onClose={() => setIsModalVincularOpen(false)}
-                onClienteVinculado={handleClienteVinculado}
             />
         </div>
     );

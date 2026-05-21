@@ -15,7 +15,6 @@ interface Props {
     selectedConv: ChatConversationPreview;
     onChangeConv: (conv: ChatConversationPreview | null) => void;
     onCerrarClick?: () => void;
-    onVincularClick?: () => void;
     onClose?: () => void;
 }
 
@@ -52,7 +51,7 @@ const MOTIVOS_DESCARTE = [
     { value: 5, label: 'Duplicado' },
 ];
 
-export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClick, onVincularClick, onClose }: Props) {
+export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClick, onClose }: Props) {
     const { changeEstado, releaseChat, descartarLead, marcarGestionCelular } = useChatActions();
     const { asignarManualMutation } = useInbox();
     const { data: comerciales = [] } = useComerciales();
@@ -373,18 +372,9 @@ export default function LeadInfoPanel({ selectedConv, onChangeConv, onCerrarClic
                         <div className="min-w-0">
                             <p className="text-[11px] text-slate-400 font-medium uppercase tracking-wider">Empresa / RUC</p>
                             <p className="text-sm font-medium text-slate-600 mt-0.5">No Registrado</p>
-                            {selectedConv.estado !== 'CERRADO' && selectedConv.estado !== 'DESCARTADO' ? (
-                                <button 
-                                    onClick={onVincularClick} 
-                                    className="text-emerald-600 text-xs mt-1 hover:underline font-medium block"
-                                >
-                                    Vincular con Cliente →
-                                </button>
-                            ) : (
-                                <span className="text-gray-400 text-xs mt-1 block italic">
-                                    Lead {selectedConv.estado === 'CERRADO' ? 'Convertido' : 'Descartado'}
-                                </span>
-                            )}
+                            <button className="text-emerald-600 text-xs mt-1 hover:underline font-medium">
+                                Vincular con Cliente →
+                            </button>
                         </div>
                     </div>
 

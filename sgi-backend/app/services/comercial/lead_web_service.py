@@ -310,7 +310,6 @@ class LeadWebService:
 
                 if not contacto_existente:
                     nuevo_contacto = ClienteContacto(
-                        cliente_id=cliente.id,
                         ruc=cliente.ruc,
                         nombre=lead.nombre or "Sin nombre",
                         telefono=lead.telefono,

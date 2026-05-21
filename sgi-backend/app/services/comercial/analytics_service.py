@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, case, and_, extract, or_, text, literal_column
 from app.models.comercial import Cliente, ClienteContacto, Cita, CasoLlamada
-from app.models.comercial_base import BaseContacto
 from app.models.historial_llamadas import HistorialLlamada
 from app.models.comercial_inbox import Inbox
 from app.models.cliente_historial import ClienteHistorial
@@ -67,21 +66,21 @@ class AnalyticsService:
             uid = com.id
             nombre = com.nombres.split()[0] if com.nombres else 'Sin Nombre'
             
-            # Total llamadas completadas (created_at = fecha real de la llamada)
+            # Total llamadas completadas (updated_at = fecha real de la llamada)
             stmt_llamadas = select(func.count()).select_from(HistorialLlamada).where(
-                and_(HistorialLlamada.comercial_id == uid, HistorialLlamada.created_at >= dt_inicio, HistorialLlamada.created_at <= dt_fin, HistorialLlamada.caso_id.isnot(None))
+                and_(HistorialLlamada.comercial_id == uid, HistorialLlamada.updated_at >= dt_inicio, HistorialLlamada.updated_at <= dt_fin, HistorialLlamada.caso_id.isnot(None))
             )
             total_llamadas = (await self.db.execute(stmt_llamadas)).scalar() or 0
             
             # Llamadas contestadas
             stmt_contestadas = select(func.count()).select_from(HistorialLlamada).join(CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id).where(
-                and_(HistorialLlamada.comercial_id == uid, HistorialLlamada.created_at >= dt_inicio, HistorialLlamada.created_at <= dt_fin, CasoLlamada.contestado == True)
+                and_(HistorialLlamada.comercial_id == uid, HistorialLlamada.updated_at >= dt_inicio, HistorialLlamada.updated_at <= dt_fin, CasoLlamada.contestado == True)
             )
             llamadas_contestadas = (await self.db.execute(stmt_contestadas)).scalar() or 0
             
             # Llamadas efectivas
             stmt_efectivas = select(func.count()).select_from(HistorialLlamada).join(CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id).where(
-                and_(HistorialLlamada.comercial_id == uid, HistorialLlamada.created_at >= dt_inicio, HistorialLlamada.created_at <= dt_fin, CasoLlamada.gestionable == True)
+                and_(HistorialLlamada.comercial_id == uid, HistorialLlamada.updated_at >= dt_inicio, HistorialLlamada.updated_at <= dt_fin, CasoLlamada.gestionable == True)
             )
             llamadas_efectivas = (await self.db.execute(stmt_efectivas)).scalar() or 0
             
@@ -457,15 +456,15 @@ class AnalyticsService:
         """Retorna filas individuales de HistorialLlamada para exportar a Excel."""
 
         condicion = and_(
-            HistorialLlamada.created_at >= dt_inicio,
-            HistorialLlamada.created_at <= dt_fin,
+            HistorialLlamada.updated_at >= dt_inicio,
+            HistorialLlamada.updated_at <= dt_fin,
         )
 
         stmt = (
             select(
-                BaseContacto.ruc.label("ruc"),
-                func.coalesce(BaseContacto.razon_social, "Sin razón social").label("razon_social"),
-                BaseContacto.telefono,
+                ClienteContacto.ruc.label("ruc"),
+                func.coalesce(Cliente.razon_social, "Sin razón social").label("razon_social"),
+                ClienteContacto.telefono,
                 CasoLlamada.contestado.label("contesto"),
                 CasoLlamada.nombre.label("caso"),
                 CasoLlamada.gestionable.label("efectiva"),
@@ -473,7 +472,8 @@ class AnalyticsService:
                 Empleado.nombres.label("comercial"),
                 HistorialLlamada.created_at.label("fecha_llamada"),
             )
-            .join(BaseContacto, HistorialLlamada.base_id == BaseContacto.id)
+            .join(ClienteContacto, HistorialLlamada.contacto_id == ClienteContacto.id)
+            .outerjoin(Cliente, ClienteContacto.ruc == Cliente.ruc)
             .join(CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id)
             .join(Usuario, HistorialLlamada.comercial_id == Usuario.id)
             .join(Empleado, Usuario.empleado_id == Empleado.id)

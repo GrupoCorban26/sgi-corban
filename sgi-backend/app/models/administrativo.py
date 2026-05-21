@@ -138,7 +138,7 @@ class EmpleadoActivo(Base):
     id = Column(Integer, primary_key=True, index=True)
     empleado_id = Column(Integer, ForeignKey("adm.empleados.id"), nullable=False)
     activo_id = Column(Integer, ForeignKey("adm.activos.id"), nullable=False)
-    fecha_entrega = Column(DateTime(timezone=True), server_default=func.now(), default=func.now(), nullable=False)
+    fecha_entrega = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     fecha_devolucion = Column(DateTime(timezone=True))
     estado_entrega_id = Column(Integer, ForeignKey("adm.estado_activo.id"))
     estado_devolucion_id = Column(Integer, ForeignKey("adm.estado_activo.id"))
@@ -183,7 +183,7 @@ class ActivoHistorial(Base):
     observaciones = Column(String(500))
     empleado_activo_id = Column(Integer, ForeignKey("adm.empleado_activo.id"))
     registrado_por = Column(Integer, ForeignKey("seg.usuarios.id"))
-    fecha_cambio = Column(DateTime(timezone=True), server_default=func.now(), default=func.now(), nullable=False)
+    fecha_cambio = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relationships
     activo = relationship("Activo", backref="historial")
@@ -243,7 +243,7 @@ class LineaHistorial(Base):
     empleado_nuevo_id = Column(Integer, ForeignKey("adm.empleados.id"), nullable=True)
     observaciones = Column(String(500))
     registrado_por = Column(Integer, ForeignKey("seg.usuarios.id"))
-    fecha_cambio = Column(DateTime(timezone=True), server_default=func.now(), default=func.now(), nullable=False)
+    fecha_cambio = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relationships
     linea = relationship("LineaCorporativa", backref="historial")
@@ -304,7 +304,7 @@ class HistorialCargo(Base):
     area_nueva_id = Column(Integer, ForeignKey("adm.areas.id"), nullable=False)
     motivo = Column(String(100)) # 'INGRESO', 'ASCENSO', 'ROTACION', 'ERROR_CORRECCION'
     registrado_por = Column(Integer, ForeignKey("seg.usuarios.id"))
-    fecha_cambio = Column(DateTime(timezone=True), server_default=func.now(), default=func.now(), nullable=False)
+    fecha_cambio = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relationships
     empleado = relationship("Empleado", backref="historial_cargos")
@@ -322,10 +322,12 @@ class MovimientoProductoOficina(Base):
     stock_resultante = Column(Integer, nullable=False) # Foto del stock en ese instante
     motivo = Column(String(200))
     registrado_por = Column(Integer, ForeignKey("seg.usuarios.id"))
-    fecha_movimiento = Column(DateTime(timezone=True), server_default=func.now(), default=func.now(), nullable=False)
+    fecha_movimiento = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
     # Relación con la transacción que originó el error en caso de revertir
     movimiento_revertido_id = Column(Integer, ForeignKey("adm.movimientos_producto_oficina.id"), nullable=True)
 
     # Relationships
     producto = relationship("ProductoOficina", backref="historial_movimientos")
+
+

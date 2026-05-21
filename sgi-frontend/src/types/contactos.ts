@@ -42,9 +42,8 @@ export interface KpisGestion {
 
 export interface Lote {
     id: number;
-    nombre_archivo: string;
-    empresa: string | null;
-    estado: 'DISPONIBLE' | 'FINALIZADO';
+    nombre: string;
+    is_active: boolean;
     total_contactos: number;
     disponibles: number;
     created_by_nombre?: string;

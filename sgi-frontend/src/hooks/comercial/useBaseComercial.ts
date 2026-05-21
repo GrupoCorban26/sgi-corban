@@ -20,8 +20,8 @@ export function useCargarBase() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ empresa }: { empresa?: string } = {}) =>
-            baseComercialService.cargarBase(empresa),
+        mutationFn: ({ paisOrigen, partidaArancelaria }: { paisOrigen?: string[]; partidaArancelaria?: string[] }) =>
+            baseComercialService.cargarBase(paisOrigen, partidaArancelaria),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['mis-contactos'] });
         }
@@ -37,20 +37,6 @@ export function useActualizarFeedback() {
     return useMutation({
         mutationFn: ({ id, casoId, comentario }: { id: number; casoId: number; comentario: string }) =>
             baseComercialService.actualizarFeedback(id, casoId, comentario),
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['mis-contactos'] });
-        }
-    });
-}
-
-/**
- * Hook para enviar feedback del lote completo
- */
-export function useEnviarFeedbackLote() {
-    const queryClient = useQueryClient();
-
-    return useMutation({
-        mutationFn: () => baseComercialService.enviarFeedbackLote(),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['mis-contactos'] });
         }
@@ -104,7 +90,6 @@ export function useBaseComercial() {
     const casos = useCasosLlamada();
     const cargarBaseMutation = useCargarBase();
     const actualizarFeedbackMutation = useActualizarFeedback();
-    const enviarFeedbackLoteMutation = useEnviarFeedbackLote();
     const crearContactoManualMutation = useCrearContactoManual();
 
     const contactos = misContactos.data || [];
@@ -141,9 +126,6 @@ export function useBaseComercial() {
 
         actualizarFeedback: actualizarFeedbackMutation.mutateAsync,
         isActualizandoFeedback: actualizarFeedbackMutation.isPending,
-
-        enviarFeedbackLote: enviarFeedbackLoteMutation.mutateAsync,
-        isEnviandoFeedback: enviarFeedbackLoteMutation.isPending,
 
         crearContactoManual: crearContactoManualMutation.mutateAsync,
         isCreandoContactoManual: crearContactoManualMutation.isPending,
