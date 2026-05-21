@@ -42,17 +42,23 @@ class MediaService:
     """Servicio para descargar medios de la API de WhatsApp Cloud."""
 
     @staticmethod
-    async def descargar_media(media_id: str) -> dict | None:
+    async def descargar_media(media_id: str, token: str = None) -> dict | None:
         """Descarga un archivo multimedia de WhatsApp y lo guarda localmente.
         
         Args:
             media_id: ID del media proporcionado por WhatsApp.
+            token: Token de acceso a la API de Meta (opcional, de lo contrario usa WHATSAPP_TOKEN del env).
             
         Returns:
             dict con 'ruta_relativa', 'mime_type', 'nombre_archivo' o None si falla.
         """
+        token_to_use = token or WHATSAPP_TOKEN
+        if not token_to_use:
+            logger.error(f"[MEDIA] Intento de descarga sin token de WhatsApp para media_id={media_id}")
+            return None
+
         headers = {
-            "Authorization": f"Bearer {WHATSAPP_TOKEN}",
+            "Authorization": f"Bearer {token_to_use}",
         }
 
         try:

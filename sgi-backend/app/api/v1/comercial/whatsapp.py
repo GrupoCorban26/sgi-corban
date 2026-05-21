@@ -203,7 +203,7 @@ async def _process_webhook(payload: WhatsAppWebhookPayload, slug: str | None):
 
                             if media_id:
                                 from app.services.comercial.media_service import MediaService
-                                resultado_media = await MediaService.descargar_media(media_id)
+                                resultado_media = await MediaService.descargar_media(media_id, token=wa_token)
                                 if resultado_media:
                                     media_url = resultado_media["ruta_relativa"]
 
