@@ -274,3 +274,39 @@ class ContactosAsignacionService:
             )
         await self.db.commit()
         return {"success": True, "message": "Feedback enviado y registros finalizados."}
+
+    async def get_filtros_base(self):
+        """Obtiene países y sectores disponibles para filtrar la base de contactos."""
+        from sqlalchemy import text
+
+        # Obtener países únicos desde la columna 'paises' (valores separados por coma)
+        paises_result = await self.db.execute(text("""
+            SELECT TOP 50
+                LTRIM(RTRIM(value)) AS pais,
+                COUNT(*) AS cantidad
+            FROM comercial.bases
+            CROSS APPLY STRING_SPLIT(paises, ',')
+            WHERE estado = 'DISPONIBLE'
+              AND paises IS NOT NULL
+              AND LTRIM(RTRIM(value)) <> ''
+            GROUP BY LTRIM(RTRIM(value))
+            ORDER BY COUNT(*) DESC
+        """))
+        paises = [{"pais": row[0], "cantidad": row[1]} for row in paises_result.fetchall()]
+
+        # Obtener sectores únicos desde la columna 'sector' (valores separados por coma)
+        sectores_result = await self.db.execute(text("""
+            SELECT TOP 50
+                LTRIM(RTRIM(value)) AS sector,
+                COUNT(*) AS cantidad
+            FROM comercial.bases
+            CROSS APPLY STRING_SPLIT(sector, ',')
+            WHERE estado = 'DISPONIBLE'
+              AND sector IS NOT NULL
+              AND LTRIM(RTRIM(value)) <> ''
+            GROUP BY LTRIM(RTRIM(value))
+            ORDER BY COUNT(*) DESC
+        """))
+        sectores = [{"sector": row[0], "cantidad": row[1]} for row in sectores_result.fetchall()]
+
+        return {"paises": paises, "sectores": sectores}
