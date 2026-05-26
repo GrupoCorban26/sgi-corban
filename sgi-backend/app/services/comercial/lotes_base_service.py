@@ -123,14 +123,20 @@ class LotesBaseService:
             rucs_en_excel = list(df['ruc'].unique())
             excluidos_clientes_count = 0
             if rucs_en_excel:
-                stmt_clientes_activos = select(Cliente.ruc).where(
-                    and_(
-                        Cliente.ruc.in_(rucs_en_excel),
-                        Cliente.is_active == True
+                # SQL Server ODBC limita a ~2100 parámetros por query.
+                # Dividimos en lotes de 2000 para evitar el error.
+                CHUNK_SIZE = 2000
+                rucs_activos_db: set[str] = set()
+                for i in range(0, len(rucs_en_excel), CHUNK_SIZE):
+                    chunk = rucs_en_excel[i:i + CHUNK_SIZE]
+                    stmt_clientes_activos = select(Cliente.ruc).where(
+                        and_(
+                            Cliente.ruc.in_(chunk),
+                            Cliente.is_active == True
+                        )
                     )
-                )
-                res_clientes_activos = await self.db.execute(stmt_clientes_activos)
-                rucs_activos_db = set(res_clientes_activos.scalars().all())
+                    res_clientes_activos = await self.db.execute(stmt_clientes_activos)
+                    rucs_activos_db.update(res_clientes_activos.scalars().all())
 
                 # Excluir del dataframe
                 total_antes_clientes = len(df)
