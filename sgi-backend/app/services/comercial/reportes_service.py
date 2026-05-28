@@ -92,6 +92,7 @@ class ReportesLlamadasService:
                 BaseContacto.ruc.label("RUC"),
                 BaseContacto.razon_social.label("Razón Social"),
                 BaseContacto.telefono.label("Teléfono"),
+                BaseContacto.correo.label("Correo"),
                 CasoLlamada.contestado.label("Contestó"),
                 CasoLlamada.nombre.label("Caso"),
                 HistorialLlamada.comentario.label("Comentario"),
@@ -122,7 +123,7 @@ class ReportesLlamadasService:
 
         if not rows:
             # Si no hay datos, crear un excel vacío con cabeceras
-            df = pd.DataFrame(columns=["RUC", "Razón Social", "Teléfono", "Contestó", "Caso", "Comentario", "Comercial", "Fecha y Hora"])
+            df = pd.DataFrame(columns=["RUC", "Razón Social", "Teléfono", "Correo", "Contestó", "Caso", "Comentario", "Comercial", "Fecha y Hora"])
         else:
             # Construir DataFrame
             data = []
@@ -131,6 +132,7 @@ class ReportesLlamadasService:
                     "RUC": r["RUC"],
                     "Razón Social": r["Razón Social"] or "Sin razón social",
                     "Teléfono": r["Teléfono"],
+                    "Correo": r["Correo"] or "",
                     "Contestó": "Sí" if r["Contestó"] else "No",
                     "Caso": r["Caso"],
                     "Comentario": r["Comentario"] or "",
@@ -248,4 +250,3 @@ class ReportesLlamadasService:
             "motivos_descarte": motivos_descarte,
             "por_dia": por_dia
         }
-

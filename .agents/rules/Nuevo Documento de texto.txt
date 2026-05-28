@@ -1,0 +1,6 @@
+---
+trigger: always_on
+description: Always consult the graphify knowledge graph at graphify-out/ before answering codebase or architecture questions.
+---
+## graphify
+This project has a graphify knowledge graph at graphify-out/.
