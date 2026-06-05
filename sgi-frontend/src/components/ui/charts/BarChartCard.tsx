@@ -9,8 +9,7 @@ import {
   CartesianGrid, 
   Tooltip, 
   ResponsiveContainer, 
-  Legend,
-  Cell
+  Legend
 } from 'recharts';
 import { cn } from '@/lib/utils';
 
@@ -30,6 +29,9 @@ interface BarChartCardProps {
   bars: BarConfig[];
   className?: string;
   layout?: 'horizontal' | 'vertical'; // Para barras paradas o echadas
+  xAxisDomain?: [any, any];
+  yAxisDomain?: [any, any];
+  height?: number | string; // Prop de altura dinámica para evitar cortes en gráficos verticales largos
 }
 
 export default function BarChartCard({ 
@@ -38,23 +40,30 @@ export default function BarChartCard({
   xKey, 
   bars, 
   className,
-  layout = 'horizontal' 
+  layout = 'horizontal',
+  xAxisDomain,
+  yAxisDomain,
+  height
 }: BarChartCardProps) {
   return (
     <div className={cn(
-      "bg-white p-6 rounded-3xl border border-slate-100 shadow-sm h-100 w-full flex flex-col",
+      "bg-white p-6 rounded-2xl border border-slate-100 shadow-sm w-full",
       className
     )}>
       {title && (
         <h3 className="text-lg font-bold text-azul-900 mb-6">{title}</h3>
       )}
 
-      <div className="flex-1 w-full">
+      {/* Usamos el prop de height si se proporciona, sino por defecto 280px */}
+      <div className="w-full" style={{ height: height || 280 }}>
         <ResponsiveContainer width="100%" height="100%">
           <BarChart 
             data={data} 
             layout={layout}
-            margin={{ top: 5, right: 10, left: -20, bottom: 0 }}
+            margin={layout === 'vertical' 
+              ? { top: 5, right: 20, left: 10, bottom: 5 }
+              : { top: 5, right: 10, left: -20, bottom: 0 }
+            }
           >
             <CartesianGrid strokeDasharray="3 3" vertical={layout === 'vertical'} horizontal={layout === 'horizontal'} stroke="#f1f5f9" />
             
@@ -64,7 +73,7 @@ export default function BarChartCard({
               axisLine={false} 
               tickLine={false} 
               tick={{ fill: '#94a3b8', fontSize: 12 }}
-              hide={layout === 'vertical'}
+              domain={xAxisDomain}
             />
 
             <YAxis 
@@ -73,6 +82,8 @@ export default function BarChartCard({
               axisLine={false} 
               tickLine={false} 
               tick={{ fill: '#94a3b8', fontSize: 12 }}
+              width={layout === 'vertical' ? 120 : undefined} // Un poco más ancho para nombres largos de empresas
+              domain={yAxisDomain}
             />
 
             <Tooltip 
@@ -93,7 +104,7 @@ export default function BarChartCard({
                 dataKey={b.key}
                 fill={b.color}
                 radius={layout === 'horizontal' ? [6, 6, 0, 0] : [0, 6, 6, 0]} // Puntas redondeadas
-                barSize={layout === 'horizontal' ? 30 : 20}
+                barSize={layout === 'horizontal' ? 30 : 15}
               />
             ))}
           </BarChart>

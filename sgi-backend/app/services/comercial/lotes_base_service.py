@@ -116,19 +116,25 @@ class LotesBaseService:
             
             # Deduplicar dentro de este mismo archivo
             total_antes = len(df)
+            # Primero quitamos duplicados por RUC (conservando el primero), luego por teléfono
+            df = df.drop_duplicates(subset=['ruc'], keep='first')
             df = df.drop_duplicates(subset=['telefono'], keep='first')
             duplicates_count = total_antes - len(df)
 
-            # Filtrar RUCs que ya están registrados como clientes ACTIVOS en la tabla comercial.clientes
+            # Filtrar RUCs que ya están registrados como clientes ACTIVOS o que ya existen en comercial.bases
             rucs_en_excel = list(df['ruc'].unique())
             excluidos_clientes_count = 0
+            excluidos_bases_count = 0
             if rucs_en_excel:
                 # SQL Server ODBC limita a ~2100 parámetros por query.
                 # Dividimos en lotes de 2000 para evitar el error.
                 CHUNK_SIZE = 2000
                 rucs_activos_db: set[str] = set()
+                rucs_bases_db: set[str] = set()
                 for i in range(0, len(rucs_en_excel), CHUNK_SIZE):
                     chunk = rucs_en_excel[i:i + CHUNK_SIZE]
+                    
+                    # Consultar clientes activos
                     stmt_clientes_activos = select(Cliente.ruc).where(
                         and_(
                             Cliente.ruc.in_(chunk),
@@ -138,14 +144,26 @@ class LotesBaseService:
                     res_clientes_activos = await self.db.execute(stmt_clientes_activos)
                     rucs_activos_db.update(res_clientes_activos.scalars().all())
 
-                # Excluir del dataframe
+                    # Consultar contactos ya existentes en bases
+                    stmt_bases_existentes = select(BaseContacto.ruc).where(
+                        BaseContacto.ruc.in_(chunk)
+                    )
+                    res_bases_existentes = await self.db.execute(stmt_bases_existentes)
+                    rucs_bases_db.update(res_bases_existentes.scalars().all())
+
+                # Excluir clientes activos del dataframe
                 total_antes_clientes = len(df)
                 df = df[~df['ruc'].isin(rucs_activos_db)]
                 excluidos_clientes_count = total_antes_clientes - len(df)
 
+                # Excluir bases ya existentes en bases
+                total_antes_bases = len(df)
+                df = df[~df['ruc'].isin(rucs_bases_db)]
+                excluidos_bases_count = total_antes_bases - len(df)
+
             total_registros = len(df)
             if total_registros == 0:
-                raise HTTPException(400, "No se encontraron nuevos registros válidos (todos corresponden a clientes activos).")
+                raise HTTPException(400, "No se encontraron nuevos registros válidos (todos corresponden a clientes activos o ya existentes).")
 
             # Crear el lote
             nuevo_lote = Lote(
@@ -176,11 +194,12 @@ class LotesBaseService:
             await self.db.commit()
 
             return {
-                "message": f"Se importaron {inserted} contactos al lote '{file.filename}'. {duplicates_count} duplicados internos omitidos. {excluidos_clientes_count} clientes activos omitidos.",
+                "message": f"Se importaron {inserted} contactos al lote '{file.filename}'. {duplicates_count} duplicados internos omitidos. {excluidos_clientes_count} clientes activos omitidos. {excluidos_bases_count} contactos ya existentes en bases omitidos.",
                 "lote_id": nuevo_lote.id,
                 "inserted": inserted,
                 "duplicates": duplicates_count,
-                "excluidos_clientes": excluidos_clientes_count
+                "excluidos_clientes": excluidos_clientes_count,
+                "excluidos_bases": excluidos_bases_count
             }
 
         except HTTPException:

@@ -1,5 +1,9 @@
 import api from '@/lib/axios';
-import { RadarResponse, EmbudoResponse } from '@/types/analytics-comercial';
+import { 
+  RadarResponse, 
+  EmbudoResponse,
+  CotizacionesAnalyticsResponse
+} from '@/types/analytics-comercial';
 
 const BASE_URL = '/comercial/analytics';
 
@@ -17,4 +21,33 @@ export const analyticsComercialService = {
     });
     return data;
   },
+
+  obtenerCotizaciones: async (fechaInicio: string, fechaFin: string, clienteId?: number | null): Promise<CotizacionesAnalyticsResponse> => {
+    const params: Record<string, any> = { 
+      fecha_inicio: fechaInicio, 
+      fecha_fin: fechaFin 
+    };
+    if (clienteId) {
+      params.cliente_id = clienteId;
+    }
+    const { data } = await api.get<CotizacionesAnalyticsResponse>(`${BASE_URL}/cotizaciones/resumen`, {
+      params,
+    });
+    return data;
+  },
+
+  exportarCotizacionesExcel: async (fechaInicio: string, fechaFin: string, clienteId?: number | null): Promise<Blob> => {
+    const params: Record<string, any> = { 
+      fecha_inicio: fechaInicio, 
+      fecha_fin: fechaFin 
+    };
+    if (clienteId) {
+      params.cliente_id = clienteId;
+    }
+    const { data } = await api.get<Blob>(`${BASE_URL}/cotizaciones/exportar`, {
+      params,
+      responseType: 'blob'
+    });
+    return data;
+  }
 };

@@ -63,7 +63,7 @@ class Usuario(Base):
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     # Relationships
-    empleado = relationship("Empleado", backref="usuario")
+    empleado = relationship("Empleado", backref="usuario", lazy="joined")
     roles = relationship("Rol", secondary=usuarios_roles, backref="usuarios")
 
 class Sesion(Base):

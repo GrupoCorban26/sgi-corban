@@ -86,21 +86,21 @@ async def resolver_comercial_ids(
     Resuelve qué usuario_ids comerciales puede ver el usuario actual.
     
     - ADMIN/GERENCIA/SISTEMAS → None (ve todo, sin filtro)
-    - JEFE_COMERCIAL → Lista con su propio ID + IDs de sus subordinados directos
+    - JEFE_COMERCIAL/JEFA_COMERCIAL → Lista con su propio ID + IDs de sus subordinados directos
     - COMERCIAL → Lista solo con su propio ID
     
     Retorna None si no se debe aplicar filtro (rol global).
     Retorna lista de IDs si se debe filtrar.
     """
-    roles = current_user.get("roles", [])
+    roles = [r.upper() for r in current_user.get("roles", [])]
     user_id = int(current_user.get("sub"))
     
     # Roles globales: ven todo sin filtro
     if any(role in roles for role in ROLES_VER_TODO):
         return None
     
-    # JEFE_COMERCIAL: ve lo suyo + subordinados recursivos (cadena completa)
-    if "JEFE_COMERCIAL" in roles:
+    # JEFE_COMERCIAL / JEFA_COMERCIAL: ve lo suyo + subordinados recursivos (cadena completa)
+    if "JEFE_COMERCIAL" in roles or "JEFA_COMERCIAL" in roles:
         # 1. Obtener el empleado_id del jefe
         stmt_jefe = select(Usuario.empleado_id).where(Usuario.id == user_id)
         empleado_id_jefe = (await db.execute(stmt_jefe)).scalar()

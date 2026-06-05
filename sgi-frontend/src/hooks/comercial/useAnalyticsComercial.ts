@@ -18,3 +18,12 @@ export const useEmbudoComercial = (periodo: string) => {
     enabled: !!periodo,
   });
 };
+
+export const useAnalyticsCotizaciones = (fechaInicio: string, fechaFin: string, clienteId?: number | null) => {
+  return useQuery({
+    queryKey: ['analytics-cotizaciones', fechaInicio, fechaFin, clienteId],
+    queryFn: () => analyticsComercialService.obtenerCotizaciones(fechaInicio, fechaFin, clienteId),
+    staleTime: 1000 * 60 * 5,
+    enabled: !!fechaInicio && !!fechaFin,
+  });
+};

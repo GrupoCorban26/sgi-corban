@@ -37,6 +37,9 @@ import { useComerciales } from '@/hooks/organizacion/useComerciales';
 import ModalCliente from './components/modal-cliente';
 import ModalRegistrarGestion from './components/ModalRegistrarGestion';
 import ModalTimeline from './components/ModalTimeline';
+import ModalCrearSeguimiento from './components/ModalCrearSeguimiento';
+import { ArrowRightLeft } from 'lucide-react';
+
 
 const ESTADO_COLORS: Record<string, string> = {
   'PROSPECTO': 'bg-sky-50 text-sky-700 ring-sky-200',
@@ -168,6 +171,13 @@ export default function CarteraPage() {
   const [isTimelineOpen, setIsTimelineOpen] = useState(false);
   const [timelineClienteId, setTimelineClienteId] = useState<number | null>(null);
 
+  // Seguimiento modal
+  const [isSeguimientoOpen, setIsSeguimientoOpen] = useState(false);
+  const [seguimientoClienteId, setSeguimientoClienteId] = useState<number | null>(null);
+  const [seguimientoClienteNombre, setSeguimientoClienteNombre] = useState('');
+  const [seguimientoClienteRuc, setSeguimientoClienteRuc] = useState<string | null>(null);
+
+
   const { data: comerciales = [], isLoading: loadingComerciales } = useComerciales();
 
   const {
@@ -192,6 +202,14 @@ export default function CarteraPage() {
     setGestionClienteRuc(c.ruc || ''); setGestionClienteRazonSocial(c.razon_social || '');
     setGestionEstadoActual(c.estado_nombre || ''); setIsGestionModalOpen(true);
   };
+
+  const handleOpenSeguimiento = (c: Cliente) => {
+    setSeguimientoClienteId(c.id);
+    setSeguimientoClienteNombre(c.razon_social);
+    setSeguimientoClienteRuc(c.ruc);
+    setIsSeguimientoOpen(true);
+  };
+
 
   const handleClearFilters = () => { setBusqueda(''); setTipoEstado(null); setComercialId(null); setFiltroFecha(null); setOrdenarPor(null); setPage(1); };
 
@@ -466,6 +484,14 @@ export default function CarteraPage() {
                           >
                             <ClipboardList size={15} />
                           </button>
+                          <button
+                            onClick={() => handleOpenSeguimiento(cliente)}
+                            className="p-1.5 hover:bg-indigo-100 text-indigo-600 rounded-lg transition-colors cursor-pointer"
+                            title="Crear solicitud de cotización"
+                          >
+                            <ArrowRightLeft size={15} />
+                          </button>
+
                           <ActionMenu
                             onView={() => { setTimelineClienteId(cliente.id); setIsTimelineOpen(true); }}
                             onEdit={() => handleOpenEdit(cliente)}
@@ -544,6 +570,17 @@ export default function CarteraPage() {
         isOpen={isTimelineOpen}
         onClose={() => { setIsTimelineOpen(false); setTimelineClienteId(null); }}
       />
+
+      {seguimientoClienteId && (
+        <ModalCrearSeguimiento
+          isOpen={isSeguimientoOpen}
+          onClose={() => { setIsSeguimientoOpen(false); setSeguimientoClienteId(null); }}
+          clienteId={seguimientoClienteId}
+          clienteRazonSocial={seguimientoClienteNombre}
+          clienteRuc={seguimientoClienteRuc}
+        />
+      )}
+
     </div>
   );
 }

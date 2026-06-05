@@ -86,7 +86,7 @@ export default function TabRadar({ data }: TabRadarProps) {
           />
 
           {/* Tabla de progreso individual */}
-          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
             <h3 className="text-lg font-bold text-slate-800 mb-4">Progreso Individual</h3>
             <div className="space-y-3">
               {progreso_comerciales.map((c) => (
@@ -144,7 +144,7 @@ export default function TabRadar({ data }: TabRadarProps) {
             <AlertTriangle size={20} className="text-red-500" />
             Clientes sin Contacto (&gt; 15 días)
           </h3>
-          <div className="bg-white rounded-3xl border border-red-100 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-2xl border border-red-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>

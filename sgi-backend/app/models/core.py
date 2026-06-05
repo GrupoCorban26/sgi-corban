@@ -61,3 +61,14 @@ class ConfiguracionHistorial(Base):
     fecha_cambio = Column(DateTime(timezone=True), server_default=func.now(), default=func.now(), nullable=False)
     
     configuracion = relationship("Configuracion", backref="historial_cambios")
+
+class Empresa(Base):
+    """Modelo para representar las empresas del grupo."""
+    __tablename__ = "empresas"
+    __table_args__ = {"schema": "core"}
+
+    id = Column(Integer, primary_key=True, index=True)
+    razon_social = Column(String(255), nullable=False)
+    ruc = Column(String(11), nullable=False, unique=True)
+    oficina = Column(String(100))
+    modulo = Column(String(100))

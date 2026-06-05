@@ -28,14 +28,14 @@ export default function TabEmbudo({ data }: TabEmbudoProps) {
           <Filter size={20} className="text-blue-600" />
           Embudo de Conversión
         </h3>
-        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-8">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-8">
           <div className="flex flex-col items-center gap-1 max-w-xl mx-auto">
             {embudo_conversion.map((etapa, i) => {
               const widthPct = Math.max((etapa.cantidad / maxEmbudo) * 100, 20);
               return (
                 <div key={etapa.etapa} className="w-full flex flex-col items-center">
                   <div
-                    className="relative rounded-xl py-4 px-6 text-center transition-all duration-300 hover:scale-[1.02]"
+                    className="relative rounded-xl py-4 px-6 text-center transition-colors duration-300"
                     style={{
                       width: `${widthPct}%`,
                       backgroundColor: COLORES_EMBUDO[i] || '#64748b',
@@ -72,7 +72,7 @@ export default function TabEmbudo({ data }: TabEmbudoProps) {
             <Clock size={20} className="text-orange-600" />
             Tiempo Promedio por Etapa
           </h3>
-          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
+          <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
             {tiempos_promedio.length > 0 ? (
               <div className="space-y-4">
                 {tiempos_promedio.map((t) => {
@@ -117,7 +117,7 @@ export default function TabEmbudo({ data }: TabEmbudoProps) {
               isDonut={true}
             />
           ) : (
-            <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 text-center text-slate-400 py-10">
+            <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 text-center text-slate-400 py-10">
               <XCircle size={40} className="mx-auto mb-2 opacity-30" />
               <p>Sin datos de caída para el periodo seleccionado</p>
             </div>
@@ -133,7 +133,7 @@ export default function TabEmbudo({ data }: TabEmbudoProps) {
         </h3>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {efectividad_origen.map((o, i) => (
-            <div key={o.origen} className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 text-center hover:shadow-md transition-shadow">
+            <div key={o.origen} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6 text-center hover:shadow-md transition-shadow">
               <div className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center"
                 style={{ backgroundColor: `${COLORES_ORIGEN[i]}15` }}
               >

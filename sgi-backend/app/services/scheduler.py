@@ -3,11 +3,12 @@
 Incluye:
 - Reset matutino de disponibilidad del buzón (8:00 AM PET)
 - Asignación automática de leads sin respuesta después de 1 hora
+- Alertas de documentos operacionales pendientes (9:00 AM PET)
 """
 import asyncio
 import logging
 import os
-from datetime import datetime, timedelta, timezone, time
+from datetime import datetime, timedelta, timezone, time, date
 
 from sqlalchemy import update, and_, or_, func
 from sqlalchemy.future import select
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 # Zona horaria de Perú (UTC-5)
 PET = timezone(timedelta(hours=-5))
 HORA_RESET = time(8, 0)  # 8:00 AM
+HORA_ALERTAS_DOCUMENTOS = time(9, 0)  # 9:00 AM
 
 # Configuración de auto-asignación de leads sin respuesta
 TIMEOUT_LEADS_SIN_RESPUESTA_MINUTOS = 10  # 10 minutos
@@ -31,6 +33,9 @@ INTERVALO_VERIFICACION_MINUTOS = 1  # Cada minuto
 
 # Configuración de auto-derivación de cotizaciones abandonadas
 INTERVALO_COTIZACIONES_MINUTOS = 1  # Cada cuántos minutos revisar
+
+# Umbrales de alerta de documentos (días antes de la fecha límite de documentos)
+UMBRALES_ALERTA_DIAS = [10, 6, 3, 2, 1]
 
 
 async def _reset_disponibilidad_buzon():
@@ -210,6 +215,128 @@ async def _asignar_leads_sin_respuesta():
         logger.error(f"[SCHEDULER] Error asignando leads sin respuesta: {e}", exc_info=True)
 
 
+async def _alertas_documentos_pendientes():
+    """
+    Verifica seguimientos en EN_OPERACION y envía alertas de documentos pendientes
+    según los umbrales configurados (10, 6, 3, 2, 1 días antes de la fecha límite de documentos).
+    Solo envía una alerta por umbral por seguimiento (idempotente).
+    Envía por correo + WhatsApp (si está configurado).
+    """
+    try:
+        from app.models.seguimiento import (
+            Seguimiento, SeguimientoDocumento, SeguimientoAlertaEnviada
+        )
+        from app.services.comercial.notificacion_operacional_service import NotificacionOperacionalService
+
+        notif_service = NotificacionOperacionalService()
+
+        async with AsyncSessionLocal() as db:
+            # Obtener seguimientos en EN_OPERACION con fecha_limite_documentos definida
+            query = (
+                select(Seguimiento)
+                .where(
+                    and_(
+                        Seguimiento.estado == "EN_OPERACION",
+                        Seguimiento.is_active == True,
+                        Seguimiento.fecha_limite_documentos.isnot(None)
+                    )
+                )
+            )
+            result = await db.execute(query)
+            seguimientos = result.scalars().all()
+
+            if not seguimientos:
+                return
+
+            hoy = date.today()
+
+            for seg in seguimientos:
+                # Calcular días restantes respecto a la fecha límite de documentos
+                dias_restantes = (seg.fecha_limite_documentos - hoy).days
+
+                # Obtener documentos pendientes
+                query_docs = select(SeguimientoDocumento).where(
+                    and_(
+                        SeguimientoDocumento.seguimiento_id == seg.id,
+                        SeguimientoDocumento.completado == False
+                    )
+                )
+                result_docs = await db.execute(query_docs)
+                docs_pendientes = result_docs.scalars().all()
+
+                if not docs_pendientes:
+                    # Todos los documentos están completos, no enviar alerta
+                    continue
+
+                # Obtener alertas ya enviadas para este seguimiento
+                query_alertas = select(SeguimientoAlertaEnviada).where(
+                    SeguimientoAlertaEnviada.seguimiento_id == seg.id
+                )
+                result_alertas = await db.execute(query_alertas)
+                alertas_existentes = result_alertas.scalars().all()
+                dias_alertados = {a.dias_antes_eta for a in alertas_existentes}
+
+                # Obtener datos del contacto de alerta
+                destinatario_email = None
+                destinatario_telefono = None
+                nombre_contacto = ""
+                if seg.contacto_alerta_id:
+                    contacto = await db.get(ClienteContacto, seg.contacto_alerta_id)
+                    if contacto:
+                        destinatario_email = contacto.correo
+                        destinatario_telefono = contacto.telefono
+                        nombre_contacto = contacto.nombre or ""
+
+                if not destinatario_email and not destinatario_telefono:
+                    logger.warning(
+                        f"[SCHEDULER-ALERTAS] Seguimiento #{seg.id} no tiene contacto de alerta "
+                        f"con correo ni teléfono válido. Saltando."
+                    )
+                    continue
+
+                # Nombre de documentos pendientes
+                nombres_docs = [d.documento_nombre for d in docs_pendientes]
+                razon_social = seg.cliente_razon_social
+                titulo = seg.titulo
+
+                # Verificar cada umbral
+                for umbral in UMBRALES_ALERTA_DIAS:
+                    if dias_restantes <= umbral and umbral not in dias_alertados:
+                        # Enviar alerta multicanal
+                        canal = await notif_service.enviar_alerta_fecha_limite(
+                            telefono=destinatario_telefono,
+                            correo=destinatario_email,
+                            razon_social=razon_social,
+                            titulo_embarque=titulo,
+                            fecha_limite=seg.fecha_limite_documentos,
+                            dias_restantes_limite=max(dias_restantes, 0),
+                            fecha_eta=seg.fecha_eta,
+                            documentos_pendientes=nombres_docs,
+                            nombre_contacto=nombre_contacto
+                        )
+
+                        # Solo registrar la alerta si se envió exitosamente por al menos un canal
+                        if canal:
+                            alerta = SeguimientoAlertaEnviada(
+                                seguimiento_id=seg.id,
+                                dias_antes_eta=umbral,
+                                tipo="ALERTA_PENDIENTES",
+                                canal=canal
+                            )
+                            db.add(alerta)
+                            await db.commit()
+                            dias_alertados.add(umbral)
+
+                            logger.info(
+                                f"[SCHEDULER-ALERTAS] Alerta enviada ({canal}): Seguimiento #{seg.id}, "
+                                f"umbral={umbral} días, fecha_limite={seg.fecha_limite_documentos}, "
+                                f"docs_pendientes={len(docs_pendientes)}"
+                            )
+
+    except Exception as e:
+        logger.error(f"[SCHEDULER-ALERTAS] Error en alertas de documentos: {e}", exc_info=True)
+
+
 async def _calcular_segundos_hasta_hora(hora_objetivo: time) -> float:
     """Calcula los segundos hasta la próxima ocurrencia de la hora objetivo (PET)."""
     ahora = datetime.now(PET)
@@ -297,6 +424,27 @@ async def _scheduler_bases_abandonadas():
             await asyncio.sleep(3600)
 
 
+async def _scheduler_alertas_documentos():
+    """Loop que ejecuta las alertas de documentos pendientes cada día a las 9:00 AM PET."""
+    logger.info("[SCHEDULER] Tarea de alertas de documentos operacionales iniciada.")
+    while True:
+        try:
+            segundos = await _calcular_segundos_hasta_hora(HORA_ALERTAS_DOCUMENTOS)
+            hora_actual = datetime.now(PET).strftime("%H:%M:%S")
+            logger.info(
+                f"[SCHEDULER-ALERTAS] Hora actual PET: {hora_actual}. "
+                f"Próxima verificación de alertas en {segundos/3600:.1f} horas."
+            )
+            await asyncio.sleep(segundos)
+            await _alertas_documentos_pendientes()
+        except asyncio.CancelledError:
+            logger.info("[SCHEDULER] Tarea de alertas de documentos detenida.")
+            break
+        except Exception as e:
+            logger.error(f"[SCHEDULER] Error en alertas de documentos: {e}", exc_info=True)
+            await asyncio.sleep(3600)
+
+
 async def iniciar_scheduler():
     """Inicia todas las tareas programadas del sistema."""
     logger.info("[SCHEDULER] Iniciando todas las tareas programadas...")
@@ -304,5 +452,6 @@ async def iniciar_scheduler():
         _scheduler_reset_disponibilidad(),
         _scheduler_leads_sin_respuesta(),
         _scheduler_cotizaciones_abandonadas(),
-        _scheduler_bases_abandonadas()
+        _scheduler_bases_abandonadas(),
+        _scheduler_alertas_documentos()
     )

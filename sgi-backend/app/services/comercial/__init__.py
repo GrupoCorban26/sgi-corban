@@ -2,3 +2,6 @@
 
 from app.services.comercial.contactos_crud_service import ContactosCrudService
 from app.services.comercial.contactos_asignacion_service import ContactosAsignacionService
+from app.services.comercial.seguimientos_service import SeguimientosService
+from app.services.comercial.incidencias_service import IncidenciasService
+

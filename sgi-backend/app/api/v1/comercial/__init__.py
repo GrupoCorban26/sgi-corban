@@ -14,6 +14,8 @@ from . import reportes
 from . import dashboard
 from . import notificaciones
 from . import supervision
+from . import seguimientos
+from . import incidencias
 
 api_router = APIRouter()
 
@@ -32,4 +34,7 @@ api_router.include_router(reportes.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(notificaciones.router)
 api_router.include_router(supervision.router)
+api_router.include_router(seguimientos.router)
+api_router.include_router(incidencias.router)
+
 

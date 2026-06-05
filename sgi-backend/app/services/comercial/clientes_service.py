@@ -55,7 +55,8 @@ class ClientesService:
         filtro_fecha: str = None,
         ordenar_por: str = None,
         page: int = 1,
-        page_size: int = 15
+        page_size: int = 15,
+        is_active: bool = True
     ) -> dict:
         """Lista clientes con paginación y filtros. Si page_size=0, retorna todos los registros sin límite."""
         offset = (page - 1) * page_size if page_size > 0 else 0
@@ -171,7 +172,7 @@ class ClientesService:
          .outerjoin(OrigenCliente, Cliente.origen_id == OrigenCliente.id) \
          .outerjoin(Usuario, Cliente.comercial_encargado_id == Usuario.id) \
          .outerjoin(Empleado, Usuario.empleado_id == Empleado.id) \
-         .where(Cliente.is_active == True)
+         .where(Cliente.is_active == is_active)
 
         if busqueda:
             stmt = stmt.where(or_(

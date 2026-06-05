@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional, List
 from datetime import date, datetime
+from sqlalchemy.future import select
 
 # Importaciones de base de datos y esquemas
 from app.database.db_connection import get_db
@@ -11,8 +12,11 @@ from app.schemas.comercial.cliente import (
     ClienteMarcarCaido, 
     ClienteCambiarEstado
 )
+from app.schemas.comercial.contactos import ContactoResponse
+from app.models.comercial import Cliente
 from app.services.comercial.clientes_service import ClientesService
 from app.services.comercial.analytics_service import AnalyticsService
+from app.services.contactos_service import ContactosService
 
 # Importaciones de seguridad refinada
 from app.core.security import (
@@ -269,6 +273,7 @@ async def exportar_clientes(
     estado_id: Optional[int] = Query(None, description="Filtrar por estado (ID)"),
     estado_nombre: Optional[str] = Query(None, description="Filtrar por estado (nombre, ej: PROSPECTO)"),
     comercial_id: Optional[int] = Query(None, description="Filtrar por comercial"),
+    is_active: Optional[bool] = Query(True, description="Filtrar por clientes activos o inactivos"),
     filtro_fecha: Optional[str] = Query(None, description="Filtrar por fecha de próximo contacto (hoy, vencidos, proximos_7_dias)"),
     ordenar_por: Optional[str] = Query(None, description="Ordenar por: proxima_fecha_asc, proxima_fecha_desc"),
     db: AsyncSession = Depends(get_db),
@@ -299,7 +304,8 @@ async def exportar_clientes(
         filtro_fecha=filtro_fecha,
         ordenar_por=ordenar_por,
         page=1,
-        page_size=0
+        page_size=0,
+        is_active=is_active
     )
     
     return result.get("data", [])
@@ -311,10 +317,11 @@ async def listar_clientes(
     estado_id: Optional[int] = Query(None, description="Filtrar por estado (ID)"),
     estado_nombre: Optional[str] = Query(None, description="Filtrar por estado (nombre, ej: PROSPECTO)"),
     comercial_id: Optional[int] = Query(None, description="Filtrar por comercial"),
+    is_active: Optional[bool] = Query(True, description="Filtrar por clientes activos o inactivos"),
     filtro_fecha: Optional[str] = Query(None, description="Filtrar por fecha de próximo contacto (hoy, vencidos, proximos_7_dias)"),
     ordenar_por: Optional[str] = Query(None, description="Ordenar por: proxima_fecha_asc, proxima_fecha_desc"),
     page: int = Query(1, ge=1),
-    page_size: int = Query(15, ge=1, le=100),
+    page_size: int = Query(15, ge=1, le=500),
     db: AsyncSession = Depends(get_db),
     comercial_ids: list = Depends(resolver_comercial_ids)
 ):
@@ -340,7 +347,8 @@ async def listar_clientes(
         filtro_fecha=filtro_fecha,
         ordenar_por=ordenar_por,
         page=page,
-        page_size=page_size
+        page_size=page_size,
+        is_active=is_active
     )
 
 
@@ -493,3 +501,21 @@ async def obtener_historial(
     """Obtiene la línea de tiempo completa de transiciones del cliente."""
     service = ClientesService(db)
     return await service.get_historial(id)
+
+
+@router.get("/{id}/contactos", response_model=List[ContactoResponse], dependencies=[Depends(require_permission("clientes.listar"))])
+async def obtener_contactos_cliente(
+    id: int,
+    db: AsyncSession = Depends(get_db),
+    _: dict = Depends(get_current_active_auth)
+):
+    """Obtiene los contactos registrados para el cliente por su ID (buscando por su RUC)."""
+    stmt = select(Cliente).where(Cliente.id == id, Cliente.is_active == True)
+    result = await db.execute(stmt)
+    cliente = result.scalars().first()
+    
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+        
+    service = ContactosService(db)
+    return await service.get_contactos_by_ruc(cliente.ruc)

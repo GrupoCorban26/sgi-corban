@@ -38,14 +38,14 @@ export default function PieChartCard({
 }: PieChartCardProps) {
   return (
     <div className={cn(
-      "bg-white p-6 rounded-3xl border border-slate-100 shadow-sm h-100 w-full flex flex-col",
+      "bg-white p-6 rounded-2xl border border-slate-100 shadow-sm w-full",
       className
     )}>
       {title && (
         <h3 className="text-lg font-bold text-azul-900 mb-2">{title}</h3>
       )}
 
-      <div className="flex-1 w-full">
+      <div className="w-full h-[220px]">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie

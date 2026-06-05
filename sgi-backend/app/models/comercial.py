@@ -1,10 +1,7 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Numeric, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Numeric, Text, Index
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql import func, text
 from .base import Base
-
-
-
 
 
 class CasoLlamada(Base):
@@ -21,7 +18,16 @@ class CasoLlamada(Base):
 
 class Cliente(Base):
     __tablename__ = "clientes"
-    __table_args__ = {"schema": "comercial"}
+    __table_args__ = (
+        Index(
+            "uq_cliente_active_ruc_empresa",
+            "ruc",
+            "empresa_id",
+            unique=True,
+            mssql_where=text("is_active = 1 AND ruc IS NOT NULL")
+        ),
+        {"schema": "comercial"}
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     ruc = Column(String(11), index=True)
@@ -29,6 +35,7 @@ class Cliente(Base):
     direccion_fiscal = Column(String(255))
     distrito_id = Column(Integer, ForeignKey("core.distritos.id"))
     comercial_encargado_id = Column(Integer, ForeignKey("seg.usuarios.id"))
+    empresa_id = Column(Integer, ForeignKey("core.empresas.id"), nullable=True)
     proxima_fecha_contacto = Column(Date)
     estado_id = Column(Integer, ForeignKey("comercial.estado_cliente.id"), index=True)
     origen_id = Column(Integer, ForeignKey("comercial.origen_cliente.id"))
@@ -41,6 +48,7 @@ class Cliente(Base):
     # Relationships
     distrito = relationship("app.models.core.Distrito")
     comercial = relationship("app.models.seguridad.Usuario", foreign_keys=[comercial_encargado_id])
+    empresa = relationship("app.models.core.Empresa")
     estado = relationship("app.models.comercial_catalogos.EstadoCliente")
     origen = relationship("app.models.comercial_catalogos.OrigenCliente")
     usuario_creador = relationship("app.models.seguridad.Usuario", foreign_keys=[created_by])

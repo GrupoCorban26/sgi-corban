@@ -56,6 +56,11 @@ export interface EtapaEmbudo {
   porcentaje_retencion: number;
 }
 
+export interface ZeitPromedio { // Se mantiene por retrocompatibilidad
+  etapa: string;
+  dias_promedio: number;
+}
+
 export interface TiempoPromedio {
   etapa: string;
   dias_promedio: number;
@@ -79,4 +84,73 @@ export interface EmbudoResponse {
   tiempos_promedio: TiempoPromedio[];
   motivos_caida: MotivoCaida[];
   efectividad_origen: EfectividadOrigen[];
+}
+
+// =========================================================================
+// RENDIMIENTO COTIZACIONES KANBAN
+// =========================================================================
+
+export interface CotizacionesKpis {
+  total_tarjetas: number;
+  total_cotizaciones: number;
+  total_ganadas: number;
+  total_perdidas: number;
+  tasa_conversion: number;
+}
+
+export interface ComercialCotizacionesRendimiento {
+  comercial_id: number;
+  nombre: string;
+  iniciales: string | null;
+  cotizados_creados: number;
+  cierres_exitosos: number;
+  negociaciones_caidas: number;
+  tasa_efectividad: number;
+  cotizaciones_pendientes: number;
+  jefe_id?: number | null;
+  jefe_nombre?: string | null;
+}
+
+export interface DistribucionCarga {
+  tipo_carga_nombre: string;
+  cantidad: number;
+  porcentaje: number;
+}
+
+export interface DistribucionOperacion {
+  tipo_operacion: string;
+  cantidad: number;
+  porcentaje: number;
+}
+
+export interface DistribucionSegmentacion {
+  segmentacion_nombre: string;
+  cantidad: number;
+  porcentaje: number;
+}
+
+export interface TopMotivoCaida {
+  motivo: string;
+  cantidad: number;
+  porcentaje: number;
+}
+
+export interface EmpresaCotizacionesRendimiento {
+  cliente_id: number;
+  nombre: string;
+  cotizados_creados: number;
+  cierres_exitosos: number;
+  negociaciones_caidas: number;
+  tasa_efectividad: number;
+  cotizaciones_pendientes: number;
+}
+
+export interface CotizacionesAnalyticsResponse {
+  kpis: CotizacionesKpis;
+  rendimiento_comerciales: ComercialCotizacionesRendimiento[];
+  rendimiento_empresas: EmpresaCotizacionesRendimiento[];
+  distribucion_carga: DistribucionCarga[];
+  distribucion_operacion: DistribucionOperacion[];
+  distribucion_segmentacion: DistribucionSegmentacion[];
+  motivos_caida: TopMotivoCaida[];
 }

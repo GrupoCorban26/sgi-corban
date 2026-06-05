@@ -89,5 +89,25 @@ PERMISOS_BASE = [
         "nombre_display": "Gestionar Configuraciones",
         "modulo": "Core",
         "descripcion": "Permite alterar parámetros globales y catálogos del sistema."
+    },
+    
+    # Módulo Seguimientos y Cotizaciones (Kanban)
+    {
+        "nombre_tecnico": "seguimientos.listar",
+        "nombre_display": "Listar Seguimientos",
+        "modulo": "Comercial",
+        "descripcion": "Permite visualizar el Kanban de seguimientos y cotizaciones."
+    },
+    {
+        "nombre_tecnico": "seguimientos.crear",
+        "nombre_display": "Crear Seguimientos",
+        "modulo": "Comercial",
+        "descripcion": "Permite registrar nuevas cotizaciones y tarjetas de seguimiento."
+    },
+    {
+        "nombre_tecnico": "seguimientos.editar",
+        "nombre_display": "Editar Seguimientos",
+        "modulo": "Comercial",
+        "descripcion": "Permite mover tarjetas, agregar cotizaciones, cerrar o registrar gestiones."
     }
 ]
