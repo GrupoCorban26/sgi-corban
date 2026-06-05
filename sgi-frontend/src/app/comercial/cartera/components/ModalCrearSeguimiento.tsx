@@ -57,10 +57,10 @@ export default function ModalCrearSeguimiento({
     useEffect(() => {
         if (isOpen && modoDropdown) {
             setLoadingClientes(true);
-            api.get<{ items: ClienteSimple[] }>('/clientes?page_size=200')
+            api.get<{ data: ClienteSimple[] }>('/clientes?page_size=200')
                 .then(res => {
-                    const data = Array.isArray(res.data) ? res.data : (res.data.data || res.data.items || []);
-                    setClientesList(data as ClienteSimple[]);
+                    const data = res.data.data || [];
+                    setClientesList(data);
                 })
                 .catch(() => {
                     setClientesList([]);
