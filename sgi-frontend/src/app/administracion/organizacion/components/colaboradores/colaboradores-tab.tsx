@@ -181,7 +181,7 @@ export function ColaboradoresTab({ onOpenHistory, onEdit, onNew, onToggleStatus 
                     <div className="text-sm text-gray-700">{emp.departamento_nombre || 'Sin departamento'}</div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm text-gray-700 font-medium">{emp.empresa || 'Corban Trans Logistic'}</div>
+                    <div className="text-sm text-gray-700 font-medium">{emp.empresa_nombre || 'Sin empresa'}</div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

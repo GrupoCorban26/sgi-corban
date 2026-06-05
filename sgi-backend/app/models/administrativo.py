@@ -83,8 +83,8 @@ class Empleado(Base):
     cargo_id = Column(Integer, ForeignKey("adm.cargos.id"), nullable=True)
     jefe_id = Column(Integer, ForeignKey("adm.empleados.id"), nullable=True)
     
-    # Nuevo campo Empresa
-    empresa = Column(String(50), default="Corban Trans Logistic", nullable=False)
+    # FK a la tabla core.empresas
+    empresa_id = Column(Integer, ForeignKey("core.empresas.id"), default=2, nullable=False)
     
     # Iniciales del comercial en SISPAC (ej: 'DC', 'CR') para homologación de órdenes
     iniciales_sispac = Column(String(10), nullable=True)
@@ -96,6 +96,7 @@ class Empleado(Base):
     cargo = relationship("Cargo", backref="empleados")
     distrito = relationship("app.models.core.Distrito")
     jefe = relationship("Empleado", remote_side=[id], backref="subordinados")
+    empresa = relationship("app.models.core.Empresa")
     
     # Áreas y Departamentos que lidera (como responsable)
     departamentos_a_cargo = relationship("Departamento", foreign_keys="[Departamento.responsable_id]", back_populates="responsable")

@@ -35,7 +35,7 @@ interface FormState {
   area_id: number | null;
   cargo_id: number | null;
   jefe_id: number | null;
-  empresa: string;
+  empresa_id: number | null;
   iniciales_sispac: string;
 }
 
@@ -51,7 +51,7 @@ interface FormErrors {
   area_id?: string;
   cargo_id?: string;
   email_personal?: string;
-  empresa?: string;
+  empresa_id?: string;
 }
 
 const initialFormState: FormState = {
@@ -72,7 +72,7 @@ const initialFormState: FormState = {
   area_id: null,
   cargo_id: null,
   jefe_id: null,
-  empresa: 'Corban Trans Logistic',
+  empresa_id: 2,
   iniciales_sispac: '',
 };
 
@@ -285,7 +285,7 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
         area_id: empleadoData.area_id || null,
         cargo_id: empleadoData.cargo_id || null,
         jefe_id: empleadoData.jefe_id || null,
-        empresa: empleadoData.empresa || 'Corban Trans Logistic',
+        empresa_id: empleadoData.empresa_id || 2,
         iniciales_sispac: empleadoData.iniciales_sispac || '',
       });
     } else {
@@ -298,7 +298,7 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     const newValue = value === '' ? null : (
-      ['departamento_geo_id', 'provincia_id', 'distrito_id', 'departamento_id', 'area_id', 'cargo_id', 'jefe_id'].includes(name)
+      ['departamento_geo_id', 'provincia_id', 'distrito_id', 'departamento_id', 'area_id', 'cargo_id', 'jefe_id', 'empresa_id'].includes(name)
         ? parseInt(value)
         : value
     );
@@ -344,7 +344,7 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
     setTouched(prev => new Set(prev).add(name));
 
     const newValue = value === '' ? null : (
-      ['departamento_geo_id', 'provincia_id', 'distrito_id', 'departamento_id', 'area_id', 'cargo_id', 'jefe_id'].includes(name)
+      ['departamento_geo_id', 'provincia_id', 'distrito_id', 'departamento_id', 'area_id', 'cargo_id', 'jefe_id', 'empresa_id'].includes(name)
         ? parseInt(value)
         : value
     );
@@ -390,7 +390,7 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
           area_id: formData.area_id!,
           cargo_id: formData.cargo_id!,
           jefe_id: formData.jefe_id,
-          empresa: formData.empresa,
+          empresa_id: formData.empresa_id!,
           iniciales_sispac: formData.iniciales_sispac || undefined,
         };
         await updateMutation.mutateAsync({ id: empleadoData.id, data: updateData });
@@ -412,7 +412,7 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
           area_id: formData.area_id!,
           cargo_id: formData.cargo_id!,
           jefe_id: formData.jefe_id,
-          empresa: formData.empresa,
+          empresa_id: formData.empresa_id!,
           iniciales_sispac: formData.iniciales_sispac || undefined,
         };
         await createMutation.mutateAsync(createData);
@@ -604,15 +604,16 @@ function ModalEmpleadoContent({ empleadoData, isOpen }: { empleadoData?: Emplead
             <div className="space-y-1">
               <label className="text-xs font-semibold text-gray-600">Empresa <span className="text-red-500">*</span></label>
               <select
-                name="empresa"
-                value={formData.empresa}
+                name="empresa_id"
+                value={formData.empresa_id || ''}
                 onChange={handleChange}
                 className="w-full px-3 py-2 rounded-lg border border-gray-200 bg-white outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 disabled={isLoading}
               >
-                <option value="Corban Trans Logistic">Corban Trans Logistic</option>
-                <option value="Corban Agencia de Aduanas">Corban Agencia de Aduanas</option>
-                <option value="EBL">EBL</option>
+                <option value="">Seleccionar empresa...</option>
+                <option value="1">Corban Agencia de Aduanas</option>
+                <option value="2">Corban Trans Logistic</option>
+                <option value="3">EBL Grupo Logístico</option>
               </select>
             </div>
             <InputField

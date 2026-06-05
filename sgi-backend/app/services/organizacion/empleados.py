@@ -97,7 +97,8 @@ class EmpleadoService:
                 e.jefe_id,
                 ISNULL(emp_jefe.nombres + ' ' + emp_jefe.apellido_paterno, 'Sin jefe') AS jefe_nombre,
                 e.iniciales_sispac,
-                e.empresa
+                e.empresa_id,
+                emp_empresa.razon_social AS empresa_nombre
             FROM adm.empleados e
             LEFT JOIN core.distritos dist ON dist.id = e.distrito_id
             LEFT JOIN core.provincias p ON p.id = dist.provincia_id
@@ -106,6 +107,7 @@ class EmpleadoService:
             LEFT JOIN adm.areas a ON a.id = c.area_id
             LEFT JOIN adm.departamentos d ON d.id = a.departamento_id
             LEFT JOIN adm.empleados emp_jefe ON emp_jefe.id = e.jefe_id
+            LEFT JOIN core.empresas emp_empresa ON emp_empresa.id = e.empresa_id
             WHERE {where_sql}
             ORDER BY e.id
             OFFSET :offset ROWS FETCH NEXT :page_size ROWS ONLY
@@ -137,7 +139,8 @@ class EmpleadoService:
                 a.departamento_id AS departamento_id, d.nombre AS departamento_nombre,
                 e.jefe_id, ISNULL(emp_jefe.nombres + ' ' + emp_jefe.apellido_paterno, 'Sin jefe') AS jefe_nombre,
                 e.iniciales_sispac,
-                e.empresa
+                e.empresa_id,
+                emp_empresa.razon_social AS empresa_nombre
             FROM adm.empleados e
             LEFT JOIN core.distritos dist ON dist.id = e.distrito_id
             LEFT JOIN core.provincias p ON p.id = dist.provincia_id
@@ -146,6 +149,7 @@ class EmpleadoService:
             LEFT JOIN adm.areas a ON a.id = c.area_id
             LEFT JOIN adm.departamentos d ON d.id = a.departamento_id
             LEFT JOIN adm.empleados emp_jefe ON emp_jefe.id = e.jefe_id
+            LEFT JOIN core.empresas emp_empresa ON emp_empresa.id = e.empresa_id
             WHERE e.id = :id
         """)
         result = await self.db.execute(query, {"id": empleado_id})
@@ -176,14 +180,14 @@ class EmpleadoService:
                 nombres, apellido_paterno, apellido_materno, fecha_nacimiento, 
                 tipo_documento, nro_documento, celular, email_personal, 
                 distrito_id, direccion, fecha_ingreso, fecha_cese, is_active, 
-                cargo_id, jefe_id, empresa, iniciales_sispac
+                cargo_id, jefe_id, empresa_id, iniciales_sispac
             )
             OUTPUT INSERTED.id
             VALUES (
                 :nombres, :apellido_paterno, :apellido_materno, :fecha_nacimiento, 
                 :tipo_documento, :nro_documento, :celular, :email_personal, 
                 :distrito_id, :direccion, :fecha_ingreso, NULL, 1, 
-                :cargo_id, :jefe_id, :empresa, :iniciales_sispac
+                :cargo_id, :jefe_id, :empresa_id, :iniciales_sispac
             )
         """)
         
@@ -201,7 +205,7 @@ class EmpleadoService:
             "fecha_ingreso": empleado.fecha_ingreso,
             "cargo_id": empleado.cargo_id,
             "jefe_id": empleado.jefe_id,
-            "empresa": empleado.empresa,
+            "empresa_id": empleado.empresa_id,
             "iniciales_sispac": empleado.iniciales_sispac
         })
         await self.db.commit()
@@ -247,7 +251,7 @@ class EmpleadoService:
                 fecha_ingreso = :fecha_ingreso,
                 cargo_id = :cargo_id,
                 jefe_id = :jefe_id,
-                empresa = :empresa,
+                empresa_id = :empresa_id,
                 iniciales_sispac = :iniciales_sispac,
                 updated_at = GETDATE()
             WHERE id = :id
@@ -268,7 +272,7 @@ class EmpleadoService:
             "fecha_ingreso": empleado.fecha_ingreso,
             "cargo_id": empleado.cargo_id,
             "jefe_id": empleado.jefe_id,
-            "empresa": empleado.empresa,
+            "empresa_id": empleado.empresa_id,
             "iniciales_sispac": empleado.iniciales_sispac
         })
         await self.db.commit()
@@ -423,7 +427,7 @@ class EmpleadoService:
                 d.nombre AS departamento,
                 a.nombre AS area,
                 c.nombre AS cargo,
-                e.empresa,
+                emp_empresa.razon_social AS empresa,
                 e.fecha_ingreso,
                 CASE WHEN e.is_active = 1 THEN 'ACTIVO' ELSE 'INACTIVO' END AS estado,
                 ISNULL(emp_jefe.nombres + ' ' + emp_jefe.apellido_paterno, 'Sin jefe') AS jefe_directo
@@ -432,6 +436,7 @@ class EmpleadoService:
             LEFT JOIN adm.areas a ON a.id = c.area_id
             LEFT JOIN adm.departamentos d ON d.id = a.departamento_id
             LEFT JOIN adm.empleados emp_jefe ON emp_jefe.id = e.jefe_id
+            LEFT JOIN core.empresas emp_empresa ON emp_empresa.id = e.empresa_id
             ORDER BY e.apellido_paterno, e.nombres
         """)
         

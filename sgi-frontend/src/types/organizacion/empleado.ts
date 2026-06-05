@@ -28,7 +28,8 @@ export interface Empleado {
     departamento_nombre?: string | null; // Departamento organizacional
     jefe_id?: number | null;
     jefe_nombre?: string | null;
-    empresa?: string | null;
+    empresa_id?: number | null;
+    empresa_nombre?: string | null;
     iniciales_sispac?: string | null;
 }
 
@@ -67,7 +68,7 @@ export interface EmpleadoCreate {
     area_id: number;
     departamento_id: number;
     jefe_id?: number | null;
-    empresa?: string;
+    empresa_id?: number;
     iniciales_sispac?: string | null;
 }
 
@@ -87,6 +88,6 @@ export interface EmpleadoUpdate {
     area_id?: number;
     departamento_id?: number;
     jefe_id?: number | null;
-    empresa?: string;
+    empresa_id?: number;
     iniciales_sispac?: string | null;
 }
