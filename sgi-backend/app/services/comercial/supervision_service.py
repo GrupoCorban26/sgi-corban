@@ -640,7 +640,8 @@ class SupervisionService:
                     EvoConversacion.instancia_id == instancia_id,
                     EvoConversacion.remote_jid == remote_jid,
                 )
-            )
+            ).order_by(EvoConversacion.id)
+            .limit(1)
         )
         conv = result.scalar_one_or_none()
 
