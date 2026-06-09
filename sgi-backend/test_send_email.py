@@ -2,6 +2,10 @@ import asyncio
 import sys
 from datetime import date, datetime
 from sqlalchemy import select
+from dotenv import load_dotenv
+
+# Cargar variables de entorno del archivo .env antes de inicializar la configuración
+load_dotenv()
 
 from app.database.db_connection import AsyncSessionLocal
 from app.models.core import Empresa
