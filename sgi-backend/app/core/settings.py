@@ -5,6 +5,7 @@ Lee las variables de entorno desde el archivo .env y valida que las
 variables críticas estén presentes al momento de arrancar el servidor.
 """
 from functools import lru_cache
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 from typing import Optional
 
@@ -57,6 +58,13 @@ class Settings(BaseSettings):
     # ========================
     BOT_JEFE_COMERCIAL_ID: Optional[int] = None
     SGI_WEB_API_KEY: Optional[str] = None  # API Key para el endpoint público de leads web
+
+    @field_validator("BOT_JEFE_COMERCIAL_ID", mode="before")
+    @classmethod
+    def empty_str_to_none(cls, v):
+        if v == "":
+            return None
+        return v
 
     # ========================
     # Evolution API (Supervisión WhatsApp)
