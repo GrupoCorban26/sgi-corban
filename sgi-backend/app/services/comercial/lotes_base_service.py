@@ -211,18 +211,17 @@ class LotesBaseService:
 
     async def cargar_base(self, user_id: int, empresa: str = None):
         """Asigna 50 contactos DISPONIBLES al comercial."""
-        # Determinar a qué empresa pertenece el comercial
-        stmt_emp = select(Empleado.empresa).join(Usuario, Usuario.empleado_id == Empleado.id).where(Usuario.id == user_id)
+        # Determinar a qué empresa pertenece el comercial (via empresa_id FK)
+        stmt_emp = select(Empleado.empresa_id).join(Usuario, Usuario.empleado_id == Empleado.id).where(Usuario.id == user_id)
         emp_res = await self.db.execute(stmt_emp)
-        empresa_empleado_raw = emp_res.scalar()
+        empresa_id_empleado = emp_res.scalar()
         
+        # Mapeo: 1=CORBAN ADUANAS, 2=CORBAN TRANS, 3=EBL
         empresa_comercial = None
-        if empresa_empleado_raw:
-            emp_upper = empresa_empleado_raw.upper()
-            if "CORBAN" in emp_upper:
-                empresa_comercial = "CORBAN"
-            elif "EBL" in emp_upper:
-                empresa_comercial = "EBL"
+        if empresa_id_empleado in (1, 2):
+            empresa_comercial = "CORBAN"
+        elif empresa_id_empleado == 3:
+            empresa_comercial = "EBL"
 
         # 1. Verificar si ya tiene contactos ASIGNADO sin gestionar (veces_llamadas == 0)
         stmt_pendientes = select(func.count(BaseContacto.id)).where(

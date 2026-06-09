@@ -19,16 +19,25 @@ logger = logging.getLogger(__name__)
 # Lock global para prevenir condiciones de carrera en el Round Robin
 _lead_web_rr_lock = asyncio.Lock()
 
-# Mapeo de página de origen → empresa del empleado
-MAPEO_PAGINA_EMPRESA = {
+# Mapeo de página de origen → empresa_ids (FK core.empresas)
+# 1=CORBAN ADUANAS, 2=CORBAN TRANS, 3=EBL
+MAPEO_PAGINA_EMPRESA_IDS: dict[str, list[int]] = {
+    "grupocorban.pe": [1, 2],
+    "corbantranslogistic.com": [2],
+    "corbanaduanas.pe": [1],
+    "eblgroup.pe": [3],
+}
+
+# Mapeo inverso para texto (para logs y búsqueda de último lead)
+MAPEO_PAGINA_EMPRESA_NOMBRE: dict[str, str] = {
     "grupocorban.pe": "Corban Trans Logistic",
     "corbantranslogistic.com": "Corban Trans Logistic",
     "corbanaduanas.pe": "Corban Trans Logistic",
     "eblgroup.pe": "EBL",
 }
 
-# Dominios permitidos (se extraen del mapeo)
-DOMINIOS_PERMITIDOS = set(MAPEO_PAGINA_EMPRESA.keys())
+# Dominios permitidos
+DOMINIOS_PERMITIDOS = set(MAPEO_PAGINA_EMPRESA_IDS.keys())
 
 
 class LeadWebService:
@@ -41,8 +50,8 @@ class LeadWebService:
         El round-robin filtra comerciales por la empresa asociada al dominio.
         """
         # 1. Resolver la empresa según la página de origen
-        empresa = MAPEO_PAGINA_EMPRESA.get(data.pagina_origen)
-        if not empresa:
+        empresa_ids = MAPEO_PAGINA_EMPRESA_IDS.get(data.pagina_origen)
+        if not empresa_ids:
             raise ValueError(f"Página de origen no reconocida: {data.pagina_origen}")
 
         # 2. Verificar duplicado reciente (mismo correo + misma página, último minuto)
@@ -65,7 +74,7 @@ class LeadWebService:
             }
 
         # 3. Asignar comercial vía Round Robin filtrado por empresa
-        usuario_asignado = await self._asignar_comercial_round_robin(empresa)
+        usuario_asignado = await self._asignar_comercial_round_robin(empresa_ids, data.pagina_origen)
 
         # 4. Crear el registro del lead
         nuevo_lead = LeadWeb(
@@ -105,7 +114,7 @@ class LeadWebService:
             "mensaje": "Lead registrado exitosamente"
         }
 
-    async def _asignar_comercial_round_robin(self, empresa: str) -> Usuario | None:
+    async def _asignar_comercial_round_robin(self, empresa_ids: list[int], pagina_origen: str) -> Usuario | None:
         """
         Asigna un comercial usando Round Robin, filtrado por empresa.
         Solo considera usuarios con rol COMERCIAL, activos y disponibles en buzón,
@@ -122,7 +131,7 @@ class LeadWebService:
                         Rol.nombre == "COMERCIAL",
                         Usuario.is_active == True,
                         Usuario.disponible_buzon == True,
-                        Empleado.empresa == empresa,
+                        Empleado.empresa_id.in_(empresa_ids),
                         Empleado.is_active == True,
                     )
                 )
@@ -142,7 +151,7 @@ class LeadWebService:
                         and_(
                             Rol.nombre == "COMERCIAL",
                             Usuario.is_active == True,
-                            Empleado.empresa == empresa,
+                            Empleado.empresa_id.in_(empresa_ids),
                             Empleado.is_active == True,
                         )
                     )
@@ -152,7 +161,7 @@ class LeadWebService:
                 comerciales = list(resultado_fb.scalars().all())
 
                 if not comerciales:
-                    logger.warning(f"No se encontraron comerciales para la empresa: {empresa}")
+                    logger.warning(f"No se encontraron comerciales para empresa_ids: {empresa_ids}")
                     return None
 
             # Ordenar por ID para consistencia
@@ -164,9 +173,7 @@ class LeadWebService:
                 .where(
                     and_(
                         LeadWeb.asignado_a.isnot(None),
-                        LeadWeb.pagina_origen.in_(
-                            [k for k, v in MAPEO_PAGINA_EMPRESA.items() if v == empresa]
-                        ),
+                        LeadWeb.pagina_origen == pagina_origen,
                     )
                 )
                 .order_by(LeadWeb.id.desc())

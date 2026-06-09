@@ -20,6 +20,18 @@ from app.utils.horario_laboral import calcular_segundos_horario_laboral
 
 logger = logging.getLogger(__name__)
 
+# Mapeo de nombres de empresa (texto del frontend) a empresa_id en core.empresas
+_EMPRESA_NOMBRE_A_IDS: dict[str, list[int]] = {
+    "Corban Trans Logistic": [2],
+    "Corban Agencia de Aduanas": [1],
+    "CORBAN": [1, 2],  # Ambas Corban
+    "EBL": [3],
+}
+
+def _get_empresa_ids(empresa: str) -> list[int]:
+    """Convierte nombre de empresa a lista de empresa_id."""
+    return _EMPRESA_NOMBRE_A_IDS.get(empresa, [])
+
 
 class AnalyticsService:
     def __init__(self, db: AsyncSession):
@@ -57,7 +69,9 @@ class AnalyticsService:
         if comercial_ids is not None:
              stmt_comerciales = stmt_comerciales.where(Usuario.id.in_(comercial_ids))
         if empresa:
-             stmt_comerciales = stmt_comerciales.where(Empleado.empresa == empresa)
+             empresa_ids = _get_empresa_ids(empresa)
+             if empresa_ids:
+                 stmt_comerciales = stmt_comerciales.where(Empleado.empresa_id.in_(empresa_ids))
         comerciales = (await self.db.execute(stmt_comerciales)).all()
         
         comerciales_stats = []
@@ -115,7 +129,9 @@ class AnalyticsService:
         if comercial_ids is not None:
              stmt_comerciales = stmt_comerciales.where(Usuario.id.in_(comercial_ids))
         if empresa:
-             stmt_comerciales = stmt_comerciales.where(Empleado.empresa == empresa)
+             empresa_ids = _get_empresa_ids(empresa)
+             if empresa_ids:
+                 stmt_comerciales = stmt_comerciales.where(Empleado.empresa_id.in_(empresa_ids))
         comerciales = (await self.db.execute(stmt_comerciales)).all()
         
         comerciales_stats = []
@@ -203,7 +219,9 @@ class AnalyticsService:
         if comercial_ids is not None:
             stmt_comerciales = stmt_comerciales.where(Usuario.id.in_(comercial_ids))
         if empresa:
-            stmt_comerciales = stmt_comerciales.where(Empleado.empresa == empresa)
+            empresa_ids = _get_empresa_ids(empresa)
+            if empresa_ids:
+                stmt_comerciales = stmt_comerciales.where(Empleado.empresa_id.in_(empresa_ids))
             
         comerciales = (await self.db.execute(stmt_comerciales)).all()
         comerciales_ids_validos = [c.id for c in comerciales]
@@ -389,7 +407,9 @@ class AnalyticsService:
             if comercial_ids is not None:
                 stmt = stmt.where(Inbox.asignado_a.in_(comercial_ids))
             if empresa:
-                stmt = stmt.where(Empleado.empresa == empresa)
+                empresa_ids = _get_empresa_ids(empresa)
+                if empresa_ids:
+                    stmt = stmt.where(Empleado.empresa_id.in_(empresa_ids))
 
             rows = (await self.db.execute(stmt)).all()
             tiene_origen = True
@@ -405,7 +425,9 @@ class AnalyticsService:
             if comercial_ids is not None:
                 stmt = stmt.where(Inbox.asignado_a.in_(comercial_ids))
             if empresa:
-                stmt = stmt.where(Empleado.empresa == empresa)
+                empresa_ids = _get_empresa_ids(empresa)
+                if empresa_ids:
+                    stmt = stmt.where(Empleado.empresa_id.in_(empresa_ids))
 
             rows = (await self.db.execute(stmt)).all()
             tiene_origen = False
@@ -485,7 +507,9 @@ class AnalyticsService:
         if comercial_ids is not None:
             stmt = stmt.where(HistorialLlamada.comercial_id.in_(comercial_ids))
         if empresa:
-            stmt = stmt.where(Empleado.empresa == empresa)
+            empresa_ids = _get_empresa_ids(empresa)
+            if empresa_ids:
+                stmt = stmt.where(Empleado.empresa_id.in_(empresa_ids))
 
         rows = (await self.db.execute(stmt)).all()
 
@@ -539,7 +563,9 @@ class AnalyticsService:
         if comercial_ids is not None:
             stmt = stmt.where(Cliente.comercial_encargado_id.in_(comercial_ids))
         if empresa:
-            stmt = stmt.where(Empleado.empresa == empresa)
+            empresa_ids = _get_empresa_ids(empresa)
+            if empresa_ids:
+                stmt = stmt.where(Empleado.empresa_id.in_(empresa_ids))
 
         rows = (await self.db.execute(stmt)).all()
 

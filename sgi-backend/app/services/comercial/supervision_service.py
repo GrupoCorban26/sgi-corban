@@ -713,6 +713,7 @@ class SupervisionService:
         Si comercial_ids es especificado (RBAC), solo muestra los de su equipo.
         """
         from app.models.seguridad import Rol, usuarios_roles
+        from app.models.core import Empresa as CoreEmpresa
 
         query = (
             select(
@@ -720,13 +721,15 @@ class SupervisionService:
                 Empleado.nombres,
                 Empleado.apellido_paterno,
                 Empleado.apellido_materno,
-                Empleado.empresa,
+                CoreEmpresa.razon_social.label("empresa"),
+                Empleado.empresa_id,
                 EvoInstancia.id.label("instancia_id"),
                 EvoInstancia.estado.label("estado_instancia"),
                 EvoInstancia.telefono.label("telefono"),
                 func.count(EvoConversacion.id.distinct()).label("total_conversaciones"),
             )
             .join(Empleado, Usuario.empleado_id == Empleado.id)
+            .outerjoin(CoreEmpresa, CoreEmpresa.id == Empleado.empresa_id)
             .join(usuarios_roles, usuarios_roles.c.usuario_id == Usuario.id)
             .join(Rol, Rol.id == usuarios_roles.c.rol_id)
             .outerjoin(EvoInstancia, EvoInstancia.usuario_id == Usuario.id)
@@ -743,16 +746,24 @@ class SupervisionService:
                 Empleado.nombres,
                 Empleado.apellido_paterno,
                 Empleado.apellido_materno,
-                Empleado.empresa,
+                CoreEmpresa.razon_social,
+                Empleado.empresa_id,
                 EvoInstancia.id,
                 EvoInstancia.estado,
                 EvoInstancia.telefono,
             )
-            .order_by(Empleado.empresa, Empleado.nombres)
+            .order_by(Empleado.empresa_id, Empleado.nombres)
         )
 
         if empresa:
-            query = query.where(Empleado.empresa == empresa)
+            # Mapeo texto → empresa_ids
+            empresa_map: dict[str, list[int]] = {
+                "Corban Trans Logistic": [2], "Corban Agencia de Aduanas": [1],
+                "CORBAN": [1, 2], "EBL": [3],
+            }
+            ids = empresa_map.get(empresa, [])
+            if ids:
+                query = query.where(Empleado.empresa_id.in_(ids))
 
         if comercial_ids is not None:
             query = query.where(Usuario.id.in_(comercial_ids))
