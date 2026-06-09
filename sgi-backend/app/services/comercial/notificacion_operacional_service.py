@@ -11,6 +11,8 @@ import logging
 import os
 from datetime import date
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.services.comercial.email_service import EmailService
 from app.services.comercial.whatsapp_service import WhatsAppService
 
@@ -47,8 +49,9 @@ class NotificacionOperacionalService:
     a través de múltiples canales (correo electrónico y WhatsApp).
     """
 
-    def __init__(self):
-        self.email_service = EmailService()
+    def __init__(self, db: AsyncSession = None):
+        self.db = db
+        self.email_service = EmailService(db)
         self.whatsapp_ops_token = os.getenv("WHATSAPP_OPS_TOKEN")
         self.whatsapp_ops_phone_id = os.getenv("WHATSAPP_OPS_PHONE_ID")
         self.whatsapp_template_alerta = os.getenv("WHATSAPP_TEMPLATE_ALERTA_DOCS", "")
@@ -68,7 +71,8 @@ class NotificacionOperacionalService:
         dias_restantes_limite: int,
         fecha_eta: date,
         documentos_pendientes: list[str],
-        nombre_contacto: str = ""
+        nombre_contacto: str = "",
+        empresa_id: int | None = None
     ) -> str:
         """
         Envía alerta de fecha límite de documentos por correo y WhatsApp.
@@ -87,7 +91,8 @@ class NotificacionOperacionalService:
                     fecha_limite=fecha_limite,
                     dias_restantes_limite=dias_restantes_limite,
                     fecha_eta=fecha_eta,
-                    documentos_pendientes=documentos_pendientes
+                    documentos_pendientes=documentos_pendientes,
+                    empresa_id=empresa_id
                 )
                 if enviado_email:
                     canal_usado.append("EMAIL")
@@ -139,7 +144,8 @@ class NotificacionOperacionalService:
         correo: str | None,
         razon_social: str,
         titulo_embarque: str,
-        nombre_contacto: str = ""
+        nombre_contacto: str = "",
+        empresa_id: int | None = None
     ) -> str:
         """
         Envía confirmación de documentos completos por correo y WhatsApp.
@@ -154,7 +160,8 @@ class NotificacionOperacionalService:
                 enviado_email = await self.email_service.enviar_confirmacion_documentos_completos(
                     destinatario_email=correo,
                     razon_social=razon_social,
-                    titulo_embarque=titulo_embarque
+                    titulo_embarque=titulo_embarque,
+                    empresa_id=empresa_id
                 )
                 if enviado_email:
                     canal_usado.append("EMAIL")

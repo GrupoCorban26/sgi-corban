@@ -722,13 +722,21 @@ class SeguimientosService:
                 seg = await self.db.get(Seguimiento, seguimiento_id)
                 if seg and seg.contacto_alerta:
                     from app.services.comercial.notificacion_operacional_service import NotificacionOperacionalService
-                    notif_svc = NotificacionOperacionalService()
+                    notif_svc = NotificacionOperacionalService(self.db)
+                    
+                    empresa_id = None
+                    if seg.cliente:
+                        empresa_id = seg.cliente.empresa_id
+                    if not empresa_id and seg.comercial and seg.comercial.empleado:
+                        empresa_id = seg.comercial.empleado.empresa_id
+
                     canal = await notif_svc.enviar_confirmacion_docs_completos(
                         telefono=seg.contacto_alerta.telefono if seg.contacto_alerta else None,
                         correo=seg.contacto_alerta.correo if seg.contacto_alerta else None,
                         razon_social=seg.cliente_razon_social,
                         titulo_embarque=seg.titulo,
-                        nombre_contacto=seg.contacto_alerta.nombre if seg.contacto_alerta else ""
+                        nombre_contacto=seg.contacto_alerta.nombre if seg.contacto_alerta else "",
+                        empresa_id=empresa_id
                     )
                     if canal:
                         logger.info(f"[DOCS-COMPLETOS] Confirmación enviada por {canal} para seguimiento #{seguimiento_id}")

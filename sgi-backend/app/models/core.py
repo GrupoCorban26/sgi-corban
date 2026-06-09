@@ -72,3 +72,10 @@ class Empresa(Base):
     ruc = Column(String(11), nullable=False, unique=True)
     oficina = Column(String(100))
     modulo = Column(String(100))
+
+    # SMTP Credentials (Dynamic Multi-Company)
+    smtp_host = Column(String(150), nullable=True)
+    smtp_port = Column(Integer, nullable=True, default=587)
+    smtp_user = Column(String(150), nullable=True)
+    smtp_password = Column(String(255), nullable=True)
+    smtp_sender = Column(String(255), nullable=True)

@@ -228,9 +228,9 @@ async def _alertas_documentos_pendientes():
         )
         from app.services.comercial.notificacion_operacional_service import NotificacionOperacionalService
 
-        notif_service = NotificacionOperacionalService()
-
         async with AsyncSessionLocal() as db:
+            notif_service = NotificacionOperacionalService(db)
+            
             # Obtener seguimientos en EN_OPERACION con fecha_limite_documentos definida
             query = (
                 select(Seguimiento)
@@ -302,6 +302,13 @@ async def _alertas_documentos_pendientes():
                 # Verificar cada umbral
                 for umbral in UMBRALES_ALERTA_DIAS:
                     if dias_restantes <= umbral and umbral not in dias_alertados:
+                        # Determinar empresa_id para el envío SMTP y firma de correo
+                        empresa_id = None
+                        if seg.cliente:
+                            empresa_id = seg.cliente.empresa_id
+                        if not empresa_id and seg.comercial and seg.comercial.empleado:
+                            empresa_id = seg.comercial.empleado.empresa_id
+
                         # Enviar alerta multicanal
                         canal = await notif_service.enviar_alerta_fecha_limite(
                             telefono=destinatario_telefono,
@@ -312,7 +319,8 @@ async def _alertas_documentos_pendientes():
                             dias_restantes_limite=max(dias_restantes, 0),
                             fecha_eta=seg.fecha_eta,
                             documentos_pendientes=nombres_docs,
-                            nombre_contacto=nombre_contacto
+                            nombre_contacto=nombre_contacto,
+                            empresa_id=empresa_id
                         )
 
                         # Solo registrar la alerta si se envió exitosamente por al menos un canal
