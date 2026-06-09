@@ -84,11 +84,24 @@ class EmailService:
 
     def _send_email_sync(self, destinatario: str, subject: str, html_body: str, smtp_config: dict) -> bool:
         """Envío síncrono del correo vía SMTP. Se ejecuta en un thread."""
+        import re
+        from email.header import Header
+        from email.utils import formataddr
+
         try:
             msg = MIMEMultipart("alternative")
-            msg["From"] = smtp_config["sender"]
+            
+            # Formatear y codificar cabecera From para evitar problemas de codificación (ej: acentos como 'í')
+            sender_str = smtp_config["sender"]
+            match = re.match(r"^(.*?)\s*<(.*?)>$", sender_str)
+            if match:
+                name, email_addr = match.groups()
+                msg["From"] = formataddr((str(Header(name, "utf-8")), email_addr))
+            else:
+                msg["From"] = sender_str
+                
             msg["To"] = destinatario
-            msg["Subject"] = subject
+            msg["Subject"] = Header(subject, "utf-8")
             msg.attach(MIMEText(html_body, "html", "utf-8"))
 
             with smtplib.SMTP(smtp_config["host"], smtp_config["port"], timeout=30) as server:

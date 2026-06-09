@@ -1,46 +1,111 @@
 <!DOCTYPE html>
 <html lang="es">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#f8fafc;font-family:'Segoe UI',Roboto,Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;padding:32px 0;">
-<tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
-    <tr><td style="background:linear-gradient(135deg,#059669,#10b981);padding:32px;text-align:center;">
-        <div style="font-size:48px;margin-bottom:8px;">&#x2705;</div>
-        <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;">
-            Documentos Recibidos Correctamente
-        </h1>
-        <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:13px;">
-            {{ empresa_nombre }} - Sistema de Gestión de Cargas
-        </p>
-    </td></tr>
-    <tr><td style="padding:32px;">
-        <p style="margin:0 0 8px;font-size:15px;color:#1e293b;">
-            Estimado/a <strong>{{ razon_social }}</strong>,
-        </p>
-        <p style="margin:0 0 24px;font-size:14px;color:#475569;line-height:1.6;">
-            Nos complace informarle que <strong>todos los documentos</strong> correspondientes
-            al embarque <strong>"{{ titulo_embarque }}"</strong> han sido recepcionados y verificados exitosamente.
-        </p>
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
-        <tr><td style="background:#ecfdf5;border:1px solid #a7f3d0;border-radius:12px;padding:20px;text-align:center;">
-            <span style="font-size:14px;font-weight:700;color:#059669;text-transform:uppercase;letter-spacing:1px;">
-                Documentación completa - Carga en proceso
-            </span>
-        </td></tr>
-        </table>
-        <p style="margin:0;font-size:13px;color:#64748b;line-height:1.6;">
-            Nuestro equipo de operaciones continuará con el seguimiento de su carga.
-            En caso de novedades, su ejecutivo comercial le contactará oportunamente.
-        </p>
-    </td></tr>
-    <tr><td style="background:#f8fafc;padding:20px 32px;border-top:1px solid #e2e8f0;">
-        <p style="margin:0;font-size:11px;color:#94a3b8;text-align:center;">
-            Este es un correo automático generado por el SGI de {{ empresa_nombre }}. Por favor no responda a este correo.
-        </p>
-    </td></tr>
-</table>
-</td></tr>
-</table>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documentos Recibidos - {{ titulo_embarque }}</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f1f5f9; padding: 40px 0;">
+        <tr>
+            <td align="center">
+                <!-- Tarjeta Principal -->
+                <table width="600" cellpadding="0" cellspacing="0" style="background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
+                    
+                    <!-- Encabezado con degradado corporativo moderno (Verde para Completado) -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #0f172a, #1e293b); padding: 32px 40px; border-bottom: 4px solid #10b981;">
+                            <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td>
+                                        <div style="color: #10b981; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px;">
+                                            SGI - Confirmación de Recepción
+                                        </div>
+                                        <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">
+                                            {{ empresa_nombre }}
+                                        </h1>
+                                    </td>
+                                    <td align="right" valign="middle">
+                                        <!-- Badge de Éxito / Completo -->
+                                        <span style="background-color: #10b98115; border: 1px solid #10b98150; color: #10b981; padding: 6px 14px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; display: inline-block;">
+                                            ✓ COMPLETO
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Contenido de la tarjeta -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="margin: 0 0 12px; font-size: 16px; color: #0f172a; font-weight: 600;">
+                                Estimado/a <strong>{{ razon_social }}</strong>,
+                            </p>
+                            <p style="margin: 0 0 24px; font-size: 14px; color: #475569; line-height: 1.6;">
+                                Nos complace informarle que **todos los documentos requeridos** para el despacho de su carga han sido recibidos y validados exitosamente en nuestro sistema.
+                            </p>
+
+                            <!-- Detalle del Embarque Procesado -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f0fdf4; border: 1px solid #dcfce7; border-radius: 12px; margin-bottom: 28px;">
+                                <tr>
+                                    <td style="padding: 20px; text-align: center;">
+                                        <div style="font-size: 12px; color: #15803d; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px;">
+                                            Embarque Identificado
+                                        </div>
+                                        <div style="font-size: 16px; color: #166534; font-weight: 700;">
+                                            "{{ titulo_embarque }}"
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Mensaje de Status Informativo -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; border: 1px solid #f1f5f9; border-radius: 12px; margin-bottom: 32px;">
+                                <tr>
+                                    <td style="padding: 20px;">
+                                        <table cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td width="30" valign="top" style="font-size: 20px; line-height: 1;">🚢</td>
+                                                <td style="font-size: 13px; color: #475569; line-height: 1.5; font-weight: 500;">
+                                                    <strong>Estado: Listo para Operar.</strong> Su documentación está completa y lista para el proceso de aduana y transporte correspondiente. Su asesor comercial asignado le mantendrá al tanto del progreso del embarque.
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <p style="margin: 0 0 28px; font-size: 14px; color: #475569; line-height: 1.6;">
+                                Agradecemos su puntual colaboración en esta fase del proceso.
+                            </p>
+                            
+                            <table width="100%" cellpadding="0" cellspacing="0" style="border-top: 1px solid #e2e8f0; padding-top: 24px;">
+                                <tr>
+                                    <td style="font-size: 13px; color: #64748b; line-height: 1.5;">
+                                        Atentamente,<br>
+                                        <strong style="color: #0f172a;">Equipo de Operaciones</strong><br>
+                                        {{ empresa_nombre }}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Pie de página / Footer -->
+                    <tr>
+                        <td style="background: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0; text-align: center;">
+                            <p style="margin: 0 0 4px; font-size: 11px; color: #94a3b8; font-weight: 500;">
+                                Este es un correo automático de notificación del SGI de {{ empresa_nombre }}.
+                            </p>
+                            <p style="margin: 0; font-size: 11px; color: #cbd5e1;">
+                                Favor no responder a esta dirección directamente.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
 </body>
 </html>

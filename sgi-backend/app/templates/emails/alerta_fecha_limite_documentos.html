@@ -1,86 +1,150 @@
 <!DOCTYPE html>
 <html lang="es">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:0;background-color:#f8fafc;font-family:'Segoe UI',Roboto,Arial,sans-serif;">
-<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f8fafc;padding:32px 0;">
-<tr><td align="center">
-<table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.06);">
-    <!-- Header -->
-    <tr><td style="background:linear-gradient(135deg,{{ urgencia_color }},{{ urgencia_color }}cc);padding:24px 32px;">
-        <h1 style="margin:0;color:#ffffff;font-size:18px;font-weight:700;letter-spacing:0.5px;">
-            {{ urgencia_icono }} {{ urgencia_texto }}: Fecha Límite de Documentos
-        </h1>
-        <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:13px;">
-            {{ empresa_nombre }} - Operaciones de Comercio Exterior
-        </p>
-    </td></tr>
-
-    <!-- Body -->
-    <tr><td style="padding:32px;">
-        <p style="margin:0 0 8px;font-size:15px;color:#1e293b;">
-            Estimado/a <strong>{{ razon_social }}</strong>,
-        </p>
-        <p style="margin:0 0 24px;font-size:14px;color:#475569;line-height:1.6;">
-            Le recordamos que el embarque <strong>"{{ titulo_embarque }}"</strong> tiene una
-            <strong>fecha límite de entrega de documentos</strong> establecida para el
-            <strong style="color:{{ urgencia_color }};">{{ fecha_limite }}</strong>.
-            La fecha estimada de arribo (ETA) de su carga es el
-            <strong>{{ fecha_eta }}</strong>.
-        </p>
-
-        <!-- Contadores -->
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ urgencia_texto }}: Fecha Límite de Documentos</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f1f5f9; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f1f5f9; padding: 40px 0;">
         <tr>
-            <td width="48%" style="background:{{ urgencia_color }}10;border:1px solid {{ urgencia_color }}30;border-radius:12px;padding:16px;text-align:center;">
-                <span style="font-size:32px;font-weight:800;color:{{ urgencia_color }};">{{ dias_restantes_limite }}</span>
-                <br><span style="font-size:11px;color:{{ urgencia_color }};font-weight:600;text-transform:uppercase;letter-spacing:1px;">días para fecha límite</span>
-            </td>
-            <td width="4%"></td>
-            <td width="48%" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:12px;padding:16px;text-align:center;">
-                <span style="font-size:16px;font-weight:700;color:#0369a1;">{{ fecha_eta }}</span>
-                <br><span style="font-size:11px;color:#0369a1;font-weight:600;text-transform:uppercase;letter-spacing:1px;">ETA de la carga</span>
+            <td align="center">
+                <!-- Tarjeta Principal -->
+                <table width="600" cellpadding="0" cellspacing="0" style="background: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.05); border: 1px solid #e2e8f0;">
+                    
+                    <!-- Encabezado con degradado corporativo moderno -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #0f172a, #1e293b); padding: 32px 40px; border-bottom: 4px solid {{ urgencia_color }};">
+                            <table width="100%" cellpadding="0" cellspacing="0">
+                                <tr>
+                                    <td>
+                                        <div style="color: #38bdf8; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px;">
+                                            SGI - Sistema de Gestión de Cargas
+                                        </div>
+                                        <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">
+                                            {{ empresa_nombre }}
+                                        </h1>
+                                    </td>
+                                    <td align="right" valign="middle">
+                                        <!-- Badge de Urgencia Dinámico -->
+                                        <span style="background-color: {{ urgencia_color }}15; border: 1px solid {{ urgencia_color }}50; color: {{ urgencia_color }}; padding: 6px 14px; border-radius: 9999px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; display: inline-block;">
+                                            {{ urgencia_icono }} {{ urgencia_texto }}
+                                        </span>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Contenido de la tarjeta -->
+                    <tr>
+                        <td style="padding: 40px;">
+                            <p style="margin: 0 0 12px; font-size: 16px; color: #0f172a; font-weight: 600;">
+                                Estimado/a <strong>{{ razon_social }}</strong>,
+                            </p>
+                            <p style="margin: 0 0 28px; font-size: 14px; color: #475569; line-height: 1.6;">
+                                Le recordamos que el embarque <strong style="color: #0f172a;">"{{ titulo_embarque }}"</strong> tiene establecida una **fecha límite de entrega de documentos**. Agradecemos regularizar el envío de los pendientes detallados.
+                            </p>
+
+                            <!-- Dashboard de Información Clave (2 columnas) -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; border-radius: 12px; border: 1px solid #f1f5f9; margin-bottom: 32px; overflow: hidden;">
+                                <tr>
+                                    <!-- Columna 1: Días para Fecha Límite -->
+                                    <td width="50%" align="center" style="padding: 24px; border-right: 1px solid #f1f5f9; border-bottom: 3px solid {{ urgencia_color }};">
+                                        <div style="font-size: 40px; font-weight: 800; color: {{ urgencia_color }}; line-height: 1; margin-bottom: 4px;">
+                                            {{ dias_restantes_limite }}
+                                        </div>
+                                        <div style="font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; line-height: 1.2;">
+                                            Días para Fecha Límite
+                                        </div>
+                                        <div style="font-size: 12px; color: #334155; font-weight: 600; margin-top: 8px;">
+                                            Límite: {{ fecha_limite }}
+                                        </div>
+                                    </td>
+                                    <!-- Columna 2: ETA de Carga -->
+                                    <td width="50%" align="center" style="padding: 24px; border-bottom: 3px solid #3b82f6;">
+                                        <div style="font-size: 20px; font-weight: 700; color: #1e293b; line-height: 1.2; margin-top: 14px; margin-bottom: 12px;">
+                                            {{ fecha_eta }}
+                                        </div>
+                                        <div style="font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
+                                            Fecha Estimada Arribo (ETA)
+                                        </div>
+                                    </td>
+                                </tr>
+                            </table>
+
+                            <!-- Advertencia de sobrecostos (solo cuando quedan ≤3 días) -->
+                            {% if dias_restantes_limite <= 3 %}
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fef2f2; border: 1px solid #fee2e2; border-radius: 12px; margin-bottom: 32px;">
+                                <tr>
+                                    <td style="padding: 18px;">
+                                        <table cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td width="32" valign="top" style="font-size: 20px; line-height: 1;">🚨</td>
+                                                <td style="font-size: 13px; color: #991b1b; line-height: 1.6; font-weight: 600;">
+                                                    <strong>AVISO CRÍTICO:</strong> Los sobrecostos en puerto/almacén generados por retrasos en la entrega y regularización de documentos <strong>no serán asumidos por {{ empresa_nombre }}</strong>. Por favor, regularice a la brevedad.
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+                            {% endif %}
+
+                            <!-- Listado de Documentos Pendientes -->
+                            <h3 style="margin: 0 0 16px; font-size: 13px; color: #334155; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px;">
+                                Documentos Requeridos Pendientes ({{ documentos_pendientes | length }})
+                            </h3>
+                            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 32px;">
+                                {% for doc in documentos_pendientes %}
+                                <tr>
+                                    <td style="padding: 12px 0; border-bottom: 1px dashed #e2e8f0; vertical-align: middle;">
+                                        <table cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td width="30" valign="top">
+                                                    <span style="font-size: 16px; color: #f97316; line-height: 1;">📄</span>
+                                                </td>
+                                                <td style="font-size: 14px; color: #334155; font-weight: 500; line-height: 1.4;">
+                                                    {{ doc }}
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </table>
+
+                            <!-- Cierre del mensaje -->
+                            <p style="margin: 0 0 24px; font-size: 14px; color: #475569; line-height: 1.6;">
+                                Por favor, envíe los documentos requeridos lo antes posible respondiendo directamente a este correo o poniéndose en contacto con su ejecutivo comercial.
+                            </p>
+                            
+                            <table width="100%" cellpadding="0" cellspacing="0" style="border-top: 1px solid #e2e8f0; padding-top: 24px;">
+                                <tr>
+                                    <td style="font-size: 13px; color: #64748b; line-height: 1.5;">
+                                        Atentamente,<br>
+                                        <strong style="color: #0f172a;">Equipo de Operaciones</strong><br>
+                                        {{ empresa_nombre }}
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Pie de página / Footer -->
+                    <tr>
+                        <td style="background: #f8fafc; padding: 24px 40px; border-top: 1px solid #e2e8f0; text-align: center;">
+                            <p style="margin: 0 0 4px; font-size: 11px; color: #94a3b8; font-weight: 500;">
+                                Este es un correo automático de notificación del SGI de {{ empresa_nombre }}.
+                            </p>
+                            <p style="margin: 0; font-size: 11px; color: #cbd5e1;">
+                                Favor no responder a esta dirección directamente.
+                            </p>
+                        </td>
+                    </tr>
+                </table>
             </td>
         </tr>
-        </table>
-
-        <!-- Advertencia de sobrecostos (solo cuando quedan ≤3 días) -->
-        {% if dias_restantes_limite <= 3 %}
-        <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:24px;">
-        <tr><td style="background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:16px;">
-            <p style="margin:0;font-size:13px;color:#991b1b;line-height:1.6;">
-                <strong>&#x26A0; Aviso importante:</strong> La documentación que no sea entregada
-                antes de la fecha límite indicada podría ocasionar retrasos en el despacho de su carga.
-                Los sobrecostos generados por demoras en la entrega de documentos
-                <strong>no serán asumidos por {{ empresa_nombre }}</strong>.
-            </p>
-        </td></tr>
-        </table>
-        {% endif %}
-
-        <!-- Lista de documentos pendientes -->
-        <h3 style="margin:0 0 12px;font-size:14px;color:#1e293b;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;">
-            Documentos Pendientes ({{ documentos_pendientes | length }})
-        </h3>
-        <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;margin-bottom:24px;">
-            <tr><td style="background:#f8fafc;padding:10px 16px;font-size:12px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #e2e8f0;">Documento Requerido</td></tr>
-            {% for doc in documentos_pendientes %}
-            <tr><td style="padding:10px 16px;border-bottom:1px solid #f1f5f9;font-size:14px;color:#334155;">&#x2B1C; {{ doc }}</td></tr>
-            {% endfor %}
-        </table>
-        <p style="margin:0;font-size:13px;color:#64748b;line-height:1.6;">
-            Por favor, envíe los documentos indicados a la brevedad para asegurar el correcto
-            procesamiento de su carga. En caso de consultas, no dude en contactar a su ejecutivo comercial.
-        </p>
-    </td></tr>
-
-    <!-- Footer -->
-    <tr><td style="background:#f8fafc;padding:20px 32px;border-top:1px solid #e2e8f0;">
-        <p style="margin:0;font-size:11px;color:#94a3b8;text-align:center;">
-            Este es un correo automático generado por el SGI de {{ empresa_nombre }}. Por favor no responda a este correo.
-        </p>
-    </td></tr>
-</table>
-</td></tr>
-</table>
+    </table>
 </body>
 </html>
