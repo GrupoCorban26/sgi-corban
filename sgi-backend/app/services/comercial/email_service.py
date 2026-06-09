@@ -20,7 +20,7 @@ from sqlalchemy.future import select
 logger = logging.getLogger(__name__)
 
 # Directorio de plantillas relativo a este archivo
-TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "templates" / "emails"
+TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "templates" / "emails"
 
 
 class EmailService:
