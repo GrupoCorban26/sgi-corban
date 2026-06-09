@@ -1,11 +1,23 @@
 import asyncio
+import os
 import sys
 from datetime import date, datetime
 from sqlalchemy import select
 from dotenv import load_dotenv
 
-# Cargar variables de entorno del archivo .env antes de inicializar la configuración
-load_dotenv()
+# Buscar y cargar el archivo de configuración (.env.production o .env) en la carpeta del script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+env_prod = os.path.join(script_dir, ".env.production")
+env_dev = os.path.join(script_dir, ".env")
+
+if os.path.exists(env_prod):
+    load_dotenv(env_prod)
+    print(f"ℹ️ Cargado archivo de configuración de producción: {env_prod}")
+elif os.path.exists(env_dev):
+    load_dotenv(env_dev)
+    print(f"ℹ️ Cargado archivo de configuración de desarrollo: {env_dev}")
+else:
+    print("⚠️ No se encontró ningún archivo .env o .env.production en el directorio del script.")
 
 from app.database.db_connection import AsyncSessionLocal
 from app.models.core import Empresa
