@@ -332,7 +332,8 @@ class AnalyticsComercialService:
         fecha_inicio: date, 
         fecha_fin: date, 
         comercial_ids: Optional[List[int]] = None,
-        cliente_id: Optional[int] = None
+        cliente_id: Optional[int] = None,
+        empresa_id: Optional[int] = None
     ) -> CotizacionesAnalyticsResponse:
         """
         Calcula las métricas de rendimiento y distribución del Kanban de cotizaciones
@@ -365,6 +366,8 @@ class AnalyticsComercialService:
         )
         if cliente_id:
             query = query.where(Seguimiento.cliente_id == cliente_id)
+        if empresa_id:
+            query = query.join(Cliente, Seguimiento.cliente_id == Cliente.id).where(Cliente.empresa_id == empresa_id)
             
         res = await self.db.execute(query)
         seguimientos = res.scalars().all()
@@ -601,13 +604,16 @@ class AnalyticsComercialService:
         fecha_inicio: date, 
         fecha_fin: date, 
         comercial_ids: Optional[List[int]] = None,
-        cliente_id: Optional[int] = None
+        cliente_id: Optional[int] = None,
+        empresa_id: Optional[int] = None
     ) -> bytes:
         """
         Genera el reporte de cotizaciones en un archivo Excel en memoria (XLSX).
         """
         # 1. Obtener la data consolidada de resumen
-        analytics_data = await self.get_cotizaciones_analytics(fecha_inicio, fecha_fin, comercial_ids, cliente_id=cliente_id)
+        analytics_data = await self.get_cotizaciones_analytics(
+            fecha_inicio, fecha_fin, comercial_ids, cliente_id=cliente_id, empresa_id=empresa_id
+        )
 
         resumen_list = []
         for rc in analytics_data.rendimiento_comerciales:
@@ -639,6 +645,8 @@ class AnalyticsComercialService:
         ).order_by(Seguimiento.created_at.desc())
         if cliente_id:
             query = query.where(Seguimiento.cliente_id == cliente_id)
+        if empresa_id:
+            query = query.join(Cliente, Seguimiento.cliente_id == Cliente.id).where(Cliente.empresa_id == empresa_id)
         
         res = await self.db.execute(query)
         seguimientos = res.scalars().all()
