@@ -33,7 +33,10 @@ class InboxService:
                 Inbox.telefono == phone, 
                 Inbox.ultimo_estado.in_(['PENDIENTE', 'NUEVO', 'BOT'])
             )
-        ).order_by(Inbox.id.desc())
+        )
+        if data.bot_config_id:
+            query_inbox = query_inbox.where(Inbox.bot_config_id == data.bot_config_id)
+        query_inbox = query_inbox.order_by(Inbox.id.desc())
         result_inbox = await self.db.execute(query_inbox)
         existing_inbox = result_inbox.scalars().first()
         
@@ -46,23 +49,53 @@ class InboxService:
                 return self._format_response(existing_inbox, user)
             # If it's NUEVO, we will just assign it below instead of creating a new one
 
-        # 3. Check if exists in Clientes or ClienteContactos
+        # Resolve company (empresa_id) of the bot/jefe to filter existing client portfolio
+        bot_empresa_id = None
+        jefe_id_val = data.jefe_comercial_id
+        if not jefe_id_val and data.bot_config_id:
+            from app.models.whatsapp_bot_config import WhatsAppBotConfig
+            stmt_bot = select(WhatsAppBotConfig.jefe_comercial_id).where(WhatsAppBotConfig.id == data.bot_config_id)
+            res_bot = await self.db.execute(stmt_bot)
+            jefe_id_val = res_bot.scalar()
+            
+        if jefe_id_val:
+            stmt_emp = select(Empleado.empresa_id).where(Empleado.id == jefe_id_val)
+            res_emp = await self.db.execute(stmt_emp)
+            bot_empresa_id = res_emp.scalar()
+
+        # 3. Check if exists in Clientes or ClienteContactos (filtered by company)
         # Buscar en Contactos primero
-        query_contacto = select(ClienteContacto).where(and_(ClienteContacto.telefono == phone, ClienteContacto.is_active == True))
+        query_contacto = (
+            select(ClienteContacto)
+            .join(Cliente, Cliente.ruc == ClienteContacto.ruc)
+            .where(
+                and_(
+                    ClienteContacto.telefono == phone,
+                    ClienteContacto.is_active == True,
+                    Cliente.is_active == True
+                )
+            )
+        )
+        if bot_empresa_id:
+            query_contacto = query_contacto.where(Cliente.empresa_id == bot_empresa_id)
+            
         result_contacto = await self.db.execute(query_contacto)
         contacto = result_contacto.scalars().first()
 
         assigned_user = None
         is_existing_client = False
 
-        if contacto:
-            pass # (Logic remains same as previous step, just skipping for brevity in diff if not changed)
-        
-        # ... (Same logic for finding client)
-
         if contacto and contacto.ruc:
             is_existing_client = True
-            query_cliente = select(Cliente).where(Cliente.ruc == contacto.ruc)
+            query_cliente = select(Cliente).where(
+                and_(
+                    Cliente.ruc == contacto.ruc,
+                    Cliente.is_active == True
+                )
+            )
+            if bot_empresa_id:
+                query_cliente = query_cliente.where(Cliente.empresa_id == bot_empresa_id)
+                
             result_cliente = await self.db.execute(query_cliente)
             cliente = result_cliente.scalars().first()
             

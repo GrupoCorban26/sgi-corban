@@ -242,13 +242,16 @@ async def _process_webhook(payload: WhatsAppWebhookPayload, slug: str | None):
                                 referral_headline = referral.get("headline", referral.get("body", ""))
                                 logger.info(f"Lead desde CAMPAÑA Meta: ad_id={referral_source_id}, headline={referral_headline}")
 
-                        # Check if there's an active inbox
+                        # Check if there's an active inbox for this bot/number
                         query_inbox = select(Inbox).where(
                             and_(
                                 Inbox.telefono == from_num_norm,
                                 Inbox.estado.not_in(['CERRADO', 'DESCARTADO'])
                             )
-                        ).order_by(Inbox.id.desc())
+                        )
+                        if bot_config_id:
+                            query_inbox = query_inbox.where(Inbox.bot_config_id == bot_config_id)
+                        query_inbox = query_inbox.order_by(Inbox.id.desc())
                         result_inbox = await db.execute(query_inbox)
                         inbox = result_inbox.scalars().first()
 
@@ -277,17 +280,33 @@ async def _process_webhook(payload: WhatsAppWebhookPayload, slug: str | None):
                             inbox = new_inbox
 
                             # ==========================================
-                            # AUTO-DERIVAR si el teléfono está en cartera
+                            # AUTO-DERIVAR si el teléfono está en cartera de la misma empresa
                             # (cliente CERRADO que regresa → asignar a su comercial)
                             # ==========================================
                             try:
                                 from app.models.comercial import ClienteContacto, Cliente
-                                query_contacto = select(ClienteContacto).where(
-                                    and_(
-                                        ClienteContacto.telefono == from_num_norm,
-                                        ClienteContacto.is_active == True
+                                
+                                # Obtener empresa vinculada al bot
+                                bot_empresa_id = None
+                                if bot_config:
+                                    stmt_emp = select(Empleado.empresa_id).where(Empleado.id == bot_config.jefe_comercial_id)
+                                    res_emp = await db.execute(stmt_emp)
+                                    bot_empresa_id = res_emp.scalar()
+
+                                query_contacto = (
+                                    select(ClienteContacto)
+                                    .join(Cliente, Cliente.ruc == ClienteContacto.ruc)
+                                    .where(
+                                        and_(
+                                            ClienteContacto.telefono == from_num_norm,
+                                            ClienteContacto.is_active == True,
+                                            Cliente.is_active == True
+                                        )
                                     )
                                 )
+                                if bot_empresa_id:
+                                    query_contacto = query_contacto.where(Cliente.empresa_id == bot_empresa_id)
+
                                 result_contacto = await db.execute(query_contacto)
                                 contacto_cartera = result_contacto.scalars().first()
 
@@ -298,6 +317,9 @@ async def _process_webhook(payload: WhatsAppWebhookPayload, slug: str | None):
                                             Cliente.is_active == True
                                         )
                                     )
+                                    if bot_empresa_id:
+                                        query_cliente = query_cliente.where(Cliente.empresa_id == bot_empresa_id)
+
                                     result_cliente = await db.execute(query_cliente)
                                     cliente_cartera = result_cliente.scalars().first()
 
