@@ -3,13 +3,18 @@ Servicio de envío de correos para alertas de documentos operacionales.
 Utiliza SMTP con plantillas HTML Jinja2 profesionales.
 
 Las plantillas HTML se encuentran en: app/templates/emails/
+Los logos de empresa se embeben como adjuntos CID (Content-ID) para
+garantizar visualización en cualquier cliente de correo, sin depender
+de que el servidor backend sea accesible públicamente.
 """
 import asyncio
 import logging
+import mimetypes
 import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.image import MIMEImage
 from datetime import date
 from pathlib import Path
 
@@ -21,6 +26,9 @@ logger = logging.getLogger(__name__)
 
 # Directorio de plantillas relativo a este archivo
 TEMPLATES_DIR = Path(__file__).resolve().parent.parent.parent / "templates" / "emails"
+
+# Directorio raíz del backend (donde están uploads/)
+BACKEND_ROOT = Path(__file__).resolve().parent.parent.parent.parent
 
 
 class EmailService:
@@ -82,43 +90,68 @@ class EmailService:
 
         return smtp_config, empresa_nombre
 
-    async def _resolve_empresa_logo(self, empresa_id: int | None) -> str | None:
-        """Obtiene la URL absoluta del logo de la empresa desde la BD o None."""
+    async def _resolve_empresa_logo_path(self, empresa_id: int | None) -> Path | None:
+        """
+        Obtiene la ruta local (Path) del archivo de logo de la empresa desde la BD.
+        Retorna None si no hay logo configurado o el archivo no existe en disco.
+        """
         from app.models.core import Empresa
-        from app.core.settings import get_settings
 
-        logo_path = None
+        logo_field = None
         if self.db and empresa_id:
             try:
                 result = await self.db.execute(select(Empresa.logo).where(Empresa.id == empresa_id))
-                logo_path = result.scalar_one_or_none()
+                logo_field = result.scalar_one_or_none()
             except Exception as e:
                 logger.error(f"Error cargando logo para empresa #{empresa_id}: {e}", exc_info=True)
 
-        if not logo_path:
+        if not logo_field:
             return None
 
-        # Si ya es una URL absoluta, la retornamos directamente
-        if logo_path.startswith("http://") or logo_path.startswith("https://"):
-            return logo_path
+        # Limpiar el valor: quitar comillas extras que puedan haberse guardado
+        logo_field = logo_field.strip().strip('"').strip("'")
 
-        # Si es una ruta relativa, le anteponemos la URL del backend configurada
-        settings = get_settings()
-        backend_url = getattr(settings, "BACKEND_URL", "http://localhost:8000").rstrip("/")
-        if not logo_path.startswith("/"):
-            logo_path = "/" + logo_path
+        # Caso 1: Es una ruta absoluta del sistema de archivos (e.g. C:\...\logo.png o /app/uploads/...)
+        candidate = Path(logo_field)
+        if candidate.is_absolute() and candidate.is_file():
+            logger.info(f"Logo encontrado como ruta absoluta: {candidate}")
+            return candidate
 
-        return f"{backend_url}{logo_path}"
+        # Caso 2: Es una ruta relativa tipo "uploads/logos/logo_ebl.png"
+        candidate = BACKEND_ROOT / logo_field
+        if candidate.is_file():
+            logger.info(f"Logo encontrado como ruta relativa al backend: {candidate}")
+            return candidate
 
+        # Caso 3: Solo viene el nombre del archivo, buscamos en uploads/logos/
+        candidate = BACKEND_ROOT / "uploads" / "logos" / Path(logo_field).name
+        if candidate.is_file():
+            logger.info(f"Logo encontrado en uploads/logos/: {candidate}")
+            return candidate
 
-    def _send_email_sync(self, destinatario: str, subject: str, html_body: str, smtp_config: dict) -> bool:
-        """Envío síncrono del correo vía SMTP. Se ejecuta en un thread."""
+        logger.warning(f"Archivo de logo no encontrado para empresa #{empresa_id}: '{logo_field}'")
+        return None
+
+    def _send_email_sync(
+        self,
+        destinatario: str,
+        subject: str,
+        html_body: str,
+        smtp_config: dict,
+        logo_path: Path | None = None,
+    ) -> bool:
+        """Envío síncrono del correo vía SMTP. Se ejecuta en un thread.
+        
+        Si se proporciona logo_path, la imagen se adjunta como recurso embebido
+        con Content-ID 'company_logo', referenciable desde el HTML como src="cid:company_logo".
+        """
         import re
         from email.header import Header
         from email.utils import formataddr
 
         try:
-            msg = MIMEMultipart("alternative")
+            # Usamos 'related' para permitir adjuntos embebidos CID
+            msg = MIMEMultipart("related")
             
             # Formatear y codificar cabecera From para evitar problemas de codificación (ej: acentos como 'í')
             sender_str = smtp_config["sender"]
@@ -131,7 +164,33 @@ class EmailService:
                 
             msg["To"] = destinatario
             msg["Subject"] = Header(subject, "utf-8")
-            msg.attach(MIMEText(html_body, "html", "utf-8"))
+
+            # Cuerpo HTML como parte alternativa dentro de 'related'
+            msg_alternative = MIMEMultipart("alternative")
+            msg_alternative.attach(MIMEText(html_body, "html", "utf-8"))
+            msg.attach(msg_alternative)
+
+            # Adjuntar logo como imagen embebida CID si existe
+            if logo_path and logo_path.is_file():
+                try:
+                    mime_type, _ = mimetypes.guess_type(str(logo_path))
+                    if mime_type and mime_type.startswith("image/"):
+                        subtype = mime_type.split("/")[1]
+                    else:
+                        subtype = "png"  # fallback
+
+                    with open(logo_path, "rb") as img_file:
+                        logo_image = MIMEImage(img_file.read(), _subtype=subtype)
+                    
+                    logo_image.add_header("Content-ID", "<company_logo>")
+                    logo_image.add_header(
+                        "Content-Disposition", "inline",
+                        filename=logo_path.name
+                    )
+                    msg.attach(logo_image)
+                    logger.info(f"Logo embebido como CID en el correo: {logo_path.name}")
+                except Exception as e:
+                    logger.warning(f"No se pudo embeber el logo '{logo_path}': {e}")
 
             with smtplib.SMTP(smtp_config["host"], smtp_config["port"], timeout=30) as server:
                 server.ehlo()
@@ -146,7 +205,14 @@ class EmailService:
             logger.error(f"Error enviando correo a {destinatario} usando SMTP {smtp_config.get('host')}: {e}", exc_info=True)
             return False
 
-    async def _send_email(self, destinatario: str, subject: str, html_body: str, smtp_config: dict) -> bool:
+    async def _send_email(
+        self,
+        destinatario: str,
+        subject: str,
+        html_body: str,
+        smtp_config: dict,
+        logo_path: Path | None = None,
+    ) -> bool:
         """Wrapper async que ejecuta el envío en un thread para no bloquear el event loop."""
         if not (smtp_config.get("host") and smtp_config.get("user") and smtp_config.get("password")):
             logger.warning(
@@ -154,7 +220,9 @@ class EmailService:
                 "Configure SMTP en la tabla core.empresas o en las variables globales del .env"
             )
             return False
-        return await asyncio.to_thread(self._send_email_sync, destinatario, subject, html_body, smtp_config)
+        return await asyncio.to_thread(
+            self._send_email_sync, destinatario, subject, html_body, smtp_config, logo_path
+        )
 
     async def enviar_alerta_documentos_pendientes(
         self,
@@ -169,7 +237,10 @@ class EmailService:
     ) -> bool:
         """Envía alerta al cliente sobre documentos pendientes antes del ETA."""
         smtp_config, empresa_nombre = await self._resolve_empresa_smtp(empresa_id)
-        logo_url = await self._resolve_empresa_logo(empresa_id)
+        logo_path = await self._resolve_empresa_logo_path(empresa_id)
+
+        # Si tenemos logo, la plantilla usará cid:company_logo; si no, usará texto
+        logo_url = "cid:company_logo" if logo_path else None
 
         urgencia_color = "#dc2626" if dias_restantes <= 7 else "#f59e0b" if dias_restantes <= 10 else "#3b82f6"
         urgencia_texto = "URGENTE" if dias_restantes <= 7 else "IMPORTANTE" if dias_restantes <= 10 else "RECORDATORIO"
@@ -189,7 +260,7 @@ class EmailService:
         )
 
         subject = f"[{urgencia_texto}] Documentos pendientes - {cor or titulo_embarque} (ETA: {fecha_eta.strftime('%d/%m/%Y')})"
-        return await self._send_email(destinatario_email, subject, html, smtp_config)
+        return await self._send_email(destinatario_email, subject, html, smtp_config, logo_path)
 
     async def enviar_confirmacion_documentos_completos(
         self,
@@ -200,7 +271,8 @@ class EmailService:
     ) -> bool:
         """Envía confirmación al cliente de que todos los documentos han sido recibidos."""
         smtp_config, empresa_nombre = await self._resolve_empresa_smtp(empresa_id)
-        logo_url = await self._resolve_empresa_logo(empresa_id)
+        logo_path = await self._resolve_empresa_logo_path(empresa_id)
+        logo_url = "cid:company_logo" if logo_path else None
 
         html = self._render_template(
             "confirmacion_documentos_completos.html",
@@ -211,7 +283,7 @@ class EmailService:
         )
 
         subject = f"Documentos recibidos - {titulo_embarque}"
-        return await self._send_email(destinatario_email, subject, html, smtp_config)
+        return await self._send_email(destinatario_email, subject, html, smtp_config, logo_path)
 
     async def enviar_alerta_fecha_limite_documentos(
         self,
@@ -227,7 +299,8 @@ class EmailService:
     ) -> bool:
         """Envía alerta al cliente sobre la fecha límite para entregar documentos."""
         smtp_config, empresa_nombre = await self._resolve_empresa_smtp(empresa_id)
-        logo_url = await self._resolve_empresa_logo(empresa_id)
+        logo_path = await self._resolve_empresa_logo_path(empresa_id)
+        logo_url = "cid:company_logo" if logo_path else None
 
         if dias_restantes_limite <= 1:
             urgencia_color = "#dc2626"
@@ -263,4 +336,4 @@ class EmailService:
         )
 
         subject = f"[{urgencia_texto}] Fecha límite de documentos - {cor or titulo_embarque} (Límite: {fecha_limite.strftime('%d/%m/%Y')})"
-        return await self._send_email(destinatario_email, subject, html, smtp_config)
+        return await self._send_email(destinatario_email, subject, html, smtp_config, logo_path)
