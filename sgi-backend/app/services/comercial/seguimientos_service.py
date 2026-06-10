@@ -16,7 +16,7 @@ from app.schemas.comercial.seguimiento import (
     SeguimientoCreate, CotizacionItemCreate, CotizacionCerrar, SeguimientoCaer,
     SeguimientoMover, SeguimientoOperar, SeguimientoEntregar,
     DocumentoOperacionalCreate, DocumentoOperacionalUpdate, DocumentoToggle,
-    ClienteRegistroFaseCierre, SeguimientoUpdate
+    ClienteRegistroFaseCierre, SeguimientoUpdate, CotizacionUpdate
 )
 from datetime import datetime, date, timedelta
 
@@ -124,7 +124,7 @@ class SeguimientosService:
         return seguimiento
 
     async def update_seguimiento(self, id: int, data: SeguimientoUpdate, usuario_id: int) -> Seguimiento:
-        """Actualiza los campos editables de una tarjeta de seguimiento."""
+        """Actualiza los campos editables de una tarjeta de seguimiento y sus cotizaciones."""
         seg = await self.get_seguimiento_by_id(id)
         
         cambios = []
@@ -178,7 +178,7 @@ class SeguimientosService:
                         else:
                             seg.fecha_limite_documentos = data.fecha_eta
                     else:
-                        seg.fecha_limite_documentos = data.fecha_eta
+                         seg.fecha_limite_documentos = data.fecha_eta
 
             if data.contacto_alerta_id is not None:
                 if seg.contacto_alerta_id != data.contacto_alerta_id:
@@ -192,6 +192,55 @@ class SeguimientosService:
                             raise HTTPException(status_code=400, detail="El contacto de alerta especificado no pertenece al cliente")
                         cambios.append(f"Contacto de alertas: '{seg.contacto_alerta.nombre if seg.contacto_alerta else 'Ninguno'}' → '{cc.nombre}'")
                         seg.contacto_alerta_id = data.contacto_alerta_id
+
+            # Actualización de cotizaciones asociadas
+            if data.cotizaciones is not None:
+                for cot_data in data.cotizaciones:
+                    cot = await self.db.get(Cotizacion, cot_data.id)
+                    if not cot or cot.seguimiento_id != seg.id:
+                        raise HTTPException(status_code=404, detail=f"La cotización con ID {cot_data.id} no pertenece a este seguimiento")
+                    
+                    cot_cambios = []
+                    if cot_data.tipo_carga_id is not None and cot.tipo_carga_id != cot_data.tipo_carga_id:
+                        from app.models.seguimiento import TipoCarga
+                        tc_old = await self.db.get(TipoCarga, cot.tipo_carga_id)
+                        tc_new = await self.db.get(TipoCarga, cot_data.tipo_carga_id)
+                        cot_cambios.append(f"Carga: '{tc_old.nombre if tc_old else cot.tipo_carga_id}' → '{tc_new.nombre if tc_new else cot_data.tipo_carga_id}'")
+                        cot.tipo_carga_id = cot_data.tipo_carga_id
+                        
+                    if cot_data.tipo_servicio_id is not None and cot.tipo_servicio_id != cot_data.tipo_servicio_id:
+                        from app.models.seguimiento import TipoServicioComercial
+                        ts_old = await self.db.get(TipoServicioComercial, cot.tipo_servicio_id)
+                        ts_new = await self.db.get(TipoServicioComercial, cot_data.tipo_servicio_id)
+                        cot_cambios.append(f"Servicio: '{ts_old.nombre if ts_old else cot.tipo_servicio_id}' → '{ts_new.nombre if ts_new else cot_data.tipo_servicio_id}'")
+                        cot.tipo_servicio_id = cot_data.tipo_servicio_id
+                        
+                    if cot_data.tipo_operacion is not None and cot.tipo_operacion != cot_data.tipo_operacion:
+                        cot_cambios.append(f"Operación: '{cot.tipo_operacion or 'N/A'}' → '{cot_data.tipo_operacion}'")
+                        cot.tipo_operacion = cot_data.tipo_operacion
+                        
+                    if cot_data.pais_origen is not None and cot.pais_origen != cot_data.pais_origen:
+                        cot_cambios.append(f"Origen: '{cot.pais_origen or 'Ninguno'}' → '{cot_data.pais_origen}'")
+                        cot.pais_origen = cot_data.pais_origen
+                        
+                    if cot_data.incoterm is not None and cot.incoterm != cot_data.incoterm:
+                        cot_cambios.append(f"Incoterm: '{cot.incoterm or 'Ninguno'}' → '{cot_data.incoterm}'")
+                        cot.incoterm = cot_data.incoterm
+                        
+                    if cot_data.codigo_operacion is not None and cot.codigo_operacion != cot_data.codigo_operacion:
+                        cot_cambios.append(f"COR: '{cot.codigo_operacion or 'Ninguno'}' → '{cot_data.codigo_operacion}'")
+                        cot.codigo_operacion = cot_data.codigo_operacion
+                        
+                    if cot_data.segmentacion_id is not None and cot.segmentacion_id != cot_data.segmentacion_id:
+                        from app.models.seguimiento import SegmentacionCierre
+                        sc_old = await self.db.get(SegmentacionCierre, cot.segmentacion_id) if cot.segmentacion_id else None
+                        sc_new = await self.db.get(SegmentacionCierre, cot_data.segmentacion_id)
+                        cot_cambios.append(f"Atribución: '{sc_old.nombre if sc_old else 'Ninguna'}' → '{sc_new.nombre if sc_new else cot_data.segmentacion_id}'")
+                        cot.segmentacion_id = cot_data.segmentacion_id
+
+                    if cot_cambios:
+                        modalidad_desc = cot.tipo_carga.nombre if cot.tipo_carga else f"#{cot.id}"
+                        cambios.append(f"Cotización ({modalidad_desc}): " + ", ".join(cot_cambios))
 
             if cambios:
                 seg.updated_by = usuario_id

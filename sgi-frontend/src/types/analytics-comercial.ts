@@ -98,6 +98,16 @@ export interface CotizacionesKpis {
   tasa_conversion: number;
 }
 
+export interface CotizacionDetalle {
+  cliente: string;
+  titulo: string;
+  tipo_carga: string;
+  servicio: string;
+  incoterm: string;
+  veces_cotizado: number;
+  estado: string;
+}
+
 export interface ComercialCotizacionesRendimiento {
   comercial_id: number;
   nombre: string;
@@ -109,6 +119,7 @@ export interface ComercialCotizacionesRendimiento {
   cotizaciones_pendientes: number;
   jefe_id?: number | null;
   jefe_nombre?: string | null;
+  detalle_cotizaciones?: CotizacionDetalle[];
 }
 
 export interface DistribucionCarga {

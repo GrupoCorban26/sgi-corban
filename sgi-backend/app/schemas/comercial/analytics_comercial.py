@@ -96,6 +96,16 @@ class CotizacionesKpis(BaseModel):
     tasa_conversion: float
 
 
+class CotizacionDetalleSchema(BaseModel):
+    cliente: str
+    titulo: str
+    tipo_carga: str
+    servicio: str
+    incoterm: str
+    veces_cotizado: int
+    estado: str
+
+
 class ComercialCotizacionesRendimiento(BaseModel):
     comercial_id: int
     nombre: str
@@ -107,6 +117,7 @@ class ComercialCotizacionesRendimiento(BaseModel):
     cotizaciones_pendientes: int
     jefe_id: Optional[int] = None
     jefe_nombre: Optional[str] = None
+    detalle_cotizaciones: List[CotizacionDetalleSchema] = []
 
 
 class DistribucionCarga(BaseModel):

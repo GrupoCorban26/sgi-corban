@@ -218,7 +218,7 @@ export default function PanelDetalleSeguimiento({
             const payload: SeguimientoUpdate = {
                 titulo: editTitulo.trim(),
                 cliente_id: editClienteId,
-                fecha_eta: editFechaEta || null,
+                fecha_eta: tieneEta ? (editFechaEta || null) : undefined,
                 temp_cliente_nombre: editClienteId ? null : editTempClienteNombre.trim(),
                 temp_cliente_ruc: editClienteId ? null : editTempClienteRuc.trim(),
                 temp_cliente_contacto: editClienteId ? null : editTempClienteContacto.trim(),
@@ -254,6 +254,7 @@ export default function PanelDetalleSeguimiento({
         : null;
 
     const mostrarDocumentos = seguimiento.estado === 'EN_OPERACION' || seguimiento.estado === 'CARGA_ENTREGADA';
+    const tieneEta = seguimiento.estado === 'EN_OPERACION' || seguimiento.estado === 'CARGA_ENTREGADA';
     const puedeEditarDocumentos = seguimiento.estado === 'EN_OPERACION';
 
     /* ── Tab pill config ── */
@@ -304,7 +305,7 @@ export default function PanelDetalleSeguimiento({
                             )}
 
                             {/* ETA badge for operational states */}
-                            {!isEditing && seguimiento.fecha_eta && mostrarDocumentos && (
+                            {!isEditing && seguimiento.fecha_eta && tieneEta && (
                                 <div className={`mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border ${
                                     diasRestantesEta !== null && diasRestantesEta <= 7
                                         ? 'bg-rose-50 text-rose-700 border-rose-200'
@@ -476,20 +477,22 @@ export default function PanelDetalleSeguimiento({
                                         </div>
 
                                         {/* Fecha ETA */}
-                                        <div>
-                                            <label className="block text-[11px] font-bold text-indigo-950 uppercase tracking-wider mb-1">
-                                                Fecha ETA
-                                            </label>
-                                            <div className="relative">
-                                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-                                                <input
-                                                    type="date"
-                                                    value={editFechaEta}
-                                                    onChange={(e) => setEditFechaEta(e.target.value)}
-                                                    className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 font-medium"
-                                                />
+                                        {tieneEta && (
+                                            <div>
+                                                <label className="block text-[11px] font-bold text-indigo-950 uppercase tracking-wider mb-1">
+                                                    Fecha ETA
+                                                </label>
+                                                <div className="relative">
+                                                    <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
+                                                    <input
+                                                        type="date"
+                                                        value={editFechaEta}
+                                                        onChange={(e) => setEditFechaEta(e.target.value)}
+                                                        className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 font-medium"
+                                                    />
+                                                </div>
                                             </div>
-                                        </div>
+                                        )}
 
                                         {/* Cliente Select */}
                                         <div>

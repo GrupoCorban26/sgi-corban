@@ -127,6 +127,17 @@ class SeguimientoCreate(BaseModel):
     temp_cliente_telefono: Optional[str] = Field(None, max_length=30)
 
 
+class CotizacionUpdate(BaseModel):
+    id: int
+    tipo_carga_id: Optional[int] = None
+    tipo_servicio_id: Optional[int] = None
+    tipo_operacion: Optional[str] = Field(None, max_length=20)
+    pais_origen: Optional[str] = Field(None, max_length=50)
+    incoterm: Optional[str] = Field(None, max_length=10)
+    codigo_operacion: Optional[str] = Field(None, max_length=20)
+    segmentacion_id: Optional[int] = None
+
+
 class SeguimientoUpdate(BaseModel):
     cliente_id: Optional[int] = None
     titulo: Optional[str] = Field(None, min_length=1, max_length=150)
@@ -137,6 +148,7 @@ class SeguimientoUpdate(BaseModel):
     temp_cliente_contacto: Optional[str] = Field(None, max_length=100)
     temp_cliente_correo: Optional[str] = Field(None, max_length=100)
     temp_cliente_telefono: Optional[str] = Field(None, max_length=30)
+    cotizaciones: Optional[List[CotizacionUpdate]] = None
 
 
 class SeguimientoResponse(BaseModel):

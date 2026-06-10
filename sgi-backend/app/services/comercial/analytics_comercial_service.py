@@ -379,7 +379,8 @@ class AnalyticsComercialService:
                 "creadas": 0,
                 "ganadas": 0,
                 "caidas": 0,
-                "pendientes": 0
+                "pendientes": 0,
+                "detalles": []
             } for uid in ids_usuarios
         }
         
@@ -425,6 +426,41 @@ class AnalyticsComercialService:
                     motivo = seg.motivo_caida.strip()
                     motivos_caida_counts[motivo] = motivos_caida_counts.get(motivo, 0) + 1
 
+            # Recopilar detalles del seguimiento para la pestaña Detalle
+            active_cots = [c for c in seg.cotizaciones if c.is_active]
+            
+            tipo_carga_list = [c.tipo_carga_nombre for c in active_cots if c.tipo_carga_nombre]
+            servicio_list = [c.tipo_servicio_nombre for c in active_cots if c.tipo_servicio_nombre]
+            incoterm_list = [c.incoterm for c in active_cots if c.incoterm]
+            
+            tipo_carga_str = ", ".join(dict.fromkeys(tipo_carga_list)) or "-"
+            servicio_str = ", ".join(dict.fromkeys(servicio_list)) or "-"
+            incoterm_str = ", ".join(dict.fromkeys(incoterm_list)) or "-"
+            
+            veces_cotizado = len(active_cots)
+            
+            if seg.estado == "CAIDO":
+                estado_det = "caido"
+            elif seg.estado in ("CIERRE", "EN_OPERACION", "CARGA_ENTREGADA"):
+                estado_det = "cerrado"
+            elif seg.estado == "COTIZADO":
+                estado_det = "cotizado"
+            else:
+                estado_det = "en seguimiento"
+                
+            detalle_item = {
+                "cliente": seg.cliente_razon_social or "Prospecto sin nombre",
+                "titulo": seg.titulo,
+                "tipo_carga": tipo_carga_str,
+                "servicio": servicio_str,
+                "incoterm": incoterm_str,
+                "veces_cotizado": veces_cotizado,
+                "estado": estado_det
+            }
+            
+            if uid in comercial_stats:
+                comercial_stats[uid]["detalles"].append(detalle_item)
+
             for cot in seg.cotizaciones:
                 if not cot.is_active:
                     continue
@@ -465,11 +501,12 @@ class AnalyticsComercialService:
         # 4. Formatear Rendimiento por Comercial
         rendimiento_comerciales = []
         for u in usuarios:
-            stats = comercial_stats.get(u.id, {"creadas": 0, "ganadas": 0, "caidas": 0, "pendientes": 0})
+            stats = comercial_stats.get(u.id, {"creadas": 0, "ganadas": 0, "caidas": 0, "pendientes": 0, "detalles": []})
             creados = stats["creadas"]
             ganados = stats["ganadas"]
             caidos = stats["caidas"]
             pendientes = stats["pendientes"]
+            detalles = stats.get("detalles", [])
 
             conclusiones_ind = ganados + caidos
             tasa_efectividad = 0.0
@@ -493,7 +530,8 @@ class AnalyticsComercialService:
                 tasa_efectividad=tasa_efectividad,
                 cotizaciones_pendientes=pendientes,
                 jefe_id=jefe_id,
-                jefe_nombre=jefe_nombre
+                jefe_nombre=jefe_nombre,
+                detalle_cotizaciones=detalles
             ))
             
         # 4b. Formatear Rendimiento por Empresa (Cliente)
