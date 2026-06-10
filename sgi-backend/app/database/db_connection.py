@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import urllib.parse
+import os
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import QueuePool
 
@@ -10,11 +11,19 @@ logger = logging.getLogger(__name__)
 
 settings = get_settings()
 
+# Determinar el servidor de base de datos.
+# Si el archivo de configuración (.env.production) define host.docker.internal,
+# pero estamos ejecutando el código fuera de Docker (por ejemplo, localmente en Windows),
+# redirigimos la conexión a localhost.
+db_server = settings.DB_SERVER
+if db_server == "host.docker.internal" and not os.path.exists("/.dockerenv"):
+    db_server = "localhost"
+
 # Construir cadena de conexión ODBC nativa (soporta instancias con nombre como localhost\SQLEXPRESS)
 if settings.DB_TRUSTED:
     odbc_connection_string = (
         f"DRIVER={{{settings.DB_DRIVER}}};"
-        f"SERVER={settings.DB_SERVER};"
+        f"SERVER={db_server};"
         f"DATABASE={settings.DB_NAME};"
         f"Trusted_Connection=yes;"
         f"TrustServerCertificate=yes;"
@@ -23,7 +32,7 @@ if settings.DB_TRUSTED:
 else:
     odbc_connection_string = (
         f"DRIVER={{{settings.DB_DRIVER}}};"
-        f"SERVER={settings.DB_SERVER};"
+        f"SERVER={db_server};"
         f"DATABASE={settings.DB_NAME};"
         f"UID={settings.DB_USER};"
         f"PWD={settings.DB_PASS};"
@@ -63,7 +72,7 @@ async def test_connection():
         # En motores asíncronos se usa "async with engine.begin()"
         async with engine.begin() as conn:
             logger.info("Conexión asíncrona exitosa")
-            logger.info(f"Conectado a: {settings.DB_NAME} en {settings.DB_SERVER}")
+            logger.info(f"Conectado a: {settings.DB_NAME} en {db_server}")
     except Exception as e:
         logger.error(f"Error en la conexión asíncrona: {e}")
 
