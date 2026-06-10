@@ -6,6 +6,7 @@ from app.database.db_connection import get_db
 from app.schemas.comercial.seguimiento import (
     SeguimientoCreate,
     SeguimientoResponse,
+    SeguimientoUpdate,
     CotizacionItemCreate,
     CotizacionItemResponse,
     CotizacionCerrar,
@@ -104,6 +105,25 @@ async def obtener_seguimiento(
         raise HTTPException(status_code=403, detail="No tienes acceso a este seguimiento")
 
     return seg
+
+
+@router.patch("/{id}", response_model=SeguimientoResponse, dependencies=[Depends(require_permission("seguimientos.editar"))])
+async def actualizar_seguimiento(
+    id: int,
+    data: SeguimientoUpdate,
+    db: AsyncSession = Depends(get_db),
+    current_user_id: int = Depends(get_current_user_id),
+    comercial_ids: list = Depends(resolver_comercial_ids)
+):
+    """Actualiza una tarjeta de seguimiento. Valida permisos del comercial encargado."""
+    service = SeguimientosService(db)
+    
+    # Validar acceso
+    seg = await service.get_seguimiento_by_id(id)
+    if comercial_ids is not None and seg.comercial_id not in comercial_ids:
+        raise HTTPException(status_code=403, detail="No tienes permisos para editar este seguimiento")
+        
+    return await service.update_seguimiento(id=id, data=data, usuario_id=current_user_id)
 
 
 # ══════════════════════════════════════════

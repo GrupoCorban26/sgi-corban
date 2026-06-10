@@ -3,6 +3,7 @@ import api from '@/lib/axios';
 import {
     Seguimiento,
     SeguimientoCreate,
+    SeguimientoUpdate,
     CotizacionItemCreate,
     CotizacionItem,
     CotizacionCerrar,
@@ -163,6 +164,18 @@ export const useSeguimientos = (comercialId: number | null = null) => {
         }
     });
 
+    // 12. Actualizar seguimiento
+    const actualizarSeguimientoMutation = useMutation({
+        mutationFn: async ({ id, data }: { id: number; data: SeguimientoUpdate }) => {
+            const { data: response } = await api.patch<Seguimiento>(`${SEGUIMIENTOS_URL}/${id}`, data);
+            return response;
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['seguimientos'] });
+            queryClient.invalidateQueries({ queryKey: ['seguimiento', variables.id] });
+        }
+    });
+
     return {
         listQuery,
         catalogosQuery,
@@ -178,7 +191,8 @@ export const useSeguimientos = (comercialId: number | null = null) => {
         registrarComentarioMutation,
         operarSeguimientoMutation,
         entregarCargaMutation,
-        toggleDocumentoMutation
+        toggleDocumentoMutation,
+        actualizarSeguimientoMutation
     };
 };
 

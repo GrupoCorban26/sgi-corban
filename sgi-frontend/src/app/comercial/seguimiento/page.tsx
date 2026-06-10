@@ -63,7 +63,8 @@ export default function SeguimientoPage() {
         agregarCotizacionMutation,
         operarSeguimientoMutation,
         entregarCargaMutation,
-        toggleDocumentoMutation
+        toggleDocumentoMutation,
+        actualizarSeguimientoMutation
     } = useSeguimientos(isBoss ? comercialId : undefined);
 
     // ── KPIs calculados client-side ──
@@ -224,6 +225,14 @@ export default function SeguimientoPage() {
         });
     };
 
+    const handleActualizarSeguimiento = async (payload: any) => {
+        if (!tarjetaSeleccionada) return;
+        return await actualizarSeguimientoMutation.mutateAsync({
+            id: tarjetaSeleccionada.id,
+            data: payload
+        });
+    };
+
     return (
         <div className="min-h-screen bg-gradient-to-br from-slate-50 via-gray-50 to-indigo-50/30">
             <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
@@ -364,6 +373,7 @@ export default function SeguimientoPage() {
                     onAgregarCotizacion={handleAgregarCotizacion}
                     onReactivar={() => handleMoverTarjeta(tarjetaSeleccionada.id, 'COTIZADO')}
                     onToggleDocumento={handleToggleDocumento}
+                    onActualizarSeguimiento={handleActualizarSeguimiento}
                 />
             )}
 

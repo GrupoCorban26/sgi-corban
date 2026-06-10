@@ -21,19 +21,24 @@ import {
     FileCheck,
     CheckCircle2,
     Clock,
-    AlertTriangle
+    AlertTriangle,
+    Edit2,
+    Save,
+    Building2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { 
     Seguimiento, 
     SeguimientoCatalogos, 
-    CotizacionItemCreate 
+    CotizacionItemCreate,
+    SeguimientoUpdate
 } from '@/types/seguimiento';
 import { 
     useSeguimientoComentarios, 
     useSeguimientoHistorial,
     useSeguimientoDetalle
 } from '@/hooks/comercial/useSeguimientos';
+import api from '@/lib/axios';
 
 /* ── Icono por medio de gestión ── */
 const MEDIO_CONFIG: Record<string, { icon: React.ElementType; color: string; bg: string }> = {
@@ -63,6 +68,13 @@ interface PanelDetalleSeguimientoProps {
     onAgregarCotizacion: (payload: CotizacionItemCreate) => Promise<unknown>;
     onReactivar?: () => void;
     onToggleDocumento?: (docRelId: number, completado: boolean) => Promise<void>;
+    onActualizarSeguimiento?: (payload: SeguimientoUpdate) => Promise<unknown>;
+}
+
+interface ClienteSimple {
+    id: number;
+    razon_social: string;
+    ruc: string | null;
 }
 
 export default function PanelDetalleSeguimiento({
@@ -73,7 +85,8 @@ export default function PanelDetalleSeguimiento({
     onRegistrarComentario,
     onAgregarCotizacion,
     onReactivar,
-    onToggleDocumento
+    onToggleDocumento,
+    onActualizarSeguimiento
 }: PanelDetalleSeguimientoProps) {
     const [activeTab, setActiveTab] = useState<'comentarios' | 'historial' | 'cotizar' | 'documentos'>('comentarios');
 
@@ -92,6 +105,20 @@ export default function PanelDetalleSeguimiento({
 
     // Toggle documento loading
     const [togglingDocId, setTogglingDocId] = useState<number | null>(null);
+
+    // Estado de Edición
+    const [isEditing, setIsEditing] = useState(false);
+    const [editTitulo, setEditTitulo] = useState('');
+    const [editFechaEta, setEditFechaEta] = useState('');
+    const [editClienteId, setEditClienteId] = useState<number | null>(null);
+    const [editTempClienteNombre, setEditTempClienteNombre] = useState('');
+    const [editTempClienteRuc, setEditTempClienteRuc] = useState('');
+    const [editTempClienteContacto, setEditTempClienteContacto] = useState('');
+    const [editTempClienteCorreo, setEditTempClienteCorreo] = useState('');
+    const [editTempClienteTelefono, setEditTempClienteTelefono] = useState('');
+    const [clientesList, setClientesList] = useState<ClienteSimple[]>([]);
+    const [loadingClientes, setLoadingClientes] = useState(false);
+    const [isUpdatingCard, setIsUpdatingCard] = useState(false);
 
     // Detalle reactivo de la tarjeta de seguimiento/cotización
     const { data: seguimientoResponse } = useSeguimientoDetalle(isOpen ? seguimientoProp.id : null);
@@ -158,6 +185,56 @@ export default function PanelDetalleSeguimiento({
         }
     };
 
+    const startEditing = () => {
+        setEditTitulo(seguimiento.titulo);
+        setEditFechaEta(seguimiento.fecha_eta ? seguimiento.fecha_eta.substring(0, 10) : '');
+        setEditClienteId(seguimiento.cliente_id);
+        setEditTempClienteNombre(seguimiento.temp_cliente_nombre || '');
+        setEditTempClienteRuc(seguimiento.temp_cliente_ruc || '');
+        setEditTempClienteContacto(seguimiento.temp_cliente_contacto || '');
+        setEditTempClienteCorreo(seguimiento.temp_cliente_correo || '');
+        setEditTempClienteTelefono(seguimiento.temp_cliente_telefono || '');
+        setIsEditing(true);
+
+        setLoadingClientes(true);
+        api.get<{ data: ClienteSimple[] }>('/clientes?page_size=200')
+            .then(res => {
+                setClientesList(res.data.data || []);
+            })
+            .catch(() => {})
+            .finally(() => setLoadingClientes(false));
+    };
+
+    const handleSaveEdit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editTitulo.trim()) {
+            toast.error('El título es requerido');
+            return;
+        }
+        if (!onActualizarSeguimiento) return;
+
+        setIsUpdatingCard(true);
+        try {
+            const payload: SeguimientoUpdate = {
+                titulo: editTitulo.trim(),
+                cliente_id: editClienteId,
+                fecha_eta: editFechaEta || null,
+                temp_cliente_nombre: editClienteId ? null : editTempClienteNombre.trim(),
+                temp_cliente_ruc: editClienteId ? null : editTempClienteRuc.trim(),
+                temp_cliente_contacto: editClienteId ? null : editTempClienteContacto.trim(),
+                temp_cliente_correo: editClienteId ? null : editTempClienteCorreo.trim(),
+                temp_cliente_telefono: editClienteId ? null : editTempClienteTelefono.trim()
+            };
+            await onActualizarSeguimiento(payload);
+            toast.success('Embarque actualizado con éxito');
+            setIsEditing(false);
+        } catch (err: any) {
+            toast.error(err.response?.data?.detail || 'Error al actualizar el embarque');
+        } finally {
+            setIsUpdatingCard(false);
+        }
+    };
+
     const formatDateTime = (dateStr: string) => {
         return new Date(dateStr).toLocaleString('es-PE', {
             day: '2-digit', month: '2-digit', year: 'numeric',
@@ -210,10 +287,11 @@ export default function PanelDetalleSeguimiento({
                             </span>
                             <h2 className="text-base font-bold text-slate-800 line-clamp-1 mt-1.5">{seguimiento.titulo}</h2>
                             <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
-                                {seguimiento.cliente_razon_social} (RUC {seguimiento.cliente_ruc})
+                                {seguimiento.cliente_razon_social || seguimiento.temp_cliente_nombre || 'Sin Cliente'}
+                                {(seguimiento.cliente_ruc || seguimiento.temp_cliente_ruc) ? ` (RUC ${seguimiento.cliente_ruc || seguimiento.temp_cliente_ruc})` : ''}
                             </p>
                             {/* Reactivar button - show for CAIDO and CERRADO */}
-                            {(seguimiento.estado === 'CAIDO' || seguimiento.estado === 'CIERRE') && onReactivar && (
+                            {!isEditing && (seguimiento.estado === 'CAIDO' || seguimiento.estado === 'CIERRE') && onReactivar && (
                                 <button
                                     onClick={() => {
                                         onReactivar();
@@ -226,7 +304,7 @@ export default function PanelDetalleSeguimiento({
                             )}
 
                             {/* ETA badge for operational states */}
-                            {seguimiento.fecha_eta && mostrarDocumentos && (
+                            {!isEditing && seguimiento.fecha_eta && mostrarDocumentos && (
                                 <div className={`mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border ${
                                     diasRestantesEta !== null && diasRestantesEta <= 7
                                         ? 'bg-rose-50 text-rose-700 border-rose-200'
@@ -242,436 +320,617 @@ export default function PanelDetalleSeguimiento({
                                 </div>
                             )}
                         </div>
-                        <button 
-                            onClick={onClose}
-                            className="p-1.5 hover:bg-slate-200 text-slate-400 hover:text-slate-600 rounded-lg transition-colors cursor-pointer ml-2"
-                        >
-                            <X size={18} />
-                        </button>
+                        <div className="flex items-center gap-1.5 ml-2">
+                            {onActualizarSeguimiento && !isEditing && (
+                                <button
+                                    onClick={startEditing}
+                                    className="p-1.5 hover:bg-slate-200 text-slate-500 hover:text-slate-700 rounded-lg transition-colors cursor-pointer"
+                                    title="Editar embarque"
+                                >
+                                    <Edit2 size={16} />
+                                </button>
+                            )}
+                            <button 
+                                onClick={onClose}
+                                className="p-1.5 hover:bg-slate-200 text-slate-400 hover:text-slate-600 rounded-lg transition-colors cursor-pointer"
+                            >
+                                <X size={18} />
+                            </button>
+                        </div>
                     </div>
 
                     {/* Cotizaciones Asociadas — Mini-cards horizontales */}
-                    <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/30">
-                        <div className="flex items-center justify-between mb-2.5">
-                            <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
-                                Cotizaciones ({seguimiento.cotizaciones?.length || 0})
-                            </span>
-                            {seguimiento.estado === 'COTIZADO' && (
-                                <button 
-                                    onClick={() => setActiveTab('cotizar')}
-                                    className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-0.5 cursor-pointer"
-                                >
-                                    <Plus size={12} /> Nueva
-                                </button>
+                    {!isEditing && (
+                        <div className="px-6 py-4 border-b border-slate-100 bg-slate-50/30">
+                            <div className="flex items-center justify-between mb-2.5">
+                                <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">
+                                    Cotizaciones ({seguimiento.cotizaciones?.length || 0})
+                                </span>
+                                {seguimiento.estado === 'COTIZADO' && (
+                                    <button 
+                                        onClick={() => setActiveTab('cotizar')}
+                                        className="text-[11px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors flex items-center gap-0.5 cursor-pointer"
+                                    >
+                                        <Plus size={12} /> Nueva
+                                    </button>
+                                )}
+                            </div>
+
+                            {seguimiento.cotizaciones && seguimiento.cotizaciones.length > 0 ? (
+                                <div className="flex gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:bg-slate-200 [&::-webkit-scrollbar-thumb]:rounded-full">
+                                    {seguimiento.cotizaciones.map((c) => {
+                                        const isAereo = c.tipo_carga_nombre?.toUpperCase().includes('AEREO') || c.tipo_carga_nombre?.toUpperCase().includes('COURIER');
+                                        return (
+                                            <div 
+                                                key={c.id} 
+                                                className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
+                                                    c.estado === 'ACEPTADO' 
+                                                        ? 'bg-emerald-50 text-emerald-800 border-emerald-200 ring-1 ring-emerald-100' 
+                                                        : c.estado === 'RECHAZADO'
+                                                        ? 'bg-rose-50/30 text-rose-500 border-rose-100 line-through opacity-70'
+                                                        : c.estado === 'DESCARTADO'
+                                                        ? 'bg-slate-50/50 text-slate-400 border-slate-100 line-through opacity-50'
+                                                        : 'bg-white text-slate-700 border-slate-200 shadow-sm'
+                                                }`}
+                                            >
+                                                <span className={`p-1 rounded-lg ${
+                                                    c.estado === 'ACEPTADO' ? 'bg-emerald-100 text-emerald-700' 
+                                                        : c.estado === 'RECHAZADO' ? 'bg-rose-100 text-rose-600'
+                                                        : 'bg-indigo-50 text-indigo-600'
+                                                }`}>
+                                                    {isAereo ? <Plane size={12} /> : <Ship size={12} />}
+                                                </span>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold flex items-center gap-1 text-xs">
+                                                        {c.tipo_carga_nombre}
+                                                        {c.incoterm && (
+                                                            <span className="text-[9px] bg-slate-100 text-slate-600 px-1 py-0.5 rounded font-mono">{c.incoterm}</span>
+                                                        )}
+                                                        {c.pais_origen && (
+                                                            <span className="text-[10px] text-slate-400 font-normal">({c.pais_origen})</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="text-[10px] text-slate-400 font-medium leading-none mt-0.5">
+                                                        {c.tipo_servicio_nombre} · <span className="uppercase">{c.tipo_operacion}</span>
+                                                    </div>
+                                                </div>
+                                                <span className={`ml-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase ${
+                                                    c.estado === 'ACEPTADO' ? 'bg-emerald-100 text-emerald-700' :
+                                                    c.estado === 'RECHAZADO' ? 'bg-rose-100 text-rose-700' :
+                                                    c.estado === 'DESCARTADO' ? 'bg-slate-100 text-slate-500' :
+                                                    'bg-indigo-50 text-indigo-700'
+                                                }`}>
+                                                    {c.estado === 'ACEPTADO' ? '✓' :
+                                                     c.estado === 'RECHAZADO' ? '✗' :
+                                                     c.estado === 'DESCARTADO' ? '—' :
+                                                     '●'}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="text-center py-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl">
+                                    <p className="text-[11px] text-slate-400 font-semibold">No hay cotizaciones asociadas</p>
+                                </div>
                             )}
                         </div>
-
-                        {seguimiento.cotizaciones && seguimiento.cotizaciones.length > 0 ? (
-                            <div className="flex gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:h-1 [&::-webkit-scrollbar-thumb]:bg-slate-200 [&::-webkit-scrollbar-thumb]:rounded-full">
-                                {seguimiento.cotizaciones.map((c) => {
-                                    const isAereo = c.tipo_carga_nombre?.toUpperCase().includes('AEREO') || c.tipo_carga_nombre?.toUpperCase().includes('COURIER');
-                                    return (
-                                        <div 
-                                            key={c.id} 
-                                            className={`flex-shrink-0 flex items-center gap-2 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
-                                                c.estado === 'ACEPTADO' 
-                                                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200 ring-1 ring-emerald-100' 
-                                                    : c.estado === 'RECHAZADO'
-                                                    ? 'bg-rose-50/30 text-rose-500 border-rose-100 line-through opacity-70'
-                                                    : c.estado === 'DESCARTADO'
-                                                    ? 'bg-slate-50/50 text-slate-400 border-slate-100 line-through opacity-50'
-                                                    : 'bg-white text-slate-700 border-slate-200 shadow-sm'
-                                            }`}
-                                        >
-                                            <span className={`p-1 rounded-lg ${
-                                                c.estado === 'ACEPTADO' ? 'bg-emerald-100 text-emerald-700' 
-                                                    : c.estado === 'RECHAZADO' ? 'bg-rose-100 text-rose-600'
-                                                    : 'bg-indigo-50 text-indigo-600'
-                                            }`}>
-                                                {isAereo ? <Plane size={12} /> : <Ship size={12} />}
-                                            </span>
-                                            <div className="min-w-0">
-                                                <div className="font-bold flex items-center gap-1 text-xs">
-                                                    {c.tipo_carga_nombre}
-                                                    {c.incoterm && (
-                                                        <span className="text-[9px] bg-slate-100 text-slate-600 px-1 py-0.5 rounded font-mono">{c.incoterm}</span>
-                                                    )}
-                                                    {c.pais_origen && (
-                                                        <span className="text-[10px] text-slate-400 font-normal">({c.pais_origen})</span>
-                                                    )}
-                                                </div>
-                                                <div className="text-[10px] text-slate-400 font-medium leading-none mt-0.5">
-                                                    {c.tipo_servicio_nombre} · <span className="uppercase">{c.tipo_operacion}</span>
-                                                </div>
-                                            </div>
-                                            <span className={`ml-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase ${
-                                                c.estado === 'ACEPTADO' ? 'bg-emerald-100 text-emerald-700' :
-                                                c.estado === 'RECHAZADO' ? 'bg-rose-100 text-rose-700' :
-                                                c.estado === 'DESCARTADO' ? 'bg-slate-100 text-slate-500' :
-                                                'bg-indigo-50 text-indigo-700'
-                                            }`}>
-                                                {c.estado === 'ACEPTADO' ? '✓' :
-                                                 c.estado === 'RECHAZADO' ? '✗' :
-                                                 c.estado === 'DESCARTADO' ? '—' :
-                                                 '●'}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        ) : (
-                            <div className="text-center py-4 bg-slate-50 border border-dashed border-slate-200 rounded-xl">
-                                <p className="text-[11px] text-slate-400 font-semibold">No hay cotizaciones asociadas</p>
-                            </div>
-                        )}
-                    </div>
+                    )}
 
                     {/* Navigation Tabs — Pills */}
-                    <div className="flex gap-1.5 px-6 py-3 bg-slate-50/30 border-b border-slate-100">
-                        {tabs.map((tab) => {
-                            const Icon = tab.icon;
-                            const isActive = activeTab === tab.id;
-                            return (
-                                <button
-                                    key={tab.id}
-                                    onClick={() => setActiveTab(tab.id)}
-                                    className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                                        isActive
-                                            ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200/50'
-                                            : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 hover:text-slate-700'
-                                    }`}
-                                >
-                                    <Icon size={14} />
-                                    {tab.label}
-                                    {tab.count !== undefined && (
-                                        <span className={`ml-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
-                                            isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                                        }`}>
-                                            {tab.count}
-                                        </span>
-                                    )}
-                                </button>
-                            );
-                        })}
-                    </div>
+                    {!isEditing && (
+                        <div className="flex gap-1.5 px-6 py-3 bg-slate-50/30 border-b border-slate-100">
+                            {tabs.map((tab) => {
+                                const Icon = tab.icon;
+                                const isActive = activeTab === tab.id;
+                                return (
+                                    <button
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id)}
+                                        className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                                            isActive
+                                                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200/50'
+                                                : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50 hover:text-slate-700'
+                                        }`}
+                                    >
+                                        <Icon size={14} />
+                                        {tab.label}
+                                        {tab.count !== undefined && (
+                                            <span className={`ml-0.5 px-1.5 py-0.5 rounded-md text-[10px] font-bold ${
+                                                isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
+                                            }`}>
+                                                {tab.count}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
 
                     {/* Scrollable Content */}
                     <div className="flex-1 overflow-y-auto px-6 py-4 [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:bg-slate-200">
                         
-                        {/* PESTAÑA COMENTARIOS / GESTIONES */}
-                        {activeTab === 'comentarios' && (
-                            <div className="space-y-4">
-                                {isLoadingComments ? (
-                                    <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-                                        <Loader2 size={24} className="animate-spin mb-2" />
-                                        <span className="text-xs">Cargando gestiones...</span>
-                                    </div>
-                                ) : comentarios.length === 0 ? (
-                                    <div className="text-center py-12 text-slate-400">
-                                        <MessageSquare size={32} className="mx-auto mb-2 opacity-50" />
-                                        <p className="text-xs font-semibold">Sin gestiones registradas</p>
-                                        <p className="text-[11px] mt-0.5">Registra la primera llamada o interacción abajo.</p>
-                                    </div>
-                                ) : (
-                                    <div className="relative pl-4 border-l-2 border-slate-100 space-y-4 py-2">
-                                        {comentarios.map((c) => {
-                                            const medio = getMedioConfig(c.medio_gestion_nombre);
-                                            const MedioIcon = medio.icon;
-                                            return (
-                                                <div key={c.id} className="relative group">
-                                                    {/* Bullet dot con color del medio */}
-                                                    <div className={`absolute -left-[22px] top-2 w-3 h-3 rounded-full border-2 border-white ring-2 ring-slate-50 transition-colors ${
-                                                        c.medio_gestion_nombre ? medio.color.replace('text-', 'bg-') : 'bg-slate-300'
-                                                    }`} />
-                                                    
-                                                    <div className="bg-white border border-slate-100 rounded-xl p-3.5 space-y-2 shadow-sm hover:shadow-md transition-shadow">
-                                                        <div className="flex items-center justify-between text-[11px] text-slate-400">
-                                                            <span className="font-semibold text-slate-500 flex items-center gap-1.5">
-                                                                <User size={11} /> {c.creador_nombre || 'Comercial'}
-                                                            </span>
-                                                            <span className="flex items-center gap-1">
-                                                                <Calendar size={11} /> {formatDateTime(c.created_at)}
-                                                            </span>
-                                                        </div>
-                                                        <p className="text-xs text-slate-700 leading-relaxed font-medium whitespace-pre-wrap">{c.comentario}</p>
-                                                        {c.medio_gestion_nombre && (
-                                                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border ${medio.bg} ${medio.color}`}>
-                                                                <MedioIcon size={10} />
-                                                                {c.medio_gestion_nombre}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* PESTAÑA HISTORIAL DE AUDITORÍA */}
-                        {activeTab === 'historial' && (
-                            <div className="space-y-4">
-                                {isLoadingHistory ? (
-                                    <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-                                        <Loader2 size={24} className="animate-spin mb-2" />
-                                        <span className="text-xs">Cargando historial...</span>
-                                    </div>
-                                ) : historial.length === 0 ? (
-                                    <p className="text-xs text-slate-400 text-center py-12">Sin historial de transiciones.</p>
-                                ) : (
-                                    <div className="relative pl-4 border-l-2 border-indigo-50 space-y-4 py-2">
-                                        {historial.map((h) => (
-                                            <div key={h.id} className="relative group">
-                                                <div className="absolute -left-[22px] top-2 w-3 h-3 rounded-full bg-indigo-300 border-2 border-white ring-2 ring-indigo-50" />
-                                                
-                                                <div className="text-xs space-y-1.5 bg-white border border-slate-100 rounded-xl p-3 shadow-sm">
-                                                    <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <span className="font-bold text-slate-800">
-                                                            {h.estado_anterior ? h.estado_anterior : 'CREACIÓN'}
-                                                        </span>
-                                                        <span className="text-slate-300">→</span>
-                                                        <span className={`font-bold px-2 py-0.5 rounded-lg text-[10px] ${
-                                                            h.estado_nuevo === 'CIERRE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
-                                                            h.estado_nuevo === 'CAIDO' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
-                                                            h.estado_nuevo === 'EN_OPERACION' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
-                                                            h.estado_nuevo === 'CARGA_ENTREGADA' ? 'bg-violet-50 text-violet-700 border border-violet-100' :
-                                                            h.estado_nuevo === 'SOLICITUD' ? 'bg-slate-50 text-slate-700 border border-slate-100' :
-                                                            'bg-indigo-50 text-indigo-700 border border-indigo-100'
-                                                        }`}>
-                                                            {h.estado_nuevo}
-                                                        </span>
-                                                    </div>
-                                                    {h.comentario && <p className="text-slate-500 text-[11px] leading-relaxed">{h.comentario}</p>}
-                                                    <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
-                                                        <span>Por: {h.usuario_nombre || 'Sistema'}</span>
-                                                        <span>{formatDateTime(h.fecha_cambio)}</span>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* PESTAÑA DOCUMENTOS OPERACIONALES */}
-                        {activeTab === 'documentos' && mostrarDocumentos && (
-                            <div className="space-y-4 animate-in fade-in duration-200">
-                                
-                                {/* Barra de progreso */}
-                                <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm space-y-3">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                                            <FileCheck size={14} className="text-blue-600" />
-                                            Control de Documentación
-                                        </span>
-                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${
-                                            progresoPorcentaje === 100
-                                                ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                                                : 'bg-blue-50 text-blue-700 border border-blue-200'
-                                        }`}>
-                                            {docsCompletados}/{documentos.length}
-                                        </span>
-                                    </div>
-                                    
-                                    {/* Progress bar */}
-                                    <div className="relative h-2.5 bg-slate-100 rounded-full overflow-hidden">
-                                        <div 
-                                            className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out ${
-                                                progresoPorcentaje === 100 ? 'bg-emerald-500' : 'bg-blue-500'
-                                            }`}
-                                            style={{ width: `${progresoPorcentaje}%` }}
-                                        />
-                                    </div>
-
-                                    <div className="flex items-center justify-between text-[10px]">
-                                        <span className="text-slate-400">
-                                            {progresoPorcentaje === 100 
-                                                ? '✅ Todos los documentos recibidos' 
-                                                : `${docsPendientes} documento${docsPendientes !== 1 ? 's' : ''} pendiente${docsPendientes !== 1 ? 's' : ''}`
-                                            }
-                                        </span>
-                                        <span className="text-slate-400 font-bold">{progresoPorcentaje}%</span>
-                                    </div>
-
-                                    {/* ETA Alert */}
-                                    {diasRestantesEta !== null && docsPendientes > 0 && (
-                                        <div className={`flex items-center gap-2 p-2.5 rounded-xl border text-[11px] font-semibold ${
-                                            diasRestantesEta <= 7
-                                                ? 'bg-rose-50 text-rose-700 border-rose-200'
-                                                : diasRestantesEta <= 14
-                                                ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                                : 'bg-blue-50 text-blue-700 border-blue-200'
-                                        }`}>
-                                            {diasRestantesEta <= 7 ? <AlertTriangle size={13} /> : <Clock size={13} />}
-                                            <span>
-                                                {diasRestantesEta <= 0
-                                                    ? 'ETA superado — documentos pendientes urgentes'
-                                                    : `${diasRestantesEta} día${diasRestantesEta !== 1 ? 's' : ''} restantes hasta ETA`
-                                                }
-                                            </span>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Lista de documentos */}
-                                <div className="space-y-2">
-                                    {documentos.map((doc) => (
-                                        <div
-                                            key={doc.id}
-                                            className={`flex items-start gap-3 p-3 rounded-xl border transition-all ${
-                                                doc.completado
-                                                    ? 'bg-emerald-50/50 border-emerald-200'
-                                                    : 'bg-white border-slate-200 hover:border-blue-300'
-                                            }`}
-                                        >
-                                            {/* Checkbox */}
-                                            <button
-                                                type="button"
-                                                disabled={!puedeEditarDocumentos || togglingDocId === doc.id}
-                                                onClick={() => handleToggleDoc(doc.id, !doc.completado)}
-                                                className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
-                                                    doc.completado
-                                                        ? 'bg-emerald-500 border-emerald-500 text-white'
-                                                        : 'border-slate-300 hover:border-blue-400 cursor-pointer'
-                                                } ${!puedeEditarDocumentos ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                            >
-                                                {togglingDocId === doc.id ? (
-                                                    <Loader2 size={12} className="animate-spin" />
-                                                ) : doc.completado ? (
-                                                    <CheckCircle2 size={12} />
-                                                ) : null}
-                                            </button>
-
-                                            {/* Info */}
-                                            <div className="flex-1 min-w-0">
-                                                <p className={`text-xs font-semibold ${
-                                                    doc.completado ? 'text-emerald-800' : 'text-slate-700'
-                                                }`}>
-                                                    {doc.documento_nombre || `Documento #${doc.documento_id}`}
-                                                </p>
-                                                {doc.completado && doc.fecha_recepcion && (
-                                                    <p className="text-[10px] text-emerald-600 mt-0.5 flex items-center gap-1">
-                                                        <CheckCircle2 size={9} />
-                                                        Recibido el {formatDateTime(doc.fecha_recepcion)}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-
-                                    {documentos.length === 0 && (
-                                        <div className="text-center py-8 text-slate-400">
-                                            <FileCheck size={32} className="mx-auto mb-2 opacity-50" />
-                                            <p className="text-xs font-semibold">No hay documentos asociados</p>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* PESTAÑA NUEVA COTIZACIÓN */}
-                        {activeTab === 'cotizar' && seguimiento.estado === 'COTIZADO' && (
-                            <form onSubmit={handleAddCotizacion} className="space-y-4 animate-in fade-in duration-200">
-                                <div className="bg-indigo-50/50 border border-indigo-100/50 p-4 rounded-2xl space-y-3">
-                                    <h4 className="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
-                                        <Ship size={14} /> Nueva Cotización Comercial
-                                    </h4>
-                                    
-                                    <div className="grid grid-cols-2 gap-3">
+                        {isEditing ? (
+                            <form onSubmit={handleSaveEdit} className="space-y-4">
+                                <div className="space-y-4">
+                                    <div className="bg-indigo-50/30 border border-indigo-100/50 p-4 rounded-2xl space-y-4">
+                                        <h3 className="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                                            <Edit2 size={14} className="text-indigo-600" />
+                                            Editar Datos de Embarque
+                                        </h3>
+                                        
+                                        {/* Título */}
                                         <div>
-                                            <label className="block text-[11px] font-bold text-indigo-700 uppercase tracking-wider mb-1">Tipo Carga</label>
-                                            <select
-                                                value={tipoCargaId}
-                                                onChange={(e) => setTipoCargaId(parseInt(e.target.value))}
-                                                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 cursor-pointer"
-                                            >
-                                                {catalogos?.tipos_carga.map(tc => (
-                                                    <option key={tc.id} value={tc.id}>{tc.nombre}</option>
-                                                ))}
-                                            </select>
+                                            <label className="block text-[11px] font-bold text-indigo-950 uppercase tracking-wider mb-1">
+                                                Título del Embarque
+                                            </label>
+                                            <input
+                                                type="text"
+                                                value={editTitulo}
+                                                onChange={(e) => setEditTitulo(e.target.value)}
+                                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 font-medium"
+                                                placeholder="Ej. Importación de Maquinaria"
+                                                required
+                                            />
                                         </div>
 
+                                        {/* Fecha ETA */}
                                         <div>
-                                            <label className="block text-[11px] font-bold text-indigo-700 uppercase tracking-wider mb-1">Servicio</label>
-                                            <select
-                                                value={tipoServicioId}
-                                                onChange={(e) => setTipoServicioId(parseInt(e.target.value))}
-                                                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 cursor-pointer"
-                                            >
-                                                {catalogos?.tipos_servicio.map(ts => (
-                                                    <option key={ts.id} value={ts.id}>{ts.nombre}</option>
-                                                ))}
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-3 gap-3">
-                                        <div>
-                                            <label className="block text-[11px] font-bold text-indigo-700 uppercase tracking-wider mb-1">Vía</label>
-                                            <select
-                                                value={tipoOperacion}
-                                                onChange={(e) => setTipoOperacion(e.target.value as 'IMPORTACION' | 'EXPORTACION')}
-                                                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 cursor-pointer font-bold"
-                                            >
-                                                <option value="IMPORTACION">IMPORTACIÓN</option>
-                                                <option value="EXPORTACION">EXPORTACIÓN</option>
-                                            </select>
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-[11px] font-bold text-indigo-700 uppercase tracking-wider mb-1">Incoterm</label>
-                                            <select
-                                                value={incoterm}
-                                                onChange={(e) => setIncoterm(e.target.value)}
-                                                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 cursor-pointer font-semibold"
-                                            >
-                                                <option value="">— Incoterm —</option>
-                                                <option value="EXW">EXW</option>
-                                                <option value="FCA">FCA</option>
-                                                <option value="CPT">CPT</option>
-                                                <option value="CIP">CIP</option>
-                                                <option value="DAP">DAP</option>
-                                                <option value="DPU">DPU</option>
-                                                <option value="DDP">DDP</option>
-                                                <option value="FAS">FAS</option>
-                                                <option value="FOB">FOB</option>
-                                                <option value="CFR">CFR</option>
-                                                <option value="CIF">CIF</option>
-                                            </select>
-                                        </div>
-
-                                        <div>
-                                            <label className="block text-[11px] font-bold text-indigo-700 uppercase tracking-wider mb-1">País Origen</label>
+                                            <label className="block text-[11px] font-bold text-indigo-950 uppercase tracking-wider mb-1">
+                                                Fecha ETA
+                                            </label>
                                             <div className="relative">
-                                                <MapPin className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+                                                <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
                                                 <input
-                                                    type="text"
-                                                    placeholder="China..."
-                                                    value={paisOrigen}
-                                                    onChange={(e) => setPaisOrigen(e.target.value)}
-                                                    className="w-full bg-white border border-slate-200 rounded-xl pl-6 pr-2.5 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 placeholder:text-slate-400"
+                                                    type="date"
+                                                    value={editFechaEta}
+                                                    onChange={(e) => setEditFechaEta(e.target.value)}
+                                                    className="w-full bg-white border border-slate-200 rounded-xl pl-9 pr-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 font-medium"
                                                 />
                                             </div>
                                         </div>
+
+                                        {/* Cliente Select */}
+                                        <div>
+                                            <label className="block text-[11px] font-bold text-indigo-950 uppercase tracking-wider mb-1">
+                                                Cliente Formal
+                                            </label>
+                                            <select
+                                                value={editClienteId || ''}
+                                                onChange={(e) => {
+                                                    const val = e.target.value;
+                                                    setEditClienteId(val ? parseInt(val) : null);
+                                                }}
+                                                className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 font-medium cursor-pointer"
+                                                disabled={loadingClientes}
+                                            >
+                                                <option value="">— Sin cliente formal (Usar datos temporales de prospecto) —</option>
+                                                {clientesList.map(c => (
+                                                    <option key={c.id} value={c.id}>
+                                                        {c.razon_social} {c.ruc ? `(RUC ${c.ruc})` : ''}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                            {loadingClientes && <span className="text-[10px] text-slate-400 mt-1 block">Cargando lista de clientes...</span>}
+                                        </div>
                                     </div>
-                                    
+
+                                    {/* Datos de cliente temporal (prospecto) - Mostrar solo si no hay cliente formal seleccionado */}
+                                    {!editClienteId && (
+                                        <div className="p-4 bg-slate-50 border border-slate-200 rounded-2xl space-y-3">
+                                            <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 border-b border-slate-200/60 pb-2">
+                                                <Building2 size={14} className="text-slate-500" />
+                                                Datos del Prospecto / Cliente Temporal
+                                            </h4>
+                                            
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                                    Razón Social / Nombre Comercial
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={editTempClienteNombre}
+                                                    onChange={(e) => setEditTempClienteNombre(e.target.value)}
+                                                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800"
+                                                    placeholder="Nombre del prospecto"
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                                    RUC
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={editTempClienteRuc}
+                                                    onChange={(e) => setEditTempClienteRuc(e.target.value)}
+                                                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800"
+                                                    placeholder="Número de RUC (11 dígitos)"
+                                                    maxLength={11}
+                                                />
+                                            </div>
+
+                                            <div>
+                                                <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                                    Nombre de Contacto
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    value={editTempClienteContacto}
+                                                    onChange={(e) => setEditTempClienteContacto(e.target.value)}
+                                                    className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800"
+                                                    placeholder="Contacto"
+                                                />
+                                            </div>
+
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                                        Correo
+                                                    </label>
+                                                    <input
+                                                        type="email"
+                                                        value={editTempClienteCorreo}
+                                                        onChange={(e) => setEditTempClienteCorreo(e.target.value)}
+                                                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800"
+                                                        placeholder="correo@ejemplo.com"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">
+                                                        Teléfono
+                                                    </label>
+                                                    <input
+                                                        type="text"
+                                                        value={editTempClienteTelefono}
+                                                        onChange={(e) => setEditTempClienteTelefono(e.target.value)}
+                                                        className="w-full bg-white border border-slate-200 rounded-xl px-3 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800"
+                                                        placeholder="Teléfono/Celular"
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Botones de Acción */}
+                                <div className="flex items-center gap-3 pt-4 border-t border-slate-100">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsEditing(false)}
+                                        className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-2.5 px-4 rounded-xl text-xs font-semibold transition-all active:scale-[0.98] cursor-pointer"
+                                    >
+                                        Cancelar
+                                    </button>
                                     <button
                                         type="submit"
-                                        disabled={isSavingCotizacion}
-                                        className="w-full mt-2 flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 px-4 rounded-xl text-xs font-semibold shadow-md shadow-indigo-200/50 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                                        disabled={isUpdatingCard}
+                                        className="flex-1 flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 px-4 rounded-xl text-xs font-semibold shadow-md shadow-indigo-200/50 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
                                     >
-                                        {isSavingCotizacion ? <Loader2 size={13} className="animate-spin" /> : <Plus size={14} />}
-                                        Agregar Cotización
+                                        {isUpdatingCard ? <Loader2 size={13} className="animate-spin" /> : <Save size={14} />}
+                                        Guardar Cambios
                                     </button>
                                 </div>
                             </form>
+                        ) : (
+                            <>
+                                {/* PESTAÑA COMENTARIOS / GESTIONES */}
+                                {activeTab === 'comentarios' && (
+                                    <div className="space-y-4">
+                                        {isLoadingComments ? (
+                                            <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                                                <Loader2 size={24} className="animate-spin mb-2" />
+                                                <span className="text-xs">Cargando gestiones...</span>
+                                            </div>
+                                        ) : comentarios.length === 0 ? (
+                                            <div className="text-center py-12 text-slate-400">
+                                                <MessageSquare size={32} className="mx-auto mb-2 opacity-50" />
+                                                <p className="text-xs font-semibold">Sin gestiones registradas</p>
+                                                <p className="text-[11px] mt-0.5">Registra la primera llamada o interacción abajo.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="relative pl-4 border-l-2 border-slate-100 space-y-4 py-2">
+                                                {comentarios.map((c) => {
+                                                    const medio = getMedioConfig(c.medio_gestion_nombre);
+                                                    const MedioIcon = medio.icon;
+                                                    return (
+                                                        <div key={c.id} className="relative group">
+                                                            {/* Bullet dot con color del medio */}
+                                                            <div className={`absolute -left-[22px] top-2 w-3 h-3 rounded-full border-2 border-white ring-2 ring-slate-50 transition-colors ${
+                                                                c.medio_gestion_nombre ? medio.color.replace('text-', 'bg-') : 'bg-slate-300'
+                                                            }`} />
+                                                            
+                                                            <div className="bg-white border border-slate-100 rounded-xl p-3.5 space-y-2 shadow-sm hover:shadow-md transition-shadow">
+                                                                <div className="flex items-center justify-between text-[11px] text-slate-400">
+                                                                    <span className="font-semibold text-slate-500 flex items-center gap-1.5">
+                                                                        <User size={11} /> {c.creador_nombre || 'Comercial'}
+                                                                    </span>
+                                                                    <span className="flex items-center gap-1">
+                                                                        <Calendar size={11} /> {formatDateTime(c.created_at)}
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-xs text-slate-700 leading-relaxed font-medium whitespace-pre-wrap">{c.comentario}</p>
+                                                                {c.medio_gestion_nombre && (
+                                                                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border ${medio.bg} ${medio.color}`}>
+                                                                        <MedioIcon size={10} />
+                                                                        {c.medio_gestion_nombre}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* PESTAÑA HISTORIAL DE AUDITORÍA */}
+                                {activeTab === 'historial' && (
+                                    <div className="space-y-4">
+                                        {isLoadingHistory ? (
+                                            <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                                                <Loader2 size={24} className="animate-spin mb-2" />
+                                                <span className="text-xs">Cargando historial...</span>
+                                            </div>
+                                        ) : historial.length === 0 ? (
+                                            <p className="text-xs text-slate-400 text-center py-12">Sin historial de transiciones.</p>
+                                        ) : (
+                                            <div className="relative pl-4 border-l-2 border-indigo-50 space-y-4 py-2">
+                                                {historial.map((h) => (
+                                                    <div key={h.id} className="relative group">
+                                                        <div className="absolute -left-[22px] top-2 w-3 h-3 rounded-full bg-indigo-300 border-2 border-white ring-2 ring-indigo-50" />
+                                                        
+                                                        <div className="text-xs space-y-1.5 bg-white border border-slate-100 rounded-xl p-3 shadow-sm">
+                                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                                <span className="font-bold text-slate-800">
+                                                                    {h.estado_anterior ? h.estado_anterior : 'CREACIÓN'}
+                                                                </span>
+                                                                <span className="text-slate-300">→</span>
+                                                                <span className={`font-bold px-2 py-0.5 rounded-lg text-[10px] ${
+                                                                    h.estado_nuevo === 'CIERRE' ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' :
+                                                                    h.estado_nuevo === 'CAIDO' ? 'bg-rose-50 text-rose-700 border border-rose-100' :
+                                                                    h.estado_nuevo === 'EN_OPERACION' ? 'bg-blue-50 text-blue-700 border border-blue-100' :
+                                                                    h.estado_nuevo === 'CARGA_ENTREGADA' ? 'bg-violet-50 text-violet-700 border border-violet-100' :
+                                                                    h.estado_nuevo === 'SOLICITUD' ? 'bg-slate-50 text-slate-700 border border-slate-100' :
+                                                                    'bg-indigo-50 text-indigo-700 border border-indigo-100'
+                                                                }`}>
+                                                                    {h.estado_nuevo}
+                                                                </span>
+                                                            </div>
+                                                            {h.comentario && <p className="text-slate-500 text-[11px] leading-relaxed">{h.comentario}</p>}
+                                                            <div className="flex items-center justify-between text-[10px] text-slate-400 pt-0.5">
+                                                                <span>Por: {h.usuario_nombre || 'Sistema'}</span>
+                                                                <span>{formatDateTime(h.fecha_cambio)}</span>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
+                                {/* PESTAÑA DOCUMENTOS OPERACIONALES */}
+                                {activeTab === 'documentos' && mostrarDocumentos && (
+                                    <div className="space-y-4 animate-in fade-in duration-200">
+                                        
+                                        {/* Barra de progreso */}
+                                        <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm space-y-3">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
+                                                    <FileCheck size={14} className="text-blue-600" />
+                                                    Control de Documentación
+                                                </span>
+                                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-lg ${
+                                                    progresoPorcentaje === 100
+                                                        ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                                        : 'bg-blue-50 text-blue-700 border-blue-200'
+                                                }`}>
+                                                    {docsCompletados}/{documentos.length}
+                                                </span>
+                                            </div>
+                                            
+                                            {/* Progress bar */}
+                                            <div className="relative h-2.5 bg-slate-100 rounded-full overflow-hidden">
+                                                <div 
+                                                    className={`absolute inset-y-0 left-0 rounded-full transition-all duration-500 ease-out ${
+                                                        progresoPorcentaje === 100 ? 'bg-emerald-500' : 'bg-blue-500'
+                                                    }`}
+                                                    style={{ width: `${progresoPorcentaje}%` }}
+                                                />
+                                            </div>
+
+                                            <div className="flex items-center justify-between text-[10px]">
+                                                <span className="text-slate-400">
+                                                    {progresoPorcentaje === 100 
+                                                        ? '✅ Todos los documentos recibidos' 
+                                                        : `${docsPendientes} documento${docsPendientes !== 1 ? 's' : ''} pendiente${docsPendientes !== 1 ? 's' : ''}`
+                                                    }
+                                                </span>
+                                                <span className="text-slate-400 font-bold">{progresoPorcentaje}%</span>
+                                            </div>
+
+                                            {/* ETA Alert */}
+                                            {diasRestantesEta !== null && docsPendientes > 0 && (
+                                                <div className={`flex items-center gap-2 p-2.5 rounded-xl border text-[11px] font-semibold ${
+                                                    diasRestantesEta <= 7
+                                                        ? 'bg-rose-50 text-rose-700 border-rose-200'
+                                                        : diasRestantesEta <= 14
+                                                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                                        : 'bg-blue-50 text-blue-700 border-blue-200'
+                                                }`}>
+                                                    {diasRestantesEta <= 7 ? <AlertTriangle size={13} /> : <Clock size={13} />}
+                                                    <span>
+                                                        {diasRestantesEta <= 0
+                                                            ? 'ETA superado — documentos pendientes urgentes'
+                                                            : `${diasRestantesEta} día${diasRestantesEta !== 1 ? 's' : ''} restantes hasta ETA`
+                                                        }
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        {/* Lista de documentos */}
+                                        <div className="space-y-2">
+                                            {documentos.map((doc) => (
+                                                <div
+                                                    key={doc.id}
+                                                    className={`flex items-start gap-3 p-3 rounded-xl border transition-all ${
+                                                        doc.completado
+                                                            ? 'bg-emerald-50/50 border-emerald-200'
+                                                            : 'bg-white border-slate-200 hover:border-blue-300'
+                                                    }`}
+                                                >
+                                                    {/* Checkbox */}
+                                                    <button
+                                                        type="button"
+                                                        disabled={!puedeEditarDocumentos || togglingDocId === doc.id}
+                                                        onClick={() => handleToggleDoc(doc.id, !doc.completado)}
+                                                        className={`flex-shrink-0 mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                                                            doc.completado
+                                                                ? 'bg-emerald-500 border-emerald-500 text-white'
+                                                                : 'border-slate-300 hover:border-blue-400 cursor-pointer'
+                                                        } ${!puedeEditarDocumentos ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                                    >
+                                                        {togglingDocId === doc.id ? (
+                                                            <Loader2 size={12} className="animate-spin" />
+                                                        ) : doc.completado ? (
+                                                            <CheckCircle2 size={12} />
+                                                        ) : null}
+                                                    </button>
+
+                                                    {/* Info */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <p className={`text-xs font-semibold ${
+                                                            doc.completado ? 'text-emerald-800' : 'text-slate-700'
+                                                        }`}>
+                                                            {doc.documento_nombre || `Documento #${doc.documento_id}`}
+                                                        </p>
+                                                        {doc.completado && doc.fecha_recepcion && (
+                                                            <p className="text-[10px] text-emerald-600 mt-0.5 flex items-center gap-1">
+                                                                <CheckCircle2 size={9} />
+                                                                Recibido el {formatDateTime(doc.fecha_recepcion)}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+
+                                            {documentos.length === 0 && (
+                                                <div className="text-center py-8 text-slate-400">
+                                                    <FileCheck size={32} className="mx-auto mb-2 opacity-50" />
+                                                    <p className="text-xs font-semibold">No hay documentos asociados</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* PESTAÑA NUEVA COTIZACIÓN */}
+                                {activeTab === 'cotizar' && seguimiento.estado === 'COTIZADO' && (
+                                    <form onSubmit={handleAddCotizacion} className="space-y-4 animate-in fade-in duration-200">
+                                        <div className="bg-indigo-50/50 border border-indigo-100/50 p-4 rounded-2xl space-y-3">
+                                            <h4 className="text-xs font-bold text-indigo-900 uppercase tracking-wider flex items-center gap-1.5">
+                                                <Ship size={14} /> Nueva Cotización Comercial
+                                            </h4>
+                                            
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div>
+                                                    <label className="block text-[11px] font-bold text-indigo-700 uppercase tracking-wider mb-1">Tipo Carga</label>
+                                                    <select
+                                                        value={tipoCargaId}
+                                                        onChange={(e) => setTipoCargaId(parseInt(e.target.value))}
+                                                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 cursor-pointer"
+                                                    >
+                                                        {catalogos?.tipos_carga.map(tc => (
+                                                            <option key={tc.id} value={tc.id}>{tc.nombre}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-[11px] font-bold text-indigo-700 uppercase tracking-wider mb-1">Servicio</label>
+                                                    <select
+                                                        value={tipoServicioId}
+                                                        onChange={(e) => setTipoServicioId(parseInt(e.target.value))}
+                                                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 cursor-pointer"
+                                                    >
+                                                        {catalogos?.tipos_servicio.map(ts => (
+                                                            <option key={ts.id} value={ts.id}>{ts.nombre}</option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-3 gap-3">
+                                                <div>
+                                                    <label className="block text-[11px] font-bold text-indigo-700 uppercase tracking-wider mb-1">Vía</label>
+                                                    <select
+                                                        value={tipoOperacion}
+                                                        onChange={(e) => setTipoOperacion(e.target.value as 'IMPORTACION' | 'EXPORTACION')}
+                                                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 cursor-pointer font-bold"
+                                                    >
+                                                        <option value="IMPORTACION">IMPORTACIÓN</option>
+                                                        <option value="EXPORTACION">EXPORTACIÓN</option>
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-[11px] font-bold text-indigo-700 uppercase tracking-wider mb-1">Incoterm</label>
+                                                    <select
+                                                        value={incoterm}
+                                                        onChange={(e) => setIncoterm(e.target.value)}
+                                                        className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 cursor-pointer font-semibold"
+                                                    >
+                                                        <option value="">— Incoterm —</option>
+                                                        <option value="EXW">EXW</option>
+                                                        <option value="FCA">FCA</option>
+                                                        <option value="CPT">CPT</option>
+                                                        <option value="CIP">CIP</option>
+                                                        <option value="DAP">DAP</option>
+                                                        <option value="DPU">DPU</option>
+                                                        <option value="DDP">DDP</option>
+                                                        <option value="FAS">FAS</option>
+                                                        <option value="FOB">FOB</option>
+                                                        <option value="CFR">CFR</option>
+                                                        <option value="CIF">CIF</option>
+                                                    </select>
+                                                </div>
+
+                                                <div>
+                                                    <label className="block text-[11px] font-bold text-indigo-700 uppercase tracking-wider mb-1">País Origen</label>
+                                                    <div className="relative">
+                                                        <MapPin className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
+                                                        <input
+                                                            type="text"
+                                                            placeholder="China..."
+                                                            value={paisOrigen}
+                                                            onChange={(e) => setPaisOrigen(e.target.value)}
+                                                            className="w-full bg-white border border-slate-200 rounded-xl pl-6 pr-2.5 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 placeholder:text-slate-400"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <button
+                                                type="submit"
+                                                disabled={isSavingCotizacion}
+                                                className="w-full mt-2 flex items-center justify-center gap-1.5 bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 px-4 rounded-xl text-xs font-semibold shadow-md shadow-indigo-200/50 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
+                                            >
+                                                {isSavingCotizacion ? <Loader2 size={13} className="animate-spin" /> : <Plus size={14} />}
+                                                Agregar Cotización
+                                            </button>
+                                        </div>
+                                    </form>
+                                )}
+                            </>
                         )}
                     </div>
 
                     {/* Bottom Comment Input — Compose bar estilo chat */}
-                    {activeTab === 'comentarios' && (
+                    {!isEditing && activeTab === 'comentarios' && (
                         <div className="px-5 py-4 border-t border-slate-100 bg-white">
                             <form onSubmit={handleSendComentario} className="space-y-2">
                                 {/* Selector de medio + label */}

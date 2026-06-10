@@ -103,6 +103,18 @@ export interface SeguimientoCreate {
     temp_cliente_telefono?: string | null;
 }
 
+export interface SeguimientoUpdate {
+    cliente_id?: number | null;
+    titulo?: string;
+    fecha_eta?: string | null;
+    contacto_alerta_id?: number | null;
+    temp_cliente_nombre?: string | null;
+    temp_cliente_ruc?: string | null;
+    temp_cliente_contacto?: string | null;
+    temp_cliente_correo?: string | null;
+    temp_cliente_telefono?: string | null;
+}
+
 export interface ClienteRegistroFaseCierre {
     ruc: string;
     razon_social: string;

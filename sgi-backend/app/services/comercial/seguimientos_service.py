@@ -16,7 +16,7 @@ from app.schemas.comercial.seguimiento import (
     SeguimientoCreate, CotizacionItemCreate, CotizacionCerrar, SeguimientoCaer,
     SeguimientoMover, SeguimientoOperar, SeguimientoEntregar,
     DocumentoOperacionalCreate, DocumentoOperacionalUpdate, DocumentoToggle,
-    ClienteRegistroFaseCierre
+    ClienteRegistroFaseCierre, SeguimientoUpdate
 )
 from datetime import datetime, date, timedelta
 
@@ -122,6 +122,100 @@ class SeguimientosService:
         if not seguimiento or not seguimiento.is_active:
             raise HTTPException(status_code=404, detail="Tarjeta de seguimiento no encontrada")
         return seguimiento
+
+    async def update_seguimiento(self, id: int, data: SeguimientoUpdate, usuario_id: int) -> Seguimiento:
+        """Actualiza los campos editables de una tarjeta de seguimiento."""
+        seg = await self.get_seguimiento_by_id(id)
+        
+        cambios = []
+        
+        async with self.db.begin_nested():
+            if data.titulo is not None:
+                if seg.titulo != data.titulo:
+                    cambios.append(f"Título: '{seg.titulo}' → '{data.titulo}'")
+                    seg.titulo = data.titulo
+
+            if data.cliente_id is not None:
+                if seg.cliente_id != data.cliente_id:
+                    if data.cliente_id == 0:
+                        cambios.append(f"Cliente desvinculado (anterior: {seg.cliente.razon_social if seg.cliente else 'Ninguno'})")
+                        seg.cliente_id = None
+                    else:
+                        nuevo_cli = await self.db.get(Cliente, data.cliente_id)
+                        if not nuevo_cli or not nuevo_cli.is_active:
+                            raise HTTPException(status_code=404, detail="El cliente especificado no existe o está inactivo")
+                        cambios.append(f"Cliente formal: '{seg.cliente.razon_social if seg.cliente else 'Ninguno'}' → '{nuevo_cli.razon_social}'")
+                        seg.cliente_id = data.cliente_id
+                        seg.temp_cliente_nombre = None
+                        seg.temp_cliente_ruc = None
+                        seg.temp_cliente_contacto = None
+                        seg.temp_cliente_correo = None
+                        seg.temp_cliente_telefono = None
+
+            if seg.cliente_id is None:
+                for field in ['temp_cliente_nombre', 'temp_cliente_ruc', 'temp_cliente_contacto', 'temp_cliente_correo', 'temp_cliente_telefono']:
+                    val = getattr(data, field)
+                    if val is not None:
+                        old_val = getattr(seg, field)
+                        if old_val != val:
+                            cambios.append(f"{field.replace('temp_cliente_', '').capitalize()}: '{old_val or 'Ninguno'}' → '{val}'")
+                            setattr(seg, field, val)
+
+            if data.fecha_eta is not None:
+                if seg.fecha_eta != data.fecha_eta:
+                    cambios.append(f"ETA: '{seg.fecha_eta or 'Ninguna'}' → '{data.fecha_eta}'")
+                    seg.fecha_eta = data.fecha_eta
+                    
+                    # Recalcular fecha límite de documentos
+                    cot_aceptada = next((c for c in seg.cotizaciones if c.estado == "ACEPTADO"), None)
+                    if cot_aceptada:
+                        tipo_servicio_nombre = cot_aceptada.tipo_servicio_nombre.upper().strip() if cot_aceptada.tipo_servicio_nombre else ""
+                        tipo_carga_nombre = cot_aceptada.tipo_carga_nombre.upper().strip() if cot_aceptada.tipo_carga_nombre else ""
+                        from app.services.comercial.notificacion_operacional_service import calcular_dias_anticipacion
+                        dias_anticipacion = calcular_dias_anticipacion(tipo_servicio_nombre, tipo_carga_nombre)
+                        if dias_anticipacion is not None:
+                            seg.fecha_limite_documentos = data.fecha_eta - timedelta(days=dias_anticipacion)
+                        else:
+                            seg.fecha_limite_documentos = data.fecha_eta
+                    else:
+                        seg.fecha_limite_documentos = data.fecha_eta
+
+            if data.contacto_alerta_id is not None:
+                if seg.contacto_alerta_id != data.contacto_alerta_id:
+                    if data.contacto_alerta_id == 0:
+                        cambios.append("Contacto de alertas desvinculado")
+                        seg.contacto_alerta_id = None
+                    else:
+                        from app.models.comercial import ClienteContacto
+                        cc = await self.db.get(ClienteContacto, data.contacto_alerta_id)
+                        if not cc or cc.cliente_id != seg.cliente_id:
+                            raise HTTPException(status_code=400, detail="El contacto de alerta especificado no pertenece al cliente")
+                        cambios.append(f"Contacto de alertas: '{seg.contacto_alerta.nombre if seg.contacto_alerta else 'Ninguno'}' → '{cc.nombre}'")
+                        seg.contacto_alerta_id = data.contacto_alerta_id
+
+            if cambios:
+                seg.updated_by = usuario_id
+                
+                comentario_texto = "✏️ Tarjeta editada manualmente:\n" + "\n".join(f"• {c}" for c in cambios)
+                comentario = SeguimientoComentario(
+                    seguimiento_id=seg.id,
+                    comentario=comentario_texto,
+                    created_by=usuario_id
+                )
+                self.db.add(comentario)
+                
+                hist = SeguimientoHistorial(
+                    seguimiento_id=seg.id,
+                    estado_anterior=seg.estado,
+                    estado_nuevo=seg.estado,
+                    comentario="Modificación de datos de la tarjeta",
+                    registrado_por=usuario_id
+                )
+                self.db.add(hist)
+
+        await self.db.commit()
+        await self.db.refresh(seg)
+        return seg
 
     # ══════════════════════════════════════════════
     # CREAR SEGUIMIENTO

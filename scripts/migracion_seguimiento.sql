@@ -38,13 +38,11 @@ BEGIN
         is_active  BIT NOT NULL DEFAULT 1
     );
     INSERT INTO comercial.segmentacion_cierre (nombre, orden) VALUES
-        ('DE_CASA', 1),
-        ('BASE_DATOS', 2),
-        ('META', 3),
-        ('FERIA', 4),
-        ('RECOMENDADO', 5),
-        ('WHATSAPP', 6),
-        ('LEAD_WEB', 7);
+        ('BASE_DATOS', 1),
+        ('META', 2),
+        ('RECOMENDADO', 3),
+        ('LEAD_WEB', 4),
+        ('CARTERA', 5);
 END;
 
 -- =========================================================================
