@@ -72,7 +72,8 @@ class NotificacionOperacionalService:
         fecha_eta: date,
         documentos_pendientes: list[str],
         nombre_contacto: str = "",
-        empresa_id: int | None = None
+        empresa_id: int | None = None,
+        cor: str = ""
     ) -> str:
         """
         Envía alerta de fecha límite de documentos por correo y WhatsApp.
@@ -92,7 +93,8 @@ class NotificacionOperacionalService:
                     dias_restantes_limite=dias_restantes_limite,
                     fecha_eta=fecha_eta,
                     documentos_pendientes=documentos_pendientes,
-                    empresa_id=empresa_id
+                    empresa_id=empresa_id,
+                    cor=cor
                 )
                 if enviado_email:
                     canal_usado.append("EMAIL")

@@ -18,12 +18,16 @@
                             <table width="100%" cellpadding="0" cellspacing="0">
                                 <tr>
                                     <td>
-                                        <div style="color: #38bdf8; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px;">
-                                            SGI - Sistema de Gestión de Cargas
-                                        </div>
-                                        <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">
-                                            {{ empresa_nombre }}
-                                        </h1>
+                                        {% if logo_url %}
+                                            <img src="{{ logo_url }}" alt="{{ empresa_nombre }}" style="max-height: 48px; max-width: 220px; display: block; margin-bottom: 4px;">
+                                        {% else %}
+                                            <div style="color: #38bdf8; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px;">
+                                                SGI - Sistema de Gestión de Cargas
+                                            </div>
+                                            <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">
+                                                {{ empresa_nombre }}
+                                            </h1>
+                                        {% endif %}
                                     </td>
                                     <td align="right" valign="middle">
                                         <!-- Badge de Urgencia Dinámico -->
@@ -43,7 +47,7 @@
                                 Estimado/a <strong>{{ razon_social }}</strong>,
                             </p>
                             <p style="margin: 0 0 28px; font-size: 14px; color: #475569; line-height: 1.6;">
-                                Le recordamos que el embarque <strong style="color: #0f172a;">"{{ titulo_embarque }}"</strong> tiene establecida una **fecha límite de entrega de documentos**. Agradecemos regularizar el envío de los pendientes detallados.
+                                Le informamos que el embarque con codigo de referencia <strong style="color: #0f172a;">{{ cor or "N/A" }}</strong> presenta requerimientos de documentación pendientes de recepción. Solicitamos su apoyo para regularizar el estado a la brevedad.
                             </p>
 
                             <!-- Dashboard de Información Clave (2 columnas) -->
@@ -55,7 +59,7 @@
                                             {{ dias_restantes_limite }}
                                         </div>
                                         <div style="font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; line-height: 1.2;">
-                                            Días para Fecha Límite
+                                            Dias restantes para el envio de documentos.
                                         </div>
                                         <div style="font-size: 12px; color: #334155; font-weight: 600; margin-top: 8px;">
                                             Límite: {{ fecha_limite }}
@@ -73,27 +77,9 @@
                                 </tr>
                             </table>
 
-                            <!-- Advertencia de sobrecostos (solo cuando quedan ≤3 días) -->
-                            {% if dias_restantes_limite <= 3 %}
-                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fef2f2; border: 1px solid #fee2e2; border-radius: 12px; margin-bottom: 32px;">
-                                <tr>
-                                    <td style="padding: 18px;">
-                                        <table cellpadding="0" cellspacing="0">
-                                            <tr>
-                                                <td width="32" valign="top" style="font-size: 20px; line-height: 1;">🚨</td>
-                                                <td style="font-size: 13px; color: #991b1b; line-height: 1.6; font-weight: 600;">
-                                                    <strong>AVISO CRÍTICO:</strong> Los sobrecostos en puerto/almacén generados por retrasos en la entrega y regularización de documentos <strong>no serán asumidos por {{ empresa_nombre }}</strong>. Por favor, regularice a la brevedad.
-                                                </td>
-                                            </tr>
-                                        </table>
-                                    </td>
-                                </tr>
-                            </table>
-                            {% endif %}
-
                             <!-- Listado de Documentos Pendientes -->
                             <h3 style="margin: 0 0 16px; font-size: 13px; color: #334155; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px;">
-                                Documentos Requeridos Pendientes ({{ documentos_pendientes | length }})
+                                DOCUMENTOS REQUERIDOS PENDIENTES ({{ documentos_pendientes | length }})
                             </h3>
                             <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 32px;">
                                 {% for doc in documentos_pendientes %}
@@ -114,9 +100,25 @@
                                 {% endfor %}
                             </table>
 
+                            <!-- Caja de advertencia -->
+                            <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #fffbeb; border: 1px solid #fef3c7; border-radius: 8px; margin-bottom: 32px;">
+                                <tr>
+                                    <td style="padding: 16px;">
+                                        <table cellpadding="0" cellspacing="0">
+                                            <tr>
+                                                <td width="30" valign="top" style="font-size: 18px; line-height: 1;">⚠️</td>
+                                                <td style="font-size: 13px; color: #b45309; line-height: 1.5; font-weight: 500;">
+                                                    <strong>Importante:</strong> La entrega tardía de la documentación puede generar demoras operativas e incurrir en sobrecostos no asumidos por la agencia. Agradecemos su puntual envío.
+                                                </td>
+                                            </tr>
+                                        </table>
+                                    </td>
+                                </tr>
+                            </table>
+
                             <!-- Cierre del mensaje -->
                             <p style="margin: 0 0 24px; font-size: 14px; color: #475569; line-height: 1.6;">
-                                Por favor, envíe los documentos requeridos lo antes posible respondiendo directamente a este correo o poniéndose en contacto con su ejecutivo comercial.
+                                Por favor, remita los documentos a la brevedad respondiendo a su asesor comercial asignado o al equipo de operaciones de la marca.
                             </p>
                             
                             <table width="100%" cellpadding="0" cellspacing="0" style="border-top: 1px solid #e2e8f0; padding-top: 24px;">

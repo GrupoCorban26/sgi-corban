@@ -72,6 +72,11 @@ class Settings(BaseSettings):
     EVOLUTION_API_URL: str = "http://host.docker.internal:8080"
     EVOLUTION_API_KEY: str = "sgi_evo_dev_key_2026"
 
+    # ========================
+    # URL del Servidor (Para resolver URLs absolutas de recursos/estáticos)
+    # ========================
+    BACKEND_URL: str = "http://localhost:8000"
+
     model_config = {
         "env_file": ".env",
         "env_file_encoding": "utf-8",

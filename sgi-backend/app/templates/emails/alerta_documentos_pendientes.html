@@ -18,12 +18,16 @@
                             <table width="100%" cellpadding="0" cellspacing="0">
                                 <tr>
                                     <td>
-                                        <div style="color: #38bdf8; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px;">
-                                            SGI - Sistema de Gestión Integral
-                                        </div>
-                                        <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">
-                                            {{ empresa_nombre }}
-                                        </h1>
+                                        {% if logo_url %}
+                                            <img src="{{ logo_url }}" alt="{{ empresa_nombre }}" style="max-height: 48px; max-width: 220px; display: block; margin-bottom: 4px;">
+                                        {% else %}
+                                            <div style="color: #38bdf8; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 6px;">
+                                                SGI - Sistema de Gestión Integral
+                                            </div>
+                                            <h1 style="margin: 0; color: #ffffff; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;">
+                                                {{ empresa_nombre }}
+                                            </h1>
+                                        {% endif %}
                                     </td>
                                     <td align="right" valign="middle">
                                         <!-- Badge de Urgencia Dinámico -->
@@ -43,7 +47,7 @@
                                 Estimado/a <strong>{{ razon_social }}</strong>,
                             </p>
                             <p style="margin: 0 0 28px; font-size: 14px; color: #475569; line-height: 1.6;">
-                                Le informamos que el embarque <strong style="color: #0f172a;">"{{ titulo_embarque }}"</strong> presenta requerimientos de documentación pendientes de recepción. Solicitamos su apoyo para regularizar el estado a la brevedad.
+                                Le informamos que el embarque con codigo de referencia <strong style="color: #0f172a;">{{ cor or "N/A" }}</strong> presenta requerimientos de documentación pendientes de recepción. Solicitamos su apoyo para regularizar el estado a la brevedad.
                             </p>
 
                             <!-- Dashboard de Información Clave -->
@@ -55,7 +59,7 @@
                                             {{ dias_restantes }}
                                         </div>
                                         <div style="font-size: 10px; color: #64748b; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
-                                            Días Restantes hasta ETA
+                                            Dias restantes para el envio de documentos.
                                         </div>
                                     </td>
                                     <!-- Columna 2: Fecha ETA -->
@@ -72,7 +76,7 @@
 
                             <!-- Listado de Documentos Pendientes -->
                             <h3 style="margin: 0 0 16px; font-size: 13px; color: #334155; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; border-bottom: 2px solid #f1f5f9; padding-bottom: 8px;">
-                                Documentos Requeridos Pendientes ({{ documentos_pendientes | length }})
+                                DOCUMENTOS REQUERIDOS PENDIENTES ({{ documentos_pendientes | length }})
                             </h3>
                             <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 32px;">
                                 {% for doc in documentos_pendientes %}

@@ -82,6 +82,35 @@ class EmailService:
 
         return smtp_config, empresa_nombre
 
+    async def _resolve_empresa_logo(self, empresa_id: int | None) -> str | None:
+        """Obtiene la URL absoluta del logo de la empresa desde la BD o None."""
+        from app.models.core import Empresa
+        from app.core.settings import get_settings
+
+        logo_path = None
+        if self.db and empresa_id:
+            try:
+                result = await self.db.execute(select(Empresa.logo).where(Empresa.id == empresa_id))
+                logo_path = result.scalar_one_or_none()
+            except Exception as e:
+                logger.error(f"Error cargando logo para empresa #{empresa_id}: {e}", exc_info=True)
+
+        if not logo_path:
+            return None
+
+        # Si ya es una URL absoluta, la retornamos directamente
+        if logo_path.startswith("http://") or logo_path.startswith("https://"):
+            return logo_path
+
+        # Si es una ruta relativa, le anteponemos la URL del backend configurada
+        settings = get_settings()
+        backend_url = getattr(settings, "BACKEND_URL", "http://localhost:8000").rstrip("/")
+        if not logo_path.startswith("/"):
+            logo_path = "/" + logo_path
+
+        return f"{backend_url}{logo_path}"
+
+
     def _send_email_sync(self, destinatario: str, subject: str, html_body: str, smtp_config: dict) -> bool:
         """Envío síncrono del correo vía SMTP. Se ejecuta en un thread."""
         import re
@@ -135,10 +164,12 @@ class EmailService:
         dias_restantes: int,
         fecha_eta: date,
         documentos_pendientes: list[str],
-        empresa_id: int | None = None
+        empresa_id: int | None = None,
+        cor: str = ""
     ) -> bool:
         """Envía alerta al cliente sobre documentos pendientes antes del ETA."""
         smtp_config, empresa_nombre = await self._resolve_empresa_smtp(empresa_id)
+        logo_url = await self._resolve_empresa_logo(empresa_id)
 
         urgencia_color = "#dc2626" if dias_restantes <= 7 else "#f59e0b" if dias_restantes <= 10 else "#3b82f6"
         urgencia_texto = "URGENTE" if dias_restantes <= 7 else "IMPORTANTE" if dias_restantes <= 10 else "RECORDATORIO"
@@ -146,16 +177,18 @@ class EmailService:
         html = self._render_template(
             "alerta_documentos_pendientes.html",
             empresa_nombre=empresa_nombre,
+            logo_url=logo_url,
             urgencia_color=urgencia_color,
             urgencia_texto=urgencia_texto,
             razon_social=razon_social,
             titulo_embarque=titulo_embarque,
+            cor=cor,
             fecha_eta=fecha_eta.strftime('%d/%m/%Y'),
             dias_restantes=dias_restantes,
             documentos_pendientes=documentos_pendientes,
         )
 
-        subject = f"[{urgencia_texto}] Documentos pendientes - {titulo_embarque} (ETA: {fecha_eta.strftime('%d/%m/%Y')})"
+        subject = f"[{urgencia_texto}] Documentos pendientes - {cor or titulo_embarque} (ETA: {fecha_eta.strftime('%d/%m/%Y')})"
         return await self._send_email(destinatario_email, subject, html, smtp_config)
 
     async def enviar_confirmacion_documentos_completos(
@@ -167,10 +200,12 @@ class EmailService:
     ) -> bool:
         """Envía confirmación al cliente de que todos los documentos han sido recibidos."""
         smtp_config, empresa_nombre = await self._resolve_empresa_smtp(empresa_id)
+        logo_url = await self._resolve_empresa_logo(empresa_id)
 
         html = self._render_template(
             "confirmacion_documentos_completos.html",
             empresa_nombre=empresa_nombre,
+            logo_url=logo_url,
             razon_social=razon_social,
             titulo_embarque=titulo_embarque,
         )
@@ -187,10 +222,12 @@ class EmailService:
         dias_restantes_limite: int,
         fecha_eta: date,
         documentos_pendientes: list[str],
-        empresa_id: int | None = None
+        empresa_id: int | None = None,
+        cor: str = ""
     ) -> bool:
         """Envía alerta al cliente sobre la fecha límite para entregar documentos."""
         smtp_config, empresa_nombre = await self._resolve_empresa_smtp(empresa_id)
+        logo_url = await self._resolve_empresa_logo(empresa_id)
 
         if dias_restantes_limite <= 1:
             urgencia_color = "#dc2626"
@@ -212,16 +249,18 @@ class EmailService:
         html = self._render_template(
             "alerta_fecha_limite_documentos.html",
             empresa_nombre=empresa_nombre,
+            logo_url=logo_url,
             urgencia_color=urgencia_color,
             urgencia_texto=urgencia_texto,
             urgencia_icono=urgencia_icono,
             razon_social=razon_social,
             titulo_embarque=titulo_embarque,
+            cor=cor,
             fecha_limite=fecha_limite.strftime('%d/%m/%Y'),
             dias_restantes_limite=dias_restantes_limite,
             fecha_eta=fecha_eta.strftime('%d/%m/%Y'),
             documentos_pendientes=documentos_pendientes,
         )
 
-        subject = f"[{urgencia_texto}] Fecha límite de documentos - {titulo_embarque} (Límite: {fecha_limite.strftime('%d/%m/%Y')})"
+        subject = f"[{urgencia_texto}] Fecha límite de documentos - {cor or titulo_embarque} (Límite: {fecha_limite.strftime('%d/%m/%Y')})"
         return await self._send_email(destinatario_email, subject, html, smtp_config)

@@ -309,6 +309,10 @@ async def _alertas_documentos_pendientes():
                         if not empresa_id and seg.comercial and seg.comercial.empleado:
                             empresa_id = seg.comercial.empleado.empresa_id
 
+                        # Obtener el código de operación (COR) de la cotización aceptada
+                        cot_aceptada = next((c for c in seg.cotizaciones if c.estado == "ACEPTADO"), None)
+                        cor = cot_aceptada.codigo_operacion if cot_aceptada else ""
+
                         # Enviar alerta multicanal
                         canal = await notif_service.enviar_alerta_fecha_limite(
                             telefono=destinatario_telefono,
@@ -320,7 +324,8 @@ async def _alertas_documentos_pendientes():
                             fecha_eta=seg.fecha_eta,
                             documentos_pendientes=nombres_docs,
                             nombre_contacto=nombre_contacto,
-                            empresa_id=empresa_id
+                            empresa_id=empresa_id,
+                            cor=cor
                         )
 
                         # Solo registrar la alerta si se envió exitosamente por al menos un canal

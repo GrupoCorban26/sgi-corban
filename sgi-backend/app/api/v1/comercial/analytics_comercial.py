@@ -66,7 +66,8 @@ async def obtener_embudo_comercial(
 async def obtener_cotizaciones_analytics(
     fecha_inicio: date = Query(..., description="Fecha inicio YYYY-MM-DD"),
     fecha_fin: date = Query(..., description="Fecha fin YYYY-MM-DD"),
-    cliente_id: Optional[int] = Query(None, description="Filtrar por empresa"),
+    cliente_id: Optional[int] = Query(None, description="Filtrar por cliente externo"),
+    empresa_id: Optional[int] = Query(None, description="Filtrar por empresa del grupo"),
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(get_current_user_obj),
     comercial_ids: Optional[List[int]] = Depends(resolver_comercial_ids),
@@ -76,14 +77,17 @@ async def obtener_cotizaciones_analytics(
     para el rango de fechas especificado.
     """
     service = AnalyticsComercialService(db)
-    return await service.get_cotizaciones_analytics(fecha_inicio, fecha_fin, comercial_ids, cliente_id=cliente_id)
+    return await service.get_cotizaciones_analytics(
+        fecha_inicio, fecha_fin, comercial_ids, cliente_id=cliente_id, empresa_id=empresa_id
+    )
 
 
 @router.get("/cotizaciones/exportar")
 async def exportar_cotizaciones_excel(
     fecha_inicio: date = Query(..., description="Fecha inicio YYYY-MM-DD"),
     fecha_fin: date = Query(..., description="Fecha fin YYYY-MM-DD"),
-    cliente_id: Optional[int] = Query(None, description="Filtrar por empresa"),
+    cliente_id: Optional[int] = Query(None, description="Filtrar por cliente externo"),
+    empresa_id: Optional[int] = Query(None, description="Filtrar por empresa del grupo"),
     db: AsyncSession = Depends(get_db),
     current_user: Usuario = Depends(get_current_user_obj),
     comercial_ids: Optional[List[int]] = Depends(resolver_comercial_ids),
@@ -93,7 +97,9 @@ async def exportar_cotizaciones_excel(
     de cotizaciones comerciales para el rango de fechas especificado.
     """
     service = AnalyticsComercialService(db)
-    excel_content = await service.export_cotizaciones_excel(fecha_inicio, fecha_fin, comercial_ids, cliente_id=cliente_id)
+    excel_content = await service.export_cotizaciones_excel(
+        fecha_inicio, fecha_fin, comercial_ids, cliente_id=cliente_id, empresa_id=empresa_id
+    )
     
     filename = f"reporte_cotizaciones_{fecha_inicio}_a_{fecha_fin}.xlsx"
     return StreamingResponse(

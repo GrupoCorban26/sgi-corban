@@ -90,7 +90,8 @@ async def run_test_email(destinatario: str, empresa_id_arg: int | None = None):
                     dias_restantes=dias_restantes,
                     fecha_eta=fecha_eta,
                     documentos_pendientes=documentos_pendientes,
-                    empresa_id=emp_id
+                    empresa_id=emp_id,
+                    cor="COR-2026-98765"
                 )
                 
                 if exito:

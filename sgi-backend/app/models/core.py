@@ -79,3 +79,4 @@ class Empresa(Base):
     smtp_user = Column(String(150), nullable=True)
     smtp_password = Column(String(255), nullable=True)
     smtp_sender = Column(String(255), nullable=True)
+    logo = Column(String(500), nullable=True)
