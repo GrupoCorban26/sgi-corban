@@ -14,10 +14,10 @@ settings = get_settings()
 # Determinar el servidor de base de datos.
 # Si el archivo de configuración (.env.production) define host.docker.internal,
 # pero estamos ejecutando el código fuera de Docker (por ejemplo, localmente en Windows),
-# redirigimos la conexión a localhost.
+# redirigimos la conexión a localhost. Esto también funciona si contiene puertos (ej. host.docker.internal,1433).
 db_server = settings.DB_SERVER
-if db_server == "host.docker.internal" and not os.path.exists("/.dockerenv"):
-    db_server = "localhost"
+if db_server and "host.docker.internal" in db_server and not os.path.exists("/.dockerenv"):
+    db_server = db_server.replace("host.docker.internal", "localhost")
 
 # Construir cadena de conexión ODBC nativa (soporta instancias con nombre como localhost\SQLEXPRESS)
 if settings.DB_TRUSTED:
