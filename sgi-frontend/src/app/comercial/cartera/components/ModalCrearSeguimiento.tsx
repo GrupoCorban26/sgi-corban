@@ -50,7 +50,7 @@ export default function ModalCrearSeguimiento({
 
     // Lista de ítems de cotización iniciales (mínimo 1)
     const [items, setItems] = useState<CotizacionItemCreate[]>([
-        { tipo_carga_id: 1, tipo_servicio_id: 1, tipo_operacion: 'IMPORTACION', pais_origen: '' }
+        { tipo_carga_id: 1, tipo_servicio_id: 1, tipo_operacion: 'IMPORTACION', pais_origen: '', incoterm: '' }
     ]);
 
     // Cargar lista de clientes cuando se abre en modo dropdown
@@ -74,7 +74,7 @@ export default function ModalCrearSeguimiento({
             setTitulo('');
             setComentarioInicial('');
             setEstadoInicial('COTIZADO');
-            setItems([{ tipo_carga_id: 1, tipo_servicio_id: 1, tipo_operacion: 'IMPORTACION', pais_origen: '' }]);
+            setItems([{ tipo_carga_id: 1, tipo_servicio_id: 1, tipo_operacion: 'IMPORTACION', pais_origen: '', incoterm: '' }]);
             setSelectedClienteId(null);
             setModoProspecto(false);
             setTempNombre('');
@@ -88,7 +88,7 @@ export default function ModalCrearSeguimiento({
     if (!isOpen) return null;
 
     const handleAddItem = () => {
-        setItems([...items, { tipo_carga_id: 1, tipo_servicio_id: 1, tipo_operacion: 'IMPORTACION', pais_origen: '' }]);
+        setItems([...items, { tipo_carga_id: 1, tipo_servicio_id: 1, tipo_operacion: 'IMPORTACION', pais_origen: '', incoterm: '' }]);
     };
 
     const handleRemoveItem = (index: number) => {
@@ -150,7 +150,8 @@ export default function ModalCrearSeguimiento({
                 titulo: titulo.trim(),
                 items: items.map(item => ({
                     ...item,
-                    pais_origen: item.pais_origen?.trim() || undefined
+                    pais_origen: item.pais_origen?.trim() || undefined,
+                    incoterm: item.incoterm || undefined
                 })),
                 comentario_inicial: comentarioInicial.trim() || undefined,
                 estado_inicial: estadoInicial,
@@ -433,16 +434,38 @@ export default function ModalCrearSeguimiento({
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-2">
+                                    <div className="grid grid-cols-3 gap-2">
                                         <div>
                                             <label className="block text-[9px] font-bold text-indigo-700 uppercase tracking-widest mb-0.5">Vía</label>
                                             <select
                                                 value={item.tipo_operacion || 'IMPORTACION'}
                                                 onChange={(e) => handleChangeItem(idx, 'tipo_operacion', e.target.value)}
-                                                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-indigo-500/20 text-slate-800 cursor-pointer font-semibold"
+                                                className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-indigo-500/20 text-slate-800 cursor-pointer font-semibold"
                                             >
                                                 <option value="IMPORTACION">IMPORTACIÓN</option>
                                                 <option value="EXPORTACION">EXPORTACIÓN</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-[9px] font-bold text-indigo-700 uppercase tracking-widest mb-0.5">Incoterm</label>
+                                            <select
+                                                value={item.incoterm || ''}
+                                                onChange={(e) => handleChangeItem(idx, 'incoterm', e.target.value)}
+                                                className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-indigo-500/20 text-slate-800 cursor-pointer font-semibold"
+                                            >
+                                                <option value="">— Incoterm —</option>
+                                                <option value="EXW">EXW</option>
+                                                <option value="FCA">FCA</option>
+                                                <option value="CPT">CPT</option>
+                                                <option value="CIP">CIP</option>
+                                                <option value="DAP">DAP</option>
+                                                <option value="DPU">DPU</option>
+                                                <option value="DDP">DDP</option>
+                                                <option value="FAS">FAS</option>
+                                                <option value="FOB">FOB</option>
+                                                <option value="CFR">CFR</option>
+                                                <option value="CIF">CIF</option>
                                             </select>
                                         </div>
 
@@ -453,7 +476,7 @@ export default function ModalCrearSeguimiento({
                                                 placeholder="China, USA..."
                                                 value={item.pais_origen || ''}
                                                 onChange={(e) => handleChangeItem(idx, 'pais_origen', e.target.value)}
-                                                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-1.5 text-xs outline-none focus:ring-1 focus:ring-indigo-500/20 text-slate-800 placeholder:text-slate-400"
+                                                className="w-full bg-white border border-slate-200 rounded-xl px-2 py-1.5 text-xs outline-none focus:ring-1 focus:ring-indigo-500/20 text-slate-800 placeholder:text-slate-400"
                                             />
                                         </div>
                                     </div>

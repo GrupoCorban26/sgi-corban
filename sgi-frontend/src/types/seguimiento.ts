@@ -118,18 +118,21 @@ export interface CotizacionCerrar {
     medio_gestion_id: number;
     comentario?: string | null;
     cliente_registro?: ClienteRegistroFaseCierre | null;
+    fecha_cambio?: string;
 }
 
 export interface SeguimientoCaer {
     motivo_caida: string;
     medio_gestion_id: number;
     comentario?: string | null;
+    fecha_cambio?: string;
 }
 
 export interface SeguimientoMover {
     estado_nuevo: 'SOLICITUD' | 'COTIZADO' | 'CIERRE' | 'EN_OPERACION' | 'CARGA_ENTREGADA' | 'CAIDO';
     medio_gestion_id: number;
     comentario?: string | null;
+    fecha_cambio?: string;
 }
 
 export interface SeguimientoOperar {
@@ -139,6 +142,7 @@ export interface SeguimientoOperar {
     contacto_alerta_id: number;
     medio_gestion_id: number;
     comentario?: string;
+    fecha_cambio?: string;
 }
 
 export interface DocumentoToggle {
@@ -148,6 +152,7 @@ export interface DocumentoToggle {
 export interface SeguimientoEntregar {
     medio_gestion_id: number;
     comentario?: string;
+    fecha_cambio?: string;
 }
 
 export interface SeguimientoComentario {

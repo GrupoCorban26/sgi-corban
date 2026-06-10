@@ -136,7 +136,7 @@ export interface TopMotivoCaida {
 }
 
 export interface EmpresaCotizacionesRendimiento {
-  cliente_id: number;
+  cliente_id: number | string;
   nombre: string;
   cotizados_creados: number;
   cierres_exitosos: number;

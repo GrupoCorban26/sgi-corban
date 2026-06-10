@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Union
 
 # =========================================================================
 # RADAR COMERCIAL SCHEMAS
@@ -134,7 +134,7 @@ class TopMotivoCaida(BaseModel):
 
 
 class EmpresaCotizacionesRendimiento(BaseModel):
-    cliente_id: int
+    cliente_id: Union[int, str]
     nombre: str
     cotizados_creados: int
     cierres_exitosos: int

@@ -176,18 +176,21 @@ class CotizacionCerrar(BaseModel):
     medio_gestion_id: int
     comentario: Optional[str] = Field(None, max_length=500)
     cliente_registro: Optional[ClienteRegistroFaseCierre] = None
+    fecha_cambio: Optional[date] = Field(None, description="Fecha de la transición. Si no se envía, se usa la fecha actual.")
 
 
 class SeguimientoCaer(BaseModel):
     motivo_caida: str = Field(..., min_length=1, max_length=500)
     medio_gestion_id: int           # Canal por el cual se contactó al cliente
     comentario: Optional[str] = Field(None, max_length=500)
+    fecha_cambio: Optional[date] = Field(None, description="Fecha de la transición. Si no se envía, se usa la fecha actual.")
 
 
 class SeguimientoMover(BaseModel):
     estado_nuevo: str = Field(..., description="SOLICITUD | COTIZADO | CIERRE | EN_OPERACION | CARGA_ENTREGADA | CAIDO")
     medio_gestion_id: int           # Canal de contacto obligatorio (Llamada, WhatsApp, Correo)
     comentario: Optional[str] = Field(None, max_length=500)
+    fecha_cambio: Optional[date] = Field(None, description="Fecha de la transición. Si no se envía, se usa la fecha actual.")
 
 
 class SeguimientoOperar(BaseModel):
@@ -198,12 +201,14 @@ class SeguimientoOperar(BaseModel):
     contacto_alerta_id: int         # Contacto del cliente para alertas por correo
     medio_gestion_id: int
     comentario: Optional[str] = Field(None, max_length=500)
+    fecha_cambio: Optional[date] = Field(None, description="Fecha de la transición. Si no se envía, se usa la fecha actual.")
 
 
 class SeguimientoEntregar(BaseModel):
     """Payload para transición EN_OPERACION → CARGA_ENTREGADA."""
     medio_gestion_id: int
     comentario: Optional[str] = Field(None, max_length=500)
+    fecha_cambio: Optional[date] = Field(None, description="Fecha de la transición. Si no se envía, se usa la fecha actual.")
 
 
 # --- Schemas de Auditoría / Comentarios ---

@@ -38,6 +38,10 @@ export default function ModalMoverTarjeta({
     // Campos comunes
     const [medioId, setMedioId] = useState<number>(1); // Default a Llamada o 1
     const [comentario, setComentario] = useState<string>('');
+    const [fechaCambio, setFechaCambio] = useState<string>(() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    });
 
     // Campos para CIERRE
     const [cotizacionId, setCotizacionId] = useState<number | null>(
@@ -131,7 +135,8 @@ export default function ModalMoverTarjeta({
                     segmentacion_id: segmentacionId,
                     medio_gestion_id: medioId,
                     comentario: comentario.trim() || undefined,
-                    cliente_registro: clienteRegistro
+                    cliente_registro: clienteRegistro,
+                    fecha_cambio: fechaCambio || undefined
                 };
                 await onConfirmMover(payload);
                 toast.success('¡Negociación cerrada con éxito!');
@@ -154,7 +159,8 @@ export default function ModalMoverTarjeta({
                 const payload: SeguimientoCaer = {
                     motivo_caida: motivoCaida.trim(),
                     medio_gestion_id: medioId,
-                    comentario: comentario.trim() || undefined
+                    comentario: comentario.trim() || undefined,
+                    fecha_cambio: fechaCambio || undefined
                 };
                 await onConfirmMover(payload);
                 toast.warning('Negociación marcada como caída');
@@ -192,7 +198,8 @@ export default function ModalMoverTarjeta({
                     documento_ids: documentoIds,
                     contacto_alerta_id: contactoAlertaId,
                     medio_gestion_id: medioId,
-                    comentario: comentario.trim() || undefined
+                    comentario: comentario.trim() || undefined,
+                    fecha_cambio: fechaCambio || undefined
                 };
                 await onConfirmMover(payload);
                 toast.success('🚢 Operación iniciada correctamente');
@@ -209,7 +216,8 @@ export default function ModalMoverTarjeta({
             try {
                 const payload: SeguimientoEntregar = {
                     medio_gestion_id: medioId,
-                    comentario: comentario.trim() || undefined
+                    comentario: comentario.trim() || undefined,
+                    fecha_cambio: fechaCambio || undefined
                 };
                 await onConfirmMover(payload);
                 toast.success('📦 Carga entregada correctamente');
@@ -228,7 +236,8 @@ export default function ModalMoverTarjeta({
                 const payload: SeguimientoMover = {
                     estado_nuevo: estadoNuevo as 'SOLICITUD' | 'COTIZADO' | 'CIERRE' | 'EN_OPERACION' | 'CARGA_ENTREGADA' | 'CAIDO',
                     medio_gestion_id: medioId,
-                    comentario: comentario.trim() || undefined
+                    comentario: comentario.trim() || undefined,
+                    fecha_cambio: fechaCambio || undefined
                 };
                 await onConfirmMover(payload);
                 toast.success(
@@ -625,8 +634,21 @@ export default function ModalMoverTarjeta({
                         </div>
                     )}
 
-                    {/* Canal y Comentario Comunes */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Canal, Comentario y Fecha Comunes */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div>
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
+                                <Calendar size={13} /> Fecha de Transición
+                            </label>
+                            <input
+                                type="date"
+                                required
+                                value={fechaCambio}
+                                onChange={(e) => setFechaCambio(e.target.value)}
+                                className="w-full bg-white border border-slate-200 outline-none rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 text-slate-800 transition-all"
+                            />
+                        </div>
+
                         <div>
                             <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1 flex items-center gap-1">
                                 <Calendar size={13} /> Vía de Gestión Comercial

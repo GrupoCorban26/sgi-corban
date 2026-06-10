@@ -86,6 +86,7 @@ export default function PanelDetalleSeguimiento({
     const [tipoCargaId, setTipoCargaId] = useState<number>(1);
     const [tipoServicioId, setTipoServicioId] = useState<number>(1);
     const [tipoOperacion, setTipoOperacion] = useState<'IMPORTACION' | 'EXPORTACION'>('IMPORTACION');
+    const [incoterm, setIncoterm] = useState('');
     const [paisOrigen, setPaisOrigen] = useState('');
     const [isSavingCotizacion, setIsSavingCotizacion] = useState(false);
 
@@ -129,10 +130,12 @@ export default function PanelDetalleSeguimiento({
                 tipo_carga_id: tipoCargaId,
                 tipo_servicio_id: tipoServicioId,
                 tipo_operacion: tipoOperacion,
-                pais_origen: paisOrigen.trim() || undefined
+                pais_origen: paisOrigen.trim() || undefined,
+                incoterm: incoterm || undefined
             };
             await onAgregarCotizacion(payload);
             setPaisOrigen('');
+            setIncoterm('');
             toast.success('Nueva cotización agregada con éxito');
             setActiveTab('comentarios');
         } catch (err) {
@@ -604,9 +607,9 @@ export default function PanelDetalleSeguimiento({
                                         </div>
                                     </div>
 
-                                    <div className="grid grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-3 gap-3">
                                         <div>
-                                            <label className="block text-[11px] font-bold text-indigo-700 uppercase tracking-wider mb-1">Vía de Operación</label>
+                                            <label className="block text-[11px] font-bold text-indigo-700 uppercase tracking-wider mb-1">Vía</label>
                                             <select
                                                 value={tipoOperacion}
                                                 onChange={(e) => setTipoOperacion(e.target.value as 'IMPORTACION' | 'EXPORTACION')}
@@ -618,12 +621,34 @@ export default function PanelDetalleSeguimiento({
                                         </div>
 
                                         <div>
+                                            <label className="block text-[11px] font-bold text-indigo-700 uppercase tracking-wider mb-1">Incoterm</label>
+                                            <select
+                                                value={incoterm}
+                                                onChange={(e) => setIncoterm(e.target.value)}
+                                                className="w-full bg-white border border-slate-200 rounded-xl px-2.5 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 cursor-pointer font-semibold"
+                                            >
+                                                <option value="">— Incoterm —</option>
+                                                <option value="EXW">EXW</option>
+                                                <option value="FCA">FCA</option>
+                                                <option value="CPT">CPT</option>
+                                                <option value="CIP">CIP</option>
+                                                <option value="DAP">DAP</option>
+                                                <option value="DPU">DPU</option>
+                                                <option value="DDP">DDP</option>
+                                                <option value="FAS">FAS</option>
+                                                <option value="FOB">FOB</option>
+                                                <option value="CFR">CFR</option>
+                                                <option value="CIF">CIF</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
                                             <label className="block text-[11px] font-bold text-indigo-700 uppercase tracking-wider mb-1">País Origen</label>
                                             <div className="relative">
                                                 <MapPin className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" size={12} />
                                                 <input
                                                     type="text"
-                                                    placeholder="Ej: China, USA..."
+                                                    placeholder="China..."
                                                     value={paisOrigen}
                                                     onChange={(e) => setPaisOrigen(e.target.value)}
                                                     className="w-full bg-white border border-slate-200 rounded-xl pl-6 pr-2.5 py-2 text-xs outline-none focus:ring-2 focus:ring-indigo-500/20 text-slate-800 placeholder:text-slate-400"

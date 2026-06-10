@@ -389,11 +389,24 @@ class ClientesService:
     async def create(self, cliente: ClienteCreate, comercial_id: int, created_by: int) -> dict:
         """Crea un nuevo cliente y registra el evento inicial en el historial."""
         try:
+            # Obtener la empresa del comercial asignado
+            stmt_empresa = (
+                select(Empleado.empresa_id)
+                .join(Usuario, Usuario.empleado_id == Empleado.id)
+                .where(Usuario.id == comercial_id)
+            )
+            res_empresa = await self.db.execute(stmt_empresa)
+            empresa_id = res_empresa.scalar()
+
             if cliente.ruc:
                 stmt_existing = (
                     select(Cliente, Usuario)
                     .outerjoin(Usuario, Cliente.comercial_encargado_id == Usuario.id)
-                    .where(Cliente.ruc == cliente.ruc, Cliente.is_active == True)
+                    .where(
+                        Cliente.ruc == cliente.ruc,
+                        Cliente.is_active == True,
+                        Cliente.empresa_id == empresa_id
+                    )
                 )
                 res_existing = await self.db.execute(stmt_existing)
                 row_existing = res_existing.first()
@@ -409,7 +422,7 @@ class ClientesService:
                         if db_comercial.id != comercial_id:
                             raise HTTPException(
                                 status_code=400,
-                                detail=f"Este cliente ya está registrado en la cartera de {nombre_comercial}. Por favor, coordina con tu supervisor para solicitar la reasignación."
+                                detail=f"Este cliente ya está registrado en la cartera de {nombre_comercial} para esta empresa. Por favor, coordina con tu supervisor para solicitar la reasignación."
                             )
                         else:
                             raise HTTPException(
@@ -419,7 +432,7 @@ class ClientesService:
                     else:
                         raise HTTPException(
                             status_code=400,
-                            detail="Este cliente ya existe en el sistema sin un asesor asignado. Por favor, usa la opción 'Vincular con Cliente' para asociar este chat."
+                            detail="Este cliente ya existe en esta empresa sin un asesor asignado. Por favor, usa la opción 'Vincular con Cliente' para asociar este chat."
                         )
 
             # Si no se especifica estado, usar PROSPECTO
@@ -433,6 +446,7 @@ class ClientesService:
                 direccion_fiscal=cliente.direccion_fiscal,
                 distrito_id=cliente.distrito_id,
                 comercial_encargado_id=comercial_id,
+                empresa_id=empresa_id,
                 estado_id=estado_id,
                 origen_id=cliente.origen_id,
                 proxima_fecha_contacto=cliente.proxima_fecha_contacto,

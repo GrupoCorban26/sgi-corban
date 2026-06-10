@@ -147,6 +147,9 @@ export default function SeguimientoCard({ seguimiento, onClick }: SeguimientoCar
                             >
                                 {isAereo ? <Plane size={11} className="flex-shrink-0" /> : <Ship size={11} className="flex-shrink-0" />}
                                 <span className="truncate max-w-[120px]">{c.tipo_carga_nombre}</span>
+                                {c.incoterm && (
+                                    <span className="text-[8px] bg-slate-200/60 text-slate-700 px-1 py-0.5 rounded font-mono font-extrabold">{c.incoterm}</span>
+                                )}
                                 {c.pais_origen && <span className="opacity-60 font-normal text-[9px]">({c.pais_origen})</span>}
                             </span>
                         );

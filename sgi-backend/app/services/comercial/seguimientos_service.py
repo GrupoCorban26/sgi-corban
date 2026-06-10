@@ -307,23 +307,33 @@ class SeguimientosService:
             seg.estado = data.estado_nuevo
             seg.updated_by = usuario_id
 
+            fecha_dt = None
+            if data.fecha_cambio:
+                fecha_dt = datetime(data.fecha_cambio.year, data.fecha_cambio.month, data.fecha_cambio.day)
+
             # Registrar comentario de la transición
-            comentario = SeguimientoComentario(
-                seguimiento_id=seg.id,
-                comentario=data.comentario or f"Transición de estado: {estado_anterior} → {data.estado_nuevo}",
-                medio_gestion_id=data.medio_gestion_id,
-                created_by=usuario_id
-            )
+            comentario_kwargs = {
+                "seguimiento_id": seg.id,
+                "comentario": data.comentario or f"Transición de estado: {estado_anterior} → {data.estado_nuevo}",
+                "medio_gestion_id": data.medio_gestion_id,
+                "created_by": usuario_id
+            }
+            if fecha_dt:
+                comentario_kwargs["created_at"] = fecha_dt
+            comentario = SeguimientoComentario(**comentario_kwargs)
             self.db.add(comentario)
 
             # Historial de auditoría
-            hist = SeguimientoHistorial(
-                seguimiento_id=seg.id,
-                estado_anterior=estado_anterior,
-                estado_nuevo=data.estado_nuevo,
-                comentario=data.comentario,
-                registrado_por=usuario_id
-            )
+            hist_kwargs = {
+                "seguimiento_id": seg.id,
+                "estado_anterior": estado_anterior,
+                "estado_nuevo": data.estado_nuevo,
+                "comentario": data.comentario,
+                "registrado_por": usuario_id
+            }
+            if fecha_dt:
+                hist_kwargs["fecha_cambio"] = fecha_dt
+            hist = SeguimientoHistorial(**hist_kwargs)
             self.db.add(hist)
 
         await self.db.commit()
@@ -374,6 +384,15 @@ class SeguimientosService:
                 res_estado = await self.db.execute(select(EstadoCliente.id).where(EstadoCliente.nombre == "ACTIVO"))
                 activo_estado_id = res_estado.scalar()
 
+                # Obtener la empresa del comercial asignado al seguimiento
+                stmt_empresa = (
+                    select(Empleado.empresa_id)
+                    .join(Usuario, Usuario.empleado_id == Empleado.id)
+                    .where(Usuario.id == seg.comercial_id)
+                )
+                res_empresa = await self.db.execute(stmt_empresa)
+                empresa_id = res_empresa.scalar()
+
                 nuevo_cliente = Cliente(
                     ruc=reg.ruc,
                     razon_social=reg.razon_social,
@@ -381,7 +400,8 @@ class SeguimientosService:
                     distrito_id=reg.distrito_id,
                     origen_id=reg.origen_id,
                     estado_id=activo_estado_id,
-                    comercial_id=seg.comercial_id,
+                    comercial_encargado_id=seg.comercial_id,
+                    empresa_id=empresa_id,
                     created_by=usuario_id
                 )
                 self.db.add(nuevo_cliente)
@@ -410,11 +430,15 @@ class SeguimientosService:
                 seg.temp_cliente_correo = None
                 seg.temp_cliente_telefono = None
 
+            fecha_dt = None
+            if data.fecha_cambio:
+                fecha_dt = datetime(data.fecha_cambio.year, data.fecha_cambio.month, data.fecha_cambio.day)
+
             # 1. Aceptar cotización elegida
             cot_elegida.estado = "ACEPTADO"
             cot_elegida.codigo_operacion = data.codigo_operacion
             cot_elegida.segmentacion_id = data.segmentacion_id
-            cot_elegida.fecha_cierre = date.today()
+            cot_elegida.fecha_cierre = data.fecha_cambio if data.fecha_cambio else date.today()
 
             # 2. Descartar las demás cotizaciones pendientes
             stmt_others = update(Cotizacion).where(
@@ -436,22 +460,28 @@ class SeguimientosService:
             if data.comentario:
                 comentario_texto += f" Comentario adicional: {data.comentario}"
 
-            comentario = SeguimientoComentario(
-                seguimiento_id=id,
-                comentario=comentario_texto,
-                medio_gestion_id=data.medio_gestion_id,
-                created_by=usuario_id
-            )
+            comentario_kwargs = {
+                "seguimiento_id": id,
+                "comentario": comentario_texto,
+                "medio_gestion_id": data.medio_gestion_id,
+                "created_by": usuario_id
+            }
+            if fecha_dt:
+                comentario_kwargs["created_at"] = fecha_dt
+            comentario = SeguimientoComentario(**comentario_kwargs)
             self.db.add(comentario)
 
             # 5. Historial
-            hist = SeguimientoHistorial(
-                seguimiento_id=id,
-                estado_anterior=estado_anterior,
-                estado_nuevo="CIERRE",
-                comentario=f"Cierre de venta (COR: {data.codigo_operacion})",
-                registrado_por=usuario_id
-            )
+            hist_kwargs = {
+                "seguimiento_id": id,
+                "estado_anterior": estado_anterior,
+                "estado_nuevo": "CIERRE",
+                "comentario": f"Cierre de venta (COR: {data.codigo_operacion})",
+                "registrado_por": usuario_id
+            }
+            if fecha_dt:
+                hist_kwargs["fecha_cambio"] = fecha_dt
+            hist = SeguimientoHistorial(**hist_kwargs)
             self.db.add(hist)
 
         await self.db.commit()
@@ -526,27 +556,37 @@ class SeguimientosService:
             seg.estado = "EN_OPERACION"
             seg.updated_by = usuario_id
 
+            fecha_dt = None
+            if data.fecha_cambio:
+                fecha_dt = datetime(data.fecha_cambio.year, data.fecha_cambio.month, data.fecha_cambio.day)
+
             # 5. Comentario
             comentario_texto = f"Tarjeta pasa a EN OPERACIÓN. ETA: {data.fecha_eta}. Incoterm: {data.incoterm.upper()}. {len(data.documento_ids)} documentos asignados."
             if data.comentario:
                 comentario_texto += f" {data.comentario}"
 
-            comentario = SeguimientoComentario(
-                seguimiento_id=id,
-                comentario=comentario_texto,
-                medio_gestion_id=data.medio_gestion_id,
-                created_by=usuario_id
-            )
+            comentario_kwargs = {
+                "seguimiento_id": id,
+                "comentario": comentario_texto,
+                "medio_gestion_id": data.medio_gestion_id,
+                "created_by": usuario_id
+            }
+            if fecha_dt:
+                comentario_kwargs["created_at"] = fecha_dt
+            comentario = SeguimientoComentario(**comentario_kwargs)
             self.db.add(comentario)
 
             # 6. Historial
-            hist = SeguimientoHistorial(
-                seguimiento_id=id,
-                estado_anterior=estado_anterior,
-                estado_nuevo="EN_OPERACION",
-                comentario=f"ETA: {data.fecha_eta} | Incoterm: {data.incoterm.upper()}",
-                registrado_por=usuario_id
-            )
+            hist_kwargs = {
+                "seguimiento_id": id,
+                "estado_anterior": estado_anterior,
+                "estado_nuevo": "EN_OPERACION",
+                "comentario": f"ETA: {data.fecha_eta} | Incoterm: {data.incoterm.upper()}",
+                "registrado_por": usuario_id
+            }
+            if fecha_dt:
+                hist_kwargs["fecha_cambio"] = fecha_dt
+            hist = SeguimientoHistorial(**hist_kwargs)
             self.db.add(hist)
 
         await self.db.commit()
@@ -571,25 +611,35 @@ class SeguimientosService:
             seg.estado = "CARGA_ENTREGADA"
             seg.updated_by = usuario_id
 
+            fecha_dt = None
+            if data.fecha_cambio:
+                fecha_dt = datetime(data.fecha_cambio.year, data.fecha_cambio.month, data.fecha_cambio.day)
+
             comentario_texto = "Carga entregada exitosamente."
             if data.comentario:
                 comentario_texto += f" {data.comentario}"
 
-            comentario = SeguimientoComentario(
-                seguimiento_id=id,
-                comentario=comentario_texto,
-                medio_gestion_id=data.medio_gestion_id,
-                created_by=usuario_id
-            )
+            comentario_kwargs = {
+                "seguimiento_id": id,
+                "comentario": comentario_texto,
+                "medio_gestion_id": data.medio_gestion_id,
+                "created_by": usuario_id
+            }
+            if fecha_dt:
+                comentario_kwargs["created_at"] = fecha_dt
+            comentario = SeguimientoComentario(**comentario_kwargs)
             self.db.add(comentario)
 
-            hist = SeguimientoHistorial(
-                seguimiento_id=id,
-                estado_anterior=estado_anterior,
-                estado_nuevo="CARGA_ENTREGADA",
-                comentario="Carga entregada",
-                registrado_por=usuario_id
-            )
+            hist_kwargs = {
+                "seguimiento_id": id,
+                "estado_anterior": estado_anterior,
+                "estado_nuevo": "CARGA_ENTREGADA",
+                "comentario": "Carga entregada",
+                "registrado_por": usuario_id
+            }
+            if fecha_dt:
+                hist_kwargs["fecha_cambio"] = fecha_dt
+            hist = SeguimientoHistorial(**hist_kwargs)
             self.db.add(hist)
 
         await self.db.commit()
@@ -639,27 +689,37 @@ class SeguimientosService:
             seg.motivo_caida = data.motivo_caida
             seg.updated_by = usuario_id
 
+            fecha_dt = None
+            if data.fecha_cambio:
+                fecha_dt = datetime(data.fecha_cambio.year, data.fecha_cambio.month, data.fecha_cambio.day)
+
             # 3. Registrar comentario de caída
             comentario_texto = f"Negociación caída. Motivo: {data.motivo_caida}."
             if data.comentario:
                 comentario_texto += f" Comentario adicional: {data.comentario}"
 
-            comentario = SeguimientoComentario(
-                seguimiento_id=id,
-                comentario=comentario_texto,
-                medio_gestion_id=data.medio_gestion_id,
-                created_by=usuario_id
-            )
+            comentario_kwargs = {
+                "seguimiento_id": id,
+                "comentario": comentario_texto,
+                "medio_gestion_id": data.medio_gestion_id,
+                "created_by": usuario_id
+            }
+            if fecha_dt:
+                comentario_kwargs["created_at"] = fecha_dt
+            comentario = SeguimientoComentario(**comentario_kwargs)
             self.db.add(comentario)
 
             # 4. Historial de transición
-            hist = SeguimientoHistorial(
-                seguimiento_id=id,
-                estado_anterior=estado_anterior,
-                estado_nuevo="CAIDO",
-                comentario=f"Caído. Motivo: {data.motivo_caida}",
-                registrado_por=usuario_id
-            )
+            hist_kwargs = {
+                "seguimiento_id": id,
+                "estado_anterior": estado_anterior,
+                "estado_nuevo": "CAIDO",
+                "comentario": f"Caído. Motivo: {data.motivo_caida}",
+                "registrado_por": usuario_id
+            }
+            if fecha_dt:
+                hist_kwargs["fecha_cambio"] = fecha_dt
+            hist = SeguimientoHistorial(**hist_kwargs)
             self.db.add(hist)
 
         await self.db.commit()
