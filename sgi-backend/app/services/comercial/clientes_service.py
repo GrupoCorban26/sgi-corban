@@ -460,6 +460,17 @@ class ClientesService:
                 nuevo_cliente.ruc = f"ID-{nuevo_cliente.id:08d}"
                 await self.db.flush()
 
+            # Vincular cualquier contacto previo creado por RUC al nuevo cliente manual
+            if nuevo_cliente.ruc:
+                await self.db.execute(
+                    update(ClienteContacto)
+                    .where(
+                        ClienteContacto.ruc == nuevo_cliente.ruc,
+                        ClienteContacto.cliente_id.is_(None)
+                    )
+                    .values(cliente_id=nuevo_cliente.id)
+                )
+
             await self._registrar_historial(
                 cliente_id=nuevo_cliente.id,
                 estado_anterior_id=None,

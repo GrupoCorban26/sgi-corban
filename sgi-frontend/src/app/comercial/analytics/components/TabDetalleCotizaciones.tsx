@@ -73,11 +73,13 @@ export default function TabDetalleCotizaciones({ data }: TabDetalleCotizacionesP
               <thead className="bg-slate-50 border-b border-slate-100">
                 <tr className="font-bold text-slate-500 uppercase tracking-wider">
                   <th className="py-4 px-5">Comercial</th>
-                  <th className="py-4 px-4 text-center">Creadas</th>
-                  <th className="py-4 px-4 text-center">Ganadas</th>
-                  <th className="py-4 px-4 text-center">Perdidas</th>
-                  <th className="py-4 px-4 text-center">Pendientes</th>
-                  <th className="py-4 px-5 text-center">Conversión</th>
+                  <th className="py-4 px-4 text-center">Cot. Totales</th>
+                  <th className="py-4 px-4 text-center">Cargas Cotizadas</th>
+                  <th className="py-4 px-4 text-center">Clientes</th>
+                  <th className="py-4 px-4 text-center">Cierres</th>
+                  <th className="py-4 px-4 text-center">En Operación</th>
+                  <th className="py-4 px-4 text-center">Caídos</th>
+                  <th className="py-4 px-5 text-center">% Conversión</th>
                   <th className="py-4 px-4 w-12 text-center"></th>
                 </tr>
               </thead>
@@ -105,13 +107,15 @@ export default function TabDetalleCotizaciones({ data }: TabDetalleCotizacionesP
                             )}
                           </div>
                         </td>
-                        <td className="py-3.5 px-4 text-center font-bold text-slate-800">{c.cotizados_creados}</td>
-                        <td className="py-3.5 px-4 text-center text-emerald-600 font-bold">{c.cierres_exitosos}</td>
-                        <td className="py-3.5 px-4 text-center text-rose-600 font-bold">{c.negociaciones_caidas}</td>
-                        <td className="py-3.5 px-4 text-center text-slate-400">{c.cotizaciones_pendientes}</td>
+                        <td className="py-3.5 px-4 text-center font-bold text-slate-800">{c.cotizaciones_totales}</td>
+                        <td className="py-3.5 px-4 text-center font-bold text-indigo-600">{c.cargas_cotizadas}</td>
+                        <td className="py-3.5 px-4 text-center font-bold text-violet-600">{c.clientes_gestionados}</td>
+                        <td className="py-3.5 px-4 text-center text-emerald-600 font-bold">{c.cierres}</td>
+                        <td className="py-3.5 px-4 text-center text-sky-600 font-bold">{c.en_operacion}</td>
+                        <td className="py-3.5 px-4 text-center text-rose-600 font-bold">{c.caidos}</td>
                         <td className="py-3.5 px-5 text-center">
-                          <span className={`inline-flex px-2 py-0.5 rounded-lg font-bold border ${getConversionColor(c.tasa_efectividad)}`}>
-                            {c.tasa_efectividad}%
+                          <span className={`inline-flex px-2 py-0.5 rounded-lg font-bold border ${getConversionColor(c.tasa_conversion)}`}>
+                            {c.tasa_conversion}%
                           </span>
                         </td>
                         <td className="py-3.5 px-4 text-center text-slate-400">
@@ -122,7 +126,7 @@ export default function TabDetalleCotizaciones({ data }: TabDetalleCotizacionesP
                       {/* Fila Detalle del Comercial */}
                       {expandido && (
                         <tr>
-                          <td colSpan={7} className="px-5 py-0 bg-slate-50/30">
+                          <td colSpan={9} className="px-5 py-0 bg-slate-50/30">
                             <div className="bg-slate-50 border border-slate-100 rounded-xl my-3 p-4 shadow-inner space-y-3">
                               <div className="flex justify-between items-center">
                                 <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">

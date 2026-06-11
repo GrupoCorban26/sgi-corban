@@ -91,10 +91,12 @@ export interface EmbudoResponse {
 // =========================================================================
 
 export interface CotizacionesKpis {
-  total_tarjetas: number;
   total_cotizaciones: number;
-  total_ganadas: number;
-  total_perdidas: number;
+  total_cargas_cotizadas: number;
+  total_clientes_gestionados: number;
+  total_cierres: number;
+  total_en_operacion: number;
+  total_caidos: number;
   tasa_conversion: number;
 }
 
@@ -112,11 +114,13 @@ export interface ComercialCotizacionesRendimiento {
   comercial_id: number;
   nombre: string;
   iniciales: string | null;
-  cotizados_creados: number;
-  cierres_exitosos: number;
-  negociaciones_caidas: number;
-  tasa_efectividad: number;
-  cotizaciones_pendientes: number;
+  cotizaciones_totales: number;
+  cargas_cotizadas: number;
+  clientes_gestionados: number;
+  cierres: number;
+  en_operacion: number;
+  caidos: number;
+  tasa_conversion: number;
   jefe_id?: number | null;
   jefe_nombre?: string | null;
   detalle_cotizaciones?: CotizacionDetalle[];
@@ -149,11 +153,12 @@ export interface TopMotivoCaida {
 export interface EmpresaCotizacionesRendimiento {
   cliente_id: number | string;
   nombre: string;
-  cotizados_creados: number;
-  cierres_exitosos: number;
-  negociaciones_caidas: number;
-  tasa_efectividad: number;
-  cotizaciones_pendientes: number;
+  cotizaciones_totales: number;
+  cargas_cotizadas: number;
+  cierres: number;
+  en_operacion: number;
+  caidos: number;
+  tasa_conversion: number;
 }
 
 export interface CotizacionesAnalyticsResponse {

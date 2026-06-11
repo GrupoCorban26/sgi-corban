@@ -22,13 +22,15 @@ interface TabRendimientoCotizacionesProps {
   fechaInicio: string;
   fechaFin: string;
   clienteId?: number | null;
+  empresaId?: number | null;
 }
 
 export default function TabRendimientoCotizaciones({ 
   data, 
   fechaInicio, 
   fechaFin,
-  clienteId
+  clienteId,
+  empresaId
 }: TabRendimientoCotizacionesProps) {
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -61,8 +63,8 @@ export default function TabRendimientoCotizaciones({
   if (agrupacion === 'comercial') {
     chartData = rendimiento_comerciales.map((c) => ({
       nombre: c.iniciales || c.nombre.split(' ')[0],
-      'Tarjeta Cerrada': c.cierres_exitosos,
-      'Tarjeta Perdida': c.negociaciones_caidas
+      'Tarjeta Cerrada': c.cierres,
+      'Tarjeta Perdida': c.caidos
     }));
   } else if (agrupacion === 'equipo') {
     const equiposMap: Record<string, { ganadas: number; perdidas: number }> = {};
@@ -75,8 +77,8 @@ export default function TabRendimientoCotizaciones({
       if (!equiposMap[eqNombre]) {
         equiposMap[eqNombre] = { ganadas: 0, perdidas: 0 };
       }
-      equiposMap[eqNombre].ganadas += c.cierres_exitosos;
-      equiposMap[eqNombre].perdidas += c.negociaciones_caidas;
+      equiposMap[eqNombre].ganadas += c.cierres;
+      equiposMap[eqNombre].perdidas += c.caidos;
     });
 
     chartData = Object.entries(equiposMap).map(([eqName, stats]) => ({
@@ -93,8 +95,8 @@ export default function TabRendimientoCotizaciones({
     // agrupacion === 'empresa'
     chartData = rendimiento_empresas.map((e) => ({
       nombre: e.nombre.length > 20 ? e.nombre.substring(0, 18) + '...' : e.nombre,
-      'Tarjeta Cerrada': e.cierres_exitosos,
-      'Tarjeta Perdida': e.negociaciones_caidas
+      'Tarjeta Cerrada': e.cierres,
+      'Tarjeta Perdida': e.caidos
     }));
   }
 
@@ -104,7 +106,7 @@ export default function TabRendimientoCotizaciones({
   const handleDownloadExcel = async () => {
     setIsDownloading(true);
     try {
-      const blob = await analyticsComercialService.exportarCotizacionesExcel(fechaInicio, fechaFin, clienteId);
+      const blob = await analyticsComercialService.exportarCotizacionesExcel(fechaInicio, fechaFin, clienteId, empresaId);
       
       // Crear enlace de descarga e iniciarla
       const url = window.URL.createObjectURL(blob);
@@ -166,26 +168,26 @@ export default function TabRendimientoCotizaciones({
       {/* ─── TARJETAS DE KPIS PRINCIPALES ──────────────────────── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard
-          title="Tarjetas de Cotización"
-          value={kpis.total_tarjetas}
+          title="Cotizaciones Totales"
+          value={kpis.total_cotizaciones}
           icon={<Briefcase size={22} />}
           color="blue"
         />
         <StatCard
-          title="Cotizaciones (Vías)"
-          value={kpis.total_cotizaciones}
+          title="Cargas Cotizadas"
+          value={kpis.total_cargas_cotizadas}
           icon={<Users size={22} />}
           color="purple"
         />
         <StatCard
-          title="Cierres COR Ganados"
-          value={kpis.total_ganadas}
+          title="Cierres"
+          value={kpis.total_cierres}
           icon={<TrendingUp size={22} />}
           color="green"
         />
         <StatCard
-          title="Cotizados Perdidos"
-          value={kpis.total_perdidas}
+          title="Caídos"
+          value={kpis.total_caidos}
           icon={<TrendingDown size={22} />}
           color="red"
         />
@@ -390,10 +392,12 @@ export default function TabRendimientoCotizaciones({
               <thead className="bg-slate-50 border-b border-slate-100 sticky top-0 z-10">
                 <tr className="font-bold text-slate-500 uppercase tracking-wider">
                   <th className="py-3 px-4 bg-slate-50">Comercial</th>
-                  <th className="py-3 px-3 text-center bg-slate-50">Creadas</th>
-                  <th className="py-3 px-3 text-center bg-slate-50">Ganadas</th>
-                  <th className="py-3 px-3 text-center bg-slate-50">Perdidas</th>
-                  <th className="py-3 px-3 text-center bg-slate-50">Pendientes</th>
+                  <th className="py-3 px-3 text-center bg-slate-50">Cot. Totales</th>
+                  <th className="py-3 px-3 text-center bg-slate-50">Cargas</th>
+                  <th className="py-3 px-3 text-center bg-slate-50">Clientes</th>
+                  <th className="py-3 px-3 text-center bg-slate-50">Cierres</th>
+                  <th className="py-3 px-3 text-center bg-slate-50">En Op.</th>
+                  <th className="py-3 px-3 text-center bg-slate-50">Caídos</th>
                   <th className="py-3 px-4 text-center bg-slate-50">Conversión</th>
                 </tr>
               </thead>
@@ -406,13 +410,15 @@ export default function TabRendimientoCotizaciones({
                       </span>
                       <span className="truncate">{c.nombre}</span>
                     </td>
-                    <td className="py-3 px-3 text-center font-bold text-slate-800">{c.cotizados_creados}</td>
-                    <td className="py-3 px-3 text-center text-emerald-600 font-bold">{c.cierres_exitosos}</td>
-                    <td className="py-3 px-3 text-center text-rose-600 font-bold">{c.negociaciones_caidas}</td>
-                    <td className="py-3 px-3 text-center text-slate-400">{c.cotizaciones_pendientes}</td>
+                    <td className="py-3 px-3 text-center font-bold text-slate-800">{c.cotizaciones_totales}</td>
+                    <td className="py-3 px-3 text-center font-bold text-indigo-600">{c.cargas_cotizadas}</td>
+                    <td className="py-3 px-3 text-center font-bold text-violet-600">{c.clientes_gestionados}</td>
+                    <td className="py-3 px-3 text-center text-emerald-600 font-bold">{c.cierres}</td>
+                    <td className="py-3 px-3 text-center text-sky-600 font-bold">{c.en_operacion}</td>
+                    <td className="py-3 px-3 text-center text-rose-600 font-bold">{c.caidos}</td>
                     <td className="py-3 px-4 text-center">
-                      <span className={`inline-flex px-2 py-0.5 rounded-lg font-bold border ${getConversionColor(c.tasa_efectividad)}`}>
-                        {c.tasa_efectividad}%
+                      <span className={`inline-flex px-2 py-0.5 rounded-lg font-bold border ${getConversionColor(c.tasa_conversion)}`}>
+                        {c.tasa_conversion}%
                       </span>
                     </td>
                   </tr>

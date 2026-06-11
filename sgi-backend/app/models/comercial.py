@@ -65,7 +65,7 @@ class ClienteContacto(Base):
     ruc = Column(String(11), nullable=False, index=True)
     nombre = Column(String(150))
     cargo = Column(String(100))
-    telefono = Column(String(20), nullable=False, index=True)
+    telefono = Column(String(20), nullable=True, index=True)
     correo = Column(String(100))
     origen = Column(String(30))
     estado_id = Column(Integer, ForeignKey("comercial.estado_contacto.id"), index=True)

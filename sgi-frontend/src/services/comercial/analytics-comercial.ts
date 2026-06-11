@@ -22,13 +22,16 @@ export const analyticsComercialService = {
     return data;
   },
 
-  obtenerCotizaciones: async (fechaInicio: string, fechaFin: string, clienteId?: number | null): Promise<CotizacionesAnalyticsResponse> => {
+  obtenerCotizaciones: async (fechaInicio: string, fechaFin: string, clienteId?: number | null, empresaId?: number | null): Promise<CotizacionesAnalyticsResponse> => {
     const params: Record<string, any> = { 
       fecha_inicio: fechaInicio, 
       fecha_fin: fechaFin 
     };
     if (clienteId) {
       params.cliente_id = clienteId;
+    }
+    if (empresaId) {
+      params.empresa_id = empresaId;
     }
     const { data } = await api.get<CotizacionesAnalyticsResponse>(`${BASE_URL}/cotizaciones/resumen`, {
       params,
@@ -36,7 +39,7 @@ export const analyticsComercialService = {
     return data;
   },
 
-  exportarCotizacionesExcel: async (fechaInicio: string, fechaFin: string, clienteId?: number | null): Promise<Blob> => {
+  exportarCotizacionesExcel: async (fechaInicio: string, fechaFin: string, clienteId?: number | null, empresaId?: number | null): Promise<Blob> => {
     const params: Record<string, any> = { 
       fecha_inicio: fechaInicio, 
       fecha_fin: fechaFin 
@@ -44,10 +47,18 @@ export const analyticsComercialService = {
     if (clienteId) {
       params.cliente_id = clienteId;
     }
+    if (empresaId) {
+      params.empresa_id = empresaId;
+    }
     const { data } = await api.get<Blob>(`${BASE_URL}/cotizaciones/exportar`, {
       params,
       responseType: 'blob'
     });
+    return data;
+  },
+
+  obtenerEmpresasGrupo: async (): Promise<{ id: number; razon_social: string; ruc: string }[]> => {
+    const { data } = await api.get<{ id: number; razon_social: string; ruc: string }[]>(`${BASE_URL}/empresas`);
     return data;
   }
 };

@@ -43,7 +43,7 @@ class AnalyticsComercialService:
             fin = inicio + relativedelta(months=1) - timedelta(microseconds=1)
             return inicio, fin
 
-    async def _get_usuarios_comerciales(self, comercial_ids: Optional[List[int]]) -> List[Usuario]:
+    async def _get_usuarios_comerciales(self, comercial_ids: Optional[List[int]], empresa_id: Optional[int] = None) -> List[Usuario]:
         """Obtiene usuarios comerciales y sus empleados."""
         query = select(Usuario).outerjoin(Empleado, Usuario.empleado_id == Empleado.id).options(
             joinedload(Usuario.empleado).joinedload(Empleado.jefe)
@@ -53,6 +53,8 @@ class AnalyticsComercialService:
         )
         if comercial_ids:
             query = query.where(Usuario.id.in_(comercial_ids))
+        if empresa_id:
+            query = query.where(Empleado.empresa_id == empresa_id)
         
         result = await self.db.execute(query)
         return result.scalars().all()
@@ -343,12 +345,12 @@ class AnalyticsComercialService:
         fin_dt = datetime.combine(fecha_fin, datetime.max.time())
 
         # 1. Obtener comerciales habilitados
-        usuarios = await self._get_usuarios_comerciales(comercial_ids)
+        usuarios = await self._get_usuarios_comerciales(comercial_ids, empresa_id=empresa_id)
         ids_usuarios = [u.id for u in usuarios]
 
         if not ids_usuarios:
             return CotizacionesAnalyticsResponse(
-                kpis=CotizacionesKpis(total_tarjetas=0, total_cotizaciones=0, total_ganadas=0, total_perdidas=0, tasa_conversion=0.0),
+                kpis=CotizacionesKpis(total_cotizaciones=0, total_cargas_cotizadas=0, total_clientes_gestionados=0, total_cierres=0, total_en_operacion=0, total_caidos=0, tasa_conversion=0.0),
                 rendimiento_comerciales=[],
                 rendimiento_empresas=[],
                 distribucion_carga=[],
@@ -366,23 +368,25 @@ class AnalyticsComercialService:
         )
         if cliente_id:
             query = query.where(Seguimiento.cliente_id == cliente_id)
-        if empresa_id:
-            query = query.join(Cliente, Seguimiento.cliente_id == Cliente.id).where(Cliente.empresa_id == empresa_id)
             
         res = await self.db.execute(query)
         seguimientos = res.scalars().all()
 
         total_tarjetas = len(seguimientos)
         total_cotizaciones = 0
-        total_ganadas = 0
-        total_perdidas = 0
+        total_cierres = 0
+        total_en_operacion = 0
+        total_caidos = 0
+        clientes_globales = set()
 
         comercial_stats = {
             uid: {
-                "creadas": 0,
-                "ganadas": 0,
-                "caidas": 0,
-                "pendientes": 0,
+                "cotizaciones_totales": 0,
+                "cargas_cotizadas": 0,
+                "clientes": set(),
+                "cierres": 0,
+                "en_operacion": 0,
+                "caidos": 0,
                 "detalles": []
             } for uid in ids_usuarios
         }
@@ -405,32 +409,54 @@ class AnalyticsComercialService:
             if cid not in empresa_stats:
                 empresa_stats[cid] = {
                     "nombre": c_name,
-                    "creadas": 0,
-                    "ganadas": 0,
-                    "caidas": 0,
-                    "pendientes": 0
+                    "cotizaciones_totales": 0,
+                    "cargas_cotizadas": 0,
+                    "cierres": 0,
+                    "en_operacion": 0,
+                    "caidos": 0
                 }
 
+            # Cargas cotizadas (count tarjetas)
             if uid in comercial_stats:
-                comercial_stats[uid]["creadas"] += 1
-            empresa_stats[cid]["creadas"] += 1
+                comercial_stats[uid]["cargas_cotizadas"] += 1
+            empresa_stats[cid]["cargas_cotizadas"] += 1
 
-            if seg.estado == "CIERRE":
-                total_ganadas += 1
+            # Clientes gestionados (DISTINCT)
+            if seg.cliente_id:
+                clientes_globales.add(seg.cliente_id)
                 if uid in comercial_stats:
-                    comercial_stats[uid]["ganadas"] += 1
-                empresa_stats[cid]["ganadas"] += 1
+                    comercial_stats[uid]["clientes"].add(seg.cliente_id)
+
+            # Cierres: CIERRE + EN_OPERACION + CARGA_ENTREGADA
+            if seg.estado in ("CIERRE", "EN_OPERACION", "CARGA_ENTREGADA"):
+                total_cierres += 1
+                if uid in comercial_stats:
+                    comercial_stats[uid]["cierres"] += 1
+                empresa_stats[cid]["cierres"] += 1
+                # En operacion: subset
+                if seg.estado in ("EN_OPERACION", "CARGA_ENTREGADA"):
+                    total_en_operacion += 1
+                    if uid in comercial_stats:
+                        comercial_stats[uid]["en_operacion"] += 1
+                    empresa_stats[cid]["en_operacion"] += 1
             elif seg.estado == "CAIDO":
-                total_perdidas += 1
+                total_caidos += 1
                 if uid in comercial_stats:
-                    comercial_stats[uid]["caidas"] += 1
-                empresa_stats[cid]["caidas"] += 1
+                    comercial_stats[uid]["caidos"] += 1
+                empresa_stats[cid]["caidos"] += 1
                 if seg.motivo_caida:
                     motivo = seg.motivo_caida.strip()
                     motivos_caida_counts[motivo] = motivos_caida_counts.get(motivo, 0) + 1
 
             # Recopilar detalles del seguimiento para la pestaña Detalle
             active_cots = [c for c in seg.cotizaciones if c.is_active]
+            num_cots = len(active_cots)
+
+            # Cotizaciones totales
+            total_cotizaciones += num_cots
+            if uid in comercial_stats:
+                comercial_stats[uid]["cotizaciones_totales"] += num_cots
+            empresa_stats[cid]["cotizaciones_totales"] += num_cots
             
             tipo_carga_list = [c.tipo_carga_nombre for c in active_cots if c.tipo_carga_nombre]
             servicio_list = [c.tipo_servicio_nombre for c in active_cots if c.tipo_servicio_nombre]
@@ -440,7 +466,7 @@ class AnalyticsComercialService:
             servicio_str = ", ".join(dict.fromkeys(servicio_list)) or "-"
             incoterm_str = ", ".join(dict.fromkeys(incoterm_list)) or "-"
             
-            veces_cotizado = len(active_cots)
+            veces_cotizado = num_cots
             
             if seg.estado == "CAIDO":
                 estado_det = "caido"
@@ -464,11 +490,8 @@ class AnalyticsComercialService:
             if uid in comercial_stats:
                 comercial_stats[uid]["detalles"].append(detalle_item)
 
-            for cot in seg.cotizaciones:
-                if not cot.is_active:
-                    continue
-                total_cotizaciones += 1
-
+            # Distribution counts (for individual cotizaciones)
+            for cot in active_cots:
                 # Tipo de Carga
                 tc_nombre = cot.tipo_carga_nombre or "OTRO"
                 carga_counts[tc_nombre] = carga_counts.get(tc_nombre, 0) + 1
@@ -477,44 +500,41 @@ class AnalyticsComercialService:
                 top_nombre = cot.tipo_operacion or "IMPORTACION"
                 operacion_counts[top_nombre] = operacion_counts.get(top_nombre, 0) + 1
 
-                # Cotizaciones pendientes
-                if cot.estado == "PENDIENTE":
-                    if uid in comercial_stats:
-                        comercial_stats[uid]["pendientes"] += 1
-                    empresa_stats[cid]["pendientes"] += 1
-
                 # Segmentación/Atribución en cierres aceptados
                 if cot.estado == "ACEPTADO" and cot.segmentacion_nombre:
                     seg_nombre = cot.segmentacion_nombre.replace("_", " ")
                     segmentacion_counts[seg_nombre] = segmentacion_counts.get(seg_nombre, 0) + 1
 
         tasa_conversion_global = 0.0
-        conclusiones = total_ganadas + total_perdidas
+        conclusiones = total_cierres + total_caidos
         if conclusiones > 0:
-            tasa_conversion_global = round((total_ganadas / conclusiones) * 100, 1)
+            tasa_conversion_global = round((total_cierres / conclusiones) * 100, 1)
 
         kpis = CotizacionesKpis(
-            total_tarjetas=total_tarjetas,
             total_cotizaciones=total_cotizaciones,
-            total_ganadas=total_ganadas,
-            total_perdidas=total_perdidas,
+            total_cargas_cotizadas=total_tarjetas,
+            total_clientes_gestionados=len(clientes_globales),
+            total_cierres=total_cierres,
+            total_en_operacion=total_en_operacion,
+            total_caidos=total_caidos,
             tasa_conversion=tasa_conversion_global
         )
 
         # 4. Formatear Rendimiento por Comercial
         rendimiento_comerciales = []
         for u in usuarios:
-            stats = comercial_stats.get(u.id, {"creadas": 0, "ganadas": 0, "caidas": 0, "pendientes": 0, "detalles": []})
-            creados = stats["creadas"]
-            ganados = stats["ganadas"]
-            caidos = stats["caidas"]
-            pendientes = stats["pendientes"]
+            stats = comercial_stats.get(u.id, {
+                "cotizaciones_totales": 0, "cargas_cotizadas": 0, "clientes": set(),
+                "cierres": 0, "en_operacion": 0, "caidos": 0, "detalles": []
+            })
+            cierres_ind = stats["cierres"]
+            caidos_ind = stats["caidos"]
             detalles = stats.get("detalles", [])
 
-            conclusiones_ind = ganados + caidos
-            tasa_efectividad = 0.0
+            conclusiones_ind = cierres_ind + caidos_ind
+            tasa_conv = 0.0
             if conclusiones_ind > 0:
-                tasa_efectividad = round((ganados / conclusiones_ind) * 100, 1)
+                tasa_conv = round((cierres_ind / conclusiones_ind) * 100, 1)
 
             empleado = u.empleado
             nombre = f"{empleado.nombres} {empleado.apellido_paterno}" if empleado else u.correo_corp
@@ -527,11 +547,13 @@ class AnalyticsComercialService:
                 comercial_id=u.id,
                 nombre=nombre,
                 iniciales=iniciales,
-                cotizados_creados=creados,
-                cierres_exitosos=ganados,
-                negociaciones_caidas=caidos,
-                tasa_efectividad=tasa_efectividad,
-                cotizaciones_pendientes=pendientes,
+                cotizaciones_totales=stats["cotizaciones_totales"],
+                cargas_cotizadas=stats["cargas_cotizadas"],
+                clientes_gestionados=len(stats["clientes"]),
+                cierres=cierres_ind,
+                en_operacion=stats["en_operacion"],
+                caidos=caidos_ind,
+                tasa_conversion=tasa_conv,
                 jefe_id=jefe_id,
                 jefe_nombre=jefe_nombre,
                 detalle_cotizaciones=detalles
@@ -540,26 +562,25 @@ class AnalyticsComercialService:
         # 4b. Formatear Rendimiento por Empresa (Cliente)
         rendimiento_empresas = []
         for cid, stats in empresa_stats.items():
-            creados = stats["creadas"]
-            ganados = stats["ganadas"]
-            caidos = stats["caidas"]
-            pendientes = stats["pendientes"]
+            cierres_e = stats["cierres"]
+            caidos_e = stats["caidos"]
 
-            conclusiones_ind = ganados + caidos
-            tasa_efectividad = 0.0
-            if conclusiones_ind > 0:
-                tasa_efectividad = round((ganados / conclusiones_ind) * 100, 1)
+            conclusiones_e = cierres_e + caidos_e
+            tasa_conv = 0.0
+            if conclusiones_e > 0:
+                tasa_conv = round((cierres_e / conclusiones_e) * 100, 1)
 
             rendimiento_empresas.append(EmpresaCotizacionesRendimiento(
                 cliente_id=cid,
                 nombre=stats["nombre"],
-                cotizados_creados=creados,
-                cierres_exitosos=ganados,
-                negociaciones_caidas=caidos,
-                tasa_efectividad=tasa_efectividad,
-                cotizaciones_pendientes=pendientes
+                cotizaciones_totales=stats["cotizaciones_totales"],
+                cargas_cotizadas=stats["cargas_cotizadas"],
+                cierres=cierres_e,
+                en_operacion=stats["en_operacion"],
+                caidos=caidos_e,
+                tasa_conversion=tasa_conv
             ))
-        rendimiento_empresas.sort(key=lambda x: x.cotizados_creados, reverse=True)
+        rendimiento_empresas.sort(key=lambda x: x.cargas_cotizadas, reverse=True)
 
         # 5. Formatear distribuciones
         dist_carga = []
@@ -620,18 +641,20 @@ class AnalyticsComercialService:
             resumen_list.append({
                 "Comercial": rc.nombre,
                 "Iniciales": rc.iniciales or "",
-                "Cotizados Creados": rc.cotizados_creados,
-                "Cierres Exitosos (Ganados)": rc.cierres_exitosos,
-                "Negociaciones Caídas (Perdidos)": rc.negociaciones_caidas,
-                "Tasa de Efectividad (%)": rc.tasa_efectividad,
-                "Cotizaciones Pendientes": rc.cotizaciones_pendientes
+                "Cotizaciones Totales": rc.cotizaciones_totales,
+                "Cargas Cotizadas": rc.cargas_cotizadas,
+                "Clientes Gestionados": rc.clientes_gestionados,
+                "Cierres": rc.cierres,
+                "En Operación": rc.en_operacion,
+                "Caídos": rc.caidos,
+                "Tasa de Conversión (%)": rc.tasa_conversion
             })
         df_resumen = pd.DataFrame(resumen_list)
 
         # 2. Consultar seguimientos uniendo las relaciones cliente y comercial para evitar MissingGreenlet
         inicio_dt = datetime.combine(fecha_inicio, datetime.min.time())
         fin_dt = datetime.combine(fecha_fin, datetime.max.time())
-        usuarios = await self._get_usuarios_comerciales(comercial_ids)
+        usuarios = await self._get_usuarios_comerciales(comercial_ids, empresa_id=empresa_id)
         ids_usuarios = [u.id for u in usuarios]
 
         query = select(Seguimiento).options(
@@ -645,8 +668,6 @@ class AnalyticsComercialService:
         ).order_by(Seguimiento.created_at.desc())
         if cliente_id:
             query = query.where(Seguimiento.cliente_id == cliente_id)
-        if empresa_id:
-            query = query.join(Cliente, Seguimiento.cliente_id == Cliente.id).where(Cliente.empresa_id == empresa_id)
         
         res = await self.db.execute(query)
         seguimientos = res.scalars().all()

@@ -1,0 +1,1 @@
+{"nodes": [{"id": "template_alerta_documentos", "label": "Email Template: Alerta Documentos Pendientes", "file_type": "code", "source_file": "sgi-backend/app/templates/emails/alerta_documentos_pendientes.html", "source_location": null, "source_url": null, "captured_at": null, "author": null, "contributor": null}], "edges": [], "hyperedges": []}

@@ -19,11 +19,19 @@ export const useEmbudoComercial = (periodo: string) => {
   });
 };
 
-export const useAnalyticsCotizaciones = (fechaInicio: string, fechaFin: string, clienteId?: number | null) => {
+export const useAnalyticsCotizaciones = (fechaInicio: string, fechaFin: string, clienteId?: number | null, empresaId?: number | null) => {
   return useQuery({
-    queryKey: ['analytics-cotizaciones', fechaInicio, fechaFin, clienteId],
-    queryFn: () => analyticsComercialService.obtenerCotizaciones(fechaInicio, fechaFin, clienteId),
+    queryKey: ['analytics-cotizaciones', fechaInicio, fechaFin, clienteId, empresaId],
+    queryFn: () => analyticsComercialService.obtenerCotizaciones(fechaInicio, fechaFin, clienteId, empresaId),
     staleTime: 1000 * 60 * 5,
     enabled: !!fechaInicio && !!fechaFin,
+  });
+};
+
+export const useEmpresasGrupo = () => {
+  return useQuery({
+    queryKey: ['empresas-grupo'],
+    queryFn: () => analyticsComercialService.obtenerEmpresasGrupo(),
+    staleTime: 1000 * 60 * 60, // 1 hora
   });
 };

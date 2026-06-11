@@ -89,11 +89,13 @@ class EmbudoResponse(BaseModel):
 # =========================================================================
 
 class CotizacionesKpis(BaseModel):
-    total_tarjetas: int
-    total_cotizaciones: int
-    total_ganadas: int
-    total_perdidas: int
-    tasa_conversion: float
+    total_cotizaciones: int          # Sum of all individual active Cotizacion records
+    total_cargas_cotizadas: int      # Count of Seguimiento (tarjetas)
+    total_clientes_gestionados: int  # Count DISTINCT cliente_id
+    total_cierres: int               # Tarjetas in CIERRE + EN_OPERACION + CARGA_ENTREGADA
+    total_en_operacion: int          # Tarjetas in EN_OPERACION + CARGA_ENTREGADA
+    total_caidos: int                # Tarjetas in CAIDO
+    tasa_conversion: float           # total_cierres / (total_cierres + total_caidos) * 100
 
 
 class CotizacionDetalleSchema(BaseModel):
@@ -110,11 +112,13 @@ class ComercialCotizacionesRendimiento(BaseModel):
     comercial_id: int
     nombre: str
     iniciales: Optional[str] = None
-    cotizados_creados: int
-    cierres_exitosos: int
-    negociaciones_caidas: int
-    tasa_efectividad: float
-    cotizaciones_pendientes: int
+    cotizaciones_totales: int       # SUM of active cotizaciones
+    cargas_cotizadas: int           # COUNT of tarjetas
+    clientes_gestionados: int       # COUNT DISTINCT of cliente_id
+    cierres: int                    # Tarjetas in CIERRE + EN_OPERACION + CARGA_ENTREGADA
+    en_operacion: int               # Tarjetas in EN_OPERACION + CARGA_ENTREGADA
+    caidos: int                     # Tarjetas in CAIDO
+    tasa_conversion: float          # cierres / (cierres + caidos) * 100
     jefe_id: Optional[int] = None
     jefe_nombre: Optional[str] = None
     detalle_cotizaciones: List[CotizacionDetalleSchema] = []
@@ -147,11 +151,12 @@ class TopMotivoCaida(BaseModel):
 class EmpresaCotizacionesRendimiento(BaseModel):
     cliente_id: Union[int, str]
     nombre: str
-    cotizados_creados: int
-    cierres_exitosos: int
-    negociaciones_caidas: int
-    tasa_efectividad: float
-    cotizaciones_pendientes: int
+    cotizaciones_totales: int
+    cargas_cotizadas: int
+    cierres: int
+    en_operacion: int
+    caidos: int
+    tasa_conversion: float
 
 
 class CotizacionesAnalyticsResponse(BaseModel):

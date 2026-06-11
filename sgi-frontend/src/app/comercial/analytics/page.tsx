@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { BarChart3, Calendar, RefreshCw, Loader2, List } from 'lucide-react';
-import { useAnalyticsCotizaciones } from '@/hooks/comercial/useAnalyticsComercial';
+import { useAnalyticsCotizaciones, useEmpresasGrupo } from '@/hooks/comercial/useAnalyticsComercial';
 import { useClientes } from '@/hooks/comercial/useClientes';
 import { SearchableSelect } from '@/components/ui/SearchableSelect';
 import TabRendimientoCotizaciones from './components/TabRendimientoCotizaciones';
@@ -21,6 +21,9 @@ export default function AnalyticsComercialPage() {
   const [clienteId, setClienteId] = useState<number | null>(null);
   const [clientSearch, setClientSearch] = useState('');
 
+  // Filtro por Empresa del Grupo
+  const [empresaId, setEmpresaId] = useState<number | null>(null);
+
   // Tab activo
   const [activeTab, setActiveTab] = useState<'resumen' | 'detalle'>('resumen');
 
@@ -34,8 +37,11 @@ export default function AnalyticsComercialPage() {
     50
   );
 
+  // Cargar lista de empresas del grupo
+  const { data: empresasGrupo = [], isLoading: loadingEmpresas } = useEmpresasGrupo();
+
   // Data hook
-  const cotizacionesQuery = useAnalyticsCotizaciones(fechaInicio, fechaFin, clienteId);
+  const cotizacionesQuery = useAnalyticsCotizaciones(fechaInicio, fechaFin, clienteId, empresaId);
 
   const isLoading = cotizacionesQuery.isLoading;
   const isError = cotizacionesQuery.isError;
@@ -69,22 +75,41 @@ export default function AnalyticsComercialPage() {
           
           {/* FILTROS: Empresa y Fechas */}
           <div className="flex items-center gap-3 flex-wrap">
-            {/* Filtro de Empresa */}
+            {/* Filtro de Empresa del Grupo */}
+            <div className="w-64">
+              <SearchableSelect
+                value={empresaId || 'all'}
+                onChange={(val) => setEmpresaId(val === 'all' || val === null ? null : Number(val))}
+                options={[
+                  { id: 'all', label: 'Todas las Empresas (Grupo)' },
+                  ...empresasGrupo.map((e) => ({
+                    id: e.id,
+                    label: e.razon_social,
+                    subLabel: e.ruc || undefined
+                  }))
+                ]}
+                placeholder="Empresa (Grupo)"
+                searchPlaceholder="Buscar empresa..."
+                loading={loadingEmpresas}
+              />
+            </div>
+
+            {/* Filtro de Cliente */}
             <div className="w-64">
               <SearchableSelect
                 value={clienteId || 'all'}
                 onChange={handleClientChange}
                 onSearch={setClientSearch}
                 options={[
-                  { id: 'all', label: 'Todas las Empresas' },
+                  { id: 'all', label: 'Todos los Clientes' },
                   ...clientes.map((c) => ({
                     id: c.id,
                     label: c.razon_social,
                     subLabel: c.ruc || undefined
                   }))
                 ]}
-                placeholder="Todas las Empresas"
-                searchPlaceholder="Buscar empresa..."
+                placeholder="Todos los Clientes"
+                searchPlaceholder="Buscar cliente..."
                 loading={loadingClientes}
               />
             </div>
@@ -171,6 +196,7 @@ export default function AnalyticsComercialPage() {
               fechaInicio={fechaInicio} 
               fechaFin={fechaFin} 
               clienteId={clienteId}
+              empresaId={empresaId}
             />
           ) : (
             <TabDetalleCotizaciones 

@@ -18,6 +18,8 @@ from app.schemas.comercial.analytics_comercial import (
 )
 from app.core.dependencies import get_current_user_obj, resolver_comercial_ids
 from app.models.seguridad import Usuario
+from app.models.core import Empresa
+from sqlalchemy import select
 
 logger = logging.getLogger(__name__)
 
@@ -107,3 +109,16 @@ async def exportar_cotizaciones_excel(
         media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         headers={"Content-Disposition": f"attachment; filename={filename}"}
     )
+
+
+@router.get("/empresas", response_model=List[dict])
+async def obtener_empresas_grupo(
+    db: AsyncSession = Depends(get_db),
+    current_user: Usuario = Depends(get_current_user_obj),
+):
+    """
+    Retorna la lista de empresas del grupo desde core.empresas.
+    """
+    result = await db.execute(select(Empresa).order_by(Empresa.razon_social))
+    empresas = result.scalars().all()
+    return [{"id": e.id, "razon_social": e.razon_social, "ruc": e.ruc} for e in empresas]

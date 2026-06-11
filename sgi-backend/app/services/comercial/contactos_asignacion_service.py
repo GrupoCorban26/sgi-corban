@@ -254,6 +254,16 @@ class ContactosAsignacionService:
                     is_active=True
                 )
                 self.db.add(cc)
+
+                # Vincular contactos del RUC creados durante la prospección al nuevo cliente
+                await self.db.execute(
+                    update(ClienteContacto)
+                    .where(
+                        ClienteContacto.ruc == nuevo_cliente.ruc,
+                        ClienteContacto.cliente_id.is_(None)
+                    )
+                    .values(cliente_id=nuevo_cliente.id)
+                )
             elif cliente_existe and not is_edit:
                 mensaje = f"Nota: Este cliente ya existe en cartera (ID: {cliente_existe.id})"
 
@@ -310,3 +320,140 @@ class ContactosAsignacionService:
         sectores = [{"sector": row[0], "cantidad": row[1]} for row in sectores_result.fetchall()]
 
         return {"paises": paises, "sectores": sectores}
+
+    async def _get_estado_contacto_id(self, nombre: str) -> int:
+        from app.models.comercial_catalogos import EstadoContacto
+        result = await self.db.execute(select(EstadoContacto.id).where(EstadoContacto.nombre == nombre))
+        estado_id = result.scalar()
+        if not estado_id:
+            raise HTTPException(500, f"Estado contacto '{nombre}' no encontrado")
+        return estado_id
+
+    async def create_contacto_manual(self, data, user_id: int):
+        """Crea un contacto manual y lo asigna inmediatamente al comercial."""
+        from app.models.comercial import ClienteContacto, Cliente
+        from app.models.comercial_catalogos import EstadoContacto
+        from sqlalchemy import select, func
+
+        contacto_actualizado = False
+        prospecto_creado = False
+        cliente_ya_existia = False
+
+        estado_asignado_id = await self._get_estado_contacto_id('ASIGNADO')
+        estado_gestionado_id = await self._get_estado_contacto_id('GESTIONADO')
+        estado_prospecto_id = await self._get_estado_cliente_id('PROSPECTO')
+        origen_manual_id = await self._get_origen_cliente_id('MANUAL')
+
+        # 1. Buscar duplicado (RUC + Teléfono) en ClienteContacto
+        contacto_existente = None
+        if data.telefono:
+            stmt_dup = select(ClienteContacto).where(
+                ClienteContacto.ruc == data.ruc,
+                ClienteContacto.telefono == data.telefono,
+                ClienteContacto.is_active == True
+            )
+            contacto_existente = (await self.db.execute(stmt_dup)).scalars().first()
+
+        # Buscar si ya existe el cliente por RUC
+        cliente_existente = (await self.db.execute(
+            select(Cliente).where(Cliente.ruc == data.ruc, Cliente.is_active == True)
+        )).scalars().first()
+        cliente_id = cliente_existente.id if cliente_existente else None
+
+        if contacto_existente:
+            if data.nombre:
+                contacto_existente.nombre = data.nombre
+            if data.cargo:
+                contacto_existente.cargo = data.cargo
+            if getattr(data, 'email', None):
+                contacto_existente.correo = data.email
+            contacto_existente.updated_at = func.now()
+            
+            # Si el cliente ya existe y no estaba enlazado, enlazarlo
+            if cliente_id and not contacto_existente.cliente_id:
+                contacto_existente.cliente_id = cliente_id
+            
+            contacto = contacto_existente
+            contacto_actualizado = True
+        else:
+            contacto = ClienteContacto(
+                cliente_id=cliente_id,
+                ruc=data.ruc,
+                nombre=data.nombre or "Sin nombre",
+                cargo=data.cargo,
+                telefono=data.telefono,
+                correo=getattr(data, 'email', None) or getattr(data, 'correo', None),
+                origen='MANUAL',
+                is_active=True,
+                estado_id=estado_asignado_id,
+            )
+            self.db.add(contacto)
+            await self.db.flush()
+
+        # 2. Si crear_como_prospecto → crear Cliente automáticamente
+        if getattr(data, 'crear_como_prospecto', False):
+            if cliente_existente:
+                cliente_ya_existia = True
+            else:
+                nuevo_cliente = Cliente(
+                    ruc=data.ruc, 
+                    razon_social=data.razon_social or data.nombre or "Sin razón social",
+                    comercial_encargado_id=user_id, 
+                    estado_id=estado_prospecto_id,
+                    origen_id=origen_manual_id, 
+                    proxima_fecha_contacto=func.now(),
+                    is_active=True, 
+                    created_by=user_id
+                )
+                self.db.add(nuevo_cliente)
+                await self.db.flush()
+                
+                # Asignar el nuevo cliente_id al contacto creado
+                contacto.cliente_id = nuevo_cliente.id
+                cliente_id = nuevo_cliente.id
+                prospecto_creado = True
+            
+            contacto.estado_id = estado_gestionado_id
+
+        # Vincular cualquier contacto previo huérfano de este RUC si se acaba de crear el cliente
+        if prospecto_creado and cliente_id:
+            await self.db.execute(
+                update(ClienteContacto)
+                .where(
+                    ClienteContacto.ruc == data.ruc,
+                    ClienteContacto.cliente_id.is_(None)
+                )
+                .values(cliente_id=cliente_id)
+            )
+
+        await self.db.commit()
+        await self.db.refresh(contacto)
+
+        # Buscar razón social para el retorno
+        razon_social = data.razon_social
+        if not razon_social and cliente_existente:
+            razon_social = cliente_existente.razon_social
+        if not razon_social:
+            razon_social = "Sin razón social"
+
+        estado_final = "ASIGNADO" if contacto.estado_id == estado_asignado_id else "GESTIONADO"
+
+        return {
+            "id": contacto.id,
+            "ruc": contacto.ruc,
+            "nombre": contacto.nombre,
+            "razon_social": razon_social,
+            "telefono": contacto.telefono,
+            "correo": contacto.correo,
+            "cargo": contacto.cargo,
+            "contesto": 0,
+            "caso_id": None,
+            "caso_nombre": None,
+            "comentario": None,
+            "estado": estado_final,
+            "fecha_asignacion": contacto.created_at,
+            "completado": False,
+            "actualizado": contacto_actualizado,
+            "prospecto_creado": prospecto_creado,
+            "cliente_ya_existia": cliente_ya_existia
+        }

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 import re
 from typing import Optional
 from datetime import datetime
@@ -8,7 +8,7 @@ class ContactoBase(BaseModel):
     razon_social: Optional[str] = Field(None, max_length=255)
     nombre: Optional[str] = Field(None, max_length=150)
     cargo: Optional[str] = Field(None, max_length=100)
-    telefono: str = Field(..., max_length=20)
+    telefono: Optional[str] = Field(None, max_length=20)
     correo: Optional[str] = Field(None, max_length=100)
     origen: Optional[str] = Field(None, max_length=30)
     is_client: bool = Field(False)
@@ -17,9 +17,20 @@ class ContactoBase(BaseModel):
     @field_validator('telefono', mode='before')
     @classmethod
     def clean_telefono(cls, v: str | None) -> str | None:
-        if v:
-            return re.sub(r'[^\d+]', '', str(v))
+        if v is not None:
+            v_str = str(v).strip()
+            if not v_str:
+                return None
+            return re.sub(r'[^\d+]', '', v_str)
         return v
+
+    @model_validator(mode='after')
+    def check_phone_or_email(self) -> 'ContactoBase':
+        telefono_val = self.telefono and self.telefono.strip()
+        correo_val = self.correo and self.correo.strip()
+        if not telefono_val and not correo_val:
+            raise ValueError("Debe proporcionar al menos un teléfono o un correo electrónico.")
+        return self
 
 class ContactoCreate(ContactoBase):
     pass
@@ -36,9 +47,20 @@ class ContactoManualCreate(BaseModel):
     @field_validator('telefono', mode='before')
     @classmethod
     def clean_telefono(cls, v: str | None) -> str | None:
-        if v:
-            return re.sub(r'[^\d+]', '', str(v))
+        if v is not None:
+            v_str = str(v).strip()
+            if not v_str:
+                return None
+            return re.sub(r'[^\d+]', '', v_str)
         return v
+
+    @model_validator(mode='after')
+    def check_phone_or_email(self) -> 'ContactoManualCreate':
+        telefono_val = self.telefono and self.telefono.strip()
+        correo_val = self.correo and self.correo.strip()
+        if not telefono_val and not correo_val:
+            raise ValueError("Debe proporcionar al menos un teléfono o un correo electrónico.")
+        return self
 
 class AsignarLeadManual(BaseModel):
     comercial_id: int = Field(..., description="ID del comercial responsable")

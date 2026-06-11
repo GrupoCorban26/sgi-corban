@@ -32,14 +32,24 @@ class ContactosCrudService:
 
     async def create_contacto(self, data: dict):
         """Crea un nuevo contacto."""
-        # Validar duplicado
-        stmt_dup = select(ClienteContacto).where(
-            ClienteContacto.ruc == data['ruc'], 
-            ClienteContacto.telefono == data['telefono'], 
-            ClienteContacto.is_active == True
-        )
-        if (await self.db.execute(stmt_dup)).scalars().first():
-             return True  # Already exists
+        # Validar duplicado por RUC + teléfono (si tiene) o RUC + correo (si tiene)
+        if data.get('telefono'):
+            stmt_dup = select(ClienteContacto).where(
+                ClienteContacto.ruc == data['ruc'], 
+                ClienteContacto.telefono == data['telefono'], 
+                ClienteContacto.is_active == True
+            )
+            if (await self.db.execute(stmt_dup)).scalars().first():
+                 return True  # Already exists
+        elif data.get('correo') or data.get('email'):
+            correo_val = data.get('correo') or data.get('email')
+            stmt_dup = select(ClienteContacto).where(
+                ClienteContacto.ruc == data['ruc'], 
+                ClienteContacto.correo == correo_val, 
+                ClienteContacto.is_active == True
+            )
+            if (await self.db.execute(stmt_dup)).scalars().first():
+                 return True  # Already exists
 
         is_client_val = data.get('is_client', False)
 
@@ -48,11 +58,20 @@ class ContactosCrudService:
         stmt_estado = select(EstadoContacto).where(EstadoContacto.nombre == estado_nombre)
         estado_obj = (await self.db.execute(stmt_estado)).scalars().first()
         
+        # Buscar si existe el cliente por RUC para vincular el ID
+        stmt_cliente = select(Cliente).where(
+            Cliente.ruc == data['ruc'], 
+            Cliente.is_active == True
+        )
+        cliente_obj = (await self.db.execute(stmt_cliente)).scalars().first()
+        cliente_id = cliente_obj.id if cliente_obj else None
+
         nuevo_contacto = ClienteContacto(
+            cliente_id=cliente_id,
             ruc=data['ruc'],
             nombre=data.get('nombre'),
             cargo=data.get('cargo'),
-            telefono=data['telefono'],
+            telefono=data.get('telefono'),
             correo=data.get('correo') or data.get('email'),
             origen=data.get('origen', 'MANUAL'),
             is_principal=data.get('is_principal', False),
