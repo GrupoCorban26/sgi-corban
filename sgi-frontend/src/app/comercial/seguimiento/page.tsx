@@ -28,11 +28,11 @@ function KpiStat({ icon, label, value, color }: {
     icon: React.ReactNode; label: string; value: string | number; color: string;
 }) {
     return (
-        <div className={`flex items-center gap-3 px-4 py-3 rounded-xl bg-gradient-to-br ${color} text-white shadow-sm`}>
+        <div className={`flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl bg-gradient-to-br ${color} text-white shadow-sm overflow-hidden`}>
             <div className="opacity-85 flex-shrink-0">{icon}</div>
-            <div className="min-w-0">
-                <p className="text-[10px] uppercase font-extrabold tracking-wider opacity-85 leading-tight">{label}</p>
-                <p className="text-base font-extrabold leading-tight tabular-nums mt-0.5">{value}</p>
+            <div className="min-w-0 overflow-hidden">
+                <p className="text-[9px] sm:text-[10px] uppercase font-extrabold tracking-wider opacity-85 leading-tight truncate" title={label}>{label}</p>
+                <p className="text-sm sm:text-base font-extrabold leading-tight tabular-nums mt-0.5">{value}</p>
             </div>
         </div>
     );
@@ -238,55 +238,57 @@ export default function SeguimientoPage() {
             <div className="w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-5">
                 
                 {/* ── Header ─────────────────────────────────────── */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-                    <div>
+                <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3">
+                    <div className="min-w-0">
                         <div className="flex items-center gap-2 text-indigo-600">
-                            <span className="p-2 bg-indigo-50 rounded-xl border border-indigo-100/50 shadow-sm">
-                                <ArrowRightLeft size={20} />
+                            <span className="p-1.5 sm:p-2 bg-indigo-50 rounded-xl border border-indigo-100/50 shadow-sm flex-shrink-0">
+                                <ArrowRightLeft size={18} />
                             </span>
-                            <h1 className="text-2xl font-bold text-slate-800 tracking-tight">
+                            <h1 className="text-lg sm:text-2xl font-bold text-slate-800 tracking-tight truncate">
                                 Seguimiento de Cargas
                             </h1>
                         </div>
-                        <p className="text-xs text-slate-500 font-medium mt-1 pl-1">
+                        <p className="text-[11px] sm:text-xs text-slate-500 font-medium mt-1 pl-1 line-clamp-1 sm:line-clamp-none">
                             {isBoss 
                                 ? 'Monitoreo global · Visualiza y filtra el pipeline comercial de todos los equipos' 
-                                : 'Arrastra tus cotizaciones activas para registrar cierres COR o descalificaciones'}
+                                : 'Usa los botones de acción o arrastra tarjetas para gestionar cierres y descalificaciones'}
                         </p>
                     </div>
 
-                    {/* Filtro por comercial (Supervisores / Directores) */}
-                    {isBoss && (
-                        <div className="flex items-center gap-2 bg-white px-3.5 py-1.5 rounded-2xl border border-slate-200 shadow-sm">
-                            <Users size={15} className="text-slate-400" />
-                            <span className="text-xs text-slate-500 font-bold mr-1">Filtrar Comercial:</span>
-                            <select
-                                value={comercialId || ''}
-                                onChange={(e) => setComercialId(e.target.value ? parseInt(e.target.value) : null)}
-                                disabled={loadingComerciales}
-                                className="bg-transparent border-none outline-none text-xs font-bold text-slate-800 cursor-pointer min-w-[160px]"
-                            >
-                                <option value="">Todos los comerciales</option>
-                                {comerciales.map((c) => (
-                                    <option key={c.id} value={c.id}>{c.nombre}</option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 flex-shrink-0">
+                        {/* Filtro por comercial (Supervisores / Directores) */}
+                        {isBoss && (
+                            <div className="flex items-center gap-2 bg-white px-3 sm:px-3.5 py-2 sm:py-1.5 rounded-2xl border border-slate-200 shadow-sm w-full sm:w-auto">
+                                <Users size={15} className="text-slate-400 flex-shrink-0" />
+                                <span className="text-xs text-slate-500 font-bold mr-1 hidden sm:inline">Filtrar:</span>
+                                <select
+                                    value={comercialId || ''}
+                                    onChange={(e) => setComercialId(e.target.value ? parseInt(e.target.value) : null)}
+                                    disabled={loadingComerciales}
+                                    className="bg-transparent border-none outline-none text-xs font-bold text-slate-800 cursor-pointer flex-1 sm:min-w-[160px]"
+                                >
+                                    <option value="">Todos los comerciales</option>
+                                    {comerciales.map((c) => (
+                                        <option key={c.id} value={c.id}>{c.nombre}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
 
-                    {/* Botón Crear Solicitud */}
-                    <button
-                        onClick={() => setIsCrearOpen(true)}
-                        className="flex items-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold shadow-lg shadow-indigo-200/50 transition-all active:scale-[0.98] cursor-pointer whitespace-nowrap"
-                    >
-                        <Plus size={14} />
-                        Crear solicitud
-                    </button>
+                        {/* Botón Crear Solicitud */}
+                        <button
+                            onClick={() => setIsCrearOpen(true)}
+                            className="flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold shadow-lg shadow-indigo-200/50 transition-all active:scale-[0.98] cursor-pointer whitespace-nowrap"
+                        >
+                            <Plus size={14} />
+                            <span>Crear solicitud</span>
+                        </button>
+                    </div>
                 </div>
 
                 {/* ── KPI Strip (8 estados/métricas con Prospecto incluido) ──────────────────────── */}
                 {!isLoading && seguimientos.length > 0 && (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-2.5">
                         <KpiStat 
                             icon={<UserSearch size={16} />} 
                             label="Prospectos" 

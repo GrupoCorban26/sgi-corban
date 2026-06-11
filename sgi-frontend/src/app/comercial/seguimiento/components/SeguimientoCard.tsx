@@ -1,13 +1,49 @@
 import React from 'react';
-import { Ship, Plane, Calendar, User, AlertCircle, Clock, FileCheck, Anchor } from 'lucide-react';
+import { Ship, Plane, Calendar, User, AlertCircle, Clock, FileCheck, Anchor, KanbanSquare, CheckCircle2, PackageCheck, XCircle, RotateCcw } from 'lucide-react';
 import { Seguimiento } from '@/types/seguimiento';
+
+type EstadoSeguimiento = 'SOLICITUD' | 'COTIZADO' | 'CIERRE' | 'EN_OPERACION' | 'CARGA_ENTREGADA' | 'CAIDO';
+
+/* ── Quick Actions config por estado ── */
+interface QuickActionDef {
+    label: string;
+    target: EstadoSeguimiento;
+    Icon: React.ComponentType<{ size?: number; className?: string }>;
+    style: string;
+    hoverStyle: string;
+}
+
+const QUICK_ACTIONS: Record<EstadoSeguimiento, QuickActionDef[]> = {
+    SOLICITUD: [
+        { label: 'Cotizar', target: 'COTIZADO', Icon: KanbanSquare, style: 'bg-indigo-50 text-indigo-700 border-indigo-200', hoverStyle: 'hover:bg-indigo-100' },
+        { label: 'Caído', target: 'CAIDO', Icon: XCircle, style: 'bg-rose-50 text-rose-600 border-rose-200', hoverStyle: 'hover:bg-rose-100' },
+    ],
+    COTIZADO: [
+        { label: 'Cerrar (COR)', target: 'CIERRE', Icon: CheckCircle2, style: 'bg-emerald-50 text-emerald-700 border-emerald-200', hoverStyle: 'hover:bg-emerald-100' },
+        { label: 'Caído', target: 'CAIDO', Icon: XCircle, style: 'bg-rose-50 text-rose-600 border-rose-200', hoverStyle: 'hover:bg-rose-100' },
+    ],
+    CIERRE: [
+        { label: 'Operar', target: 'EN_OPERACION', Icon: Ship, style: 'bg-blue-50 text-blue-700 border-blue-200', hoverStyle: 'hover:bg-blue-100' },
+        { label: 'Re-cotizar', target: 'COTIZADO', Icon: RotateCcw, style: 'bg-amber-50 text-amber-700 border-amber-200', hoverStyle: 'hover:bg-amber-100' },
+        { label: 'Caído', target: 'CAIDO', Icon: XCircle, style: 'bg-rose-50 text-rose-600 border-rose-200', hoverStyle: 'hover:bg-rose-100' },
+    ],
+    EN_OPERACION: [
+        { label: 'Entregado', target: 'CARGA_ENTREGADA', Icon: PackageCheck, style: 'bg-violet-50 text-violet-700 border-violet-200', hoverStyle: 'hover:bg-violet-100' },
+        { label: 'Caído', target: 'CAIDO', Icon: XCircle, style: 'bg-rose-50 text-rose-600 border-rose-200', hoverStyle: 'hover:bg-rose-100' },
+    ],
+    CARGA_ENTREGADA: [],
+    CAIDO: [
+        { label: 'Reactivar', target: 'COTIZADO', Icon: RotateCcw, style: 'bg-indigo-50 text-indigo-700 border-indigo-200', hoverStyle: 'hover:bg-indigo-100' },
+    ],
+};
 
 interface SeguimientoCardProps {
     seguimiento: Seguimiento;
     onClick: () => void;
+    onQuickAction?: (estadoNuevo: EstadoSeguimiento) => void;
 }
 
-export default function SeguimientoCard({ seguimiento, onClick }: SeguimientoCardProps) {
+export default function SeguimientoCard({ seguimiento, onClick, onQuickAction }: SeguimientoCardProps) {
     
     // Calcular días de antigüedad
     const getDiasAntiguedad = (dateStr: string) => {
@@ -88,19 +124,27 @@ export default function SeguimientoCard({ seguimiento, onClick }: SeguimientoCar
         target.classList.remove('opacity-40', 'scale-[0.97]');
     };
 
+    const handleQuickAction = (e: React.MouseEvent, target: EstadoSeguimiento) => {
+        e.stopPropagation();
+        e.preventDefault();
+        onQuickAction?.(target);
+    };
+
+    const actions = QUICK_ACTIONS[seguimiento.estado as EstadoSeguimiento] || [];
+
     return (
         <div
             draggable={true}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
             onClick={onClick}
-            className={`group relative bg-white border border-slate-200/80 hover:border-indigo-400 rounded-2xl p-4 shadow-sm hover:shadow-md hover:-translate-y-[2px] transition-all duration-200 cursor-grab active:cursor-grabbing select-none border-l-[4px] ${getSemaforoBorder(dias)}`}
+            className={`group relative bg-white border border-slate-200/80 hover:border-indigo-400 rounded-2xl p-3.5 sm:p-4 shadow-sm hover:shadow-md hover:-translate-y-[2px] transition-all duration-200 cursor-grab active:cursor-grabbing select-none border-l-[4px] ${getSemaforoBorder(dias)}`}
         >
             
             {/* Cabecera: RUC + Semáforo */}
-            <div className="space-y-2">
+            <div className="space-y-1.5 sm:space-y-2">
                 <div className="flex justify-between items-center gap-2 min-w-0">
-                    <span className="text-[10px] text-slate-400 font-mono tracking-wide flex-shrink-0">
+                    <span className="text-[10px] text-slate-400 font-mono tracking-wide flex-shrink-0 truncate">
                         RUC {seguimiento.cliente_ruc || 'S/N'}
                     </span>
                     
@@ -112,29 +156,35 @@ export default function SeguimientoCard({ seguimiento, onClick }: SeguimientoCar
                     </span>
                 </div>
 
-                {/* Razón Social — más prominente */}
-                <h4 className="text-sm font-bold text-slate-800 line-clamp-1 group-hover:text-indigo-600 transition-colors" title={seguimiento.cliente_razon_social || undefined}>
+                {/* Razón Social — más prominente, 2 líneas en mobile */}
+                <h4 
+                    className="text-sm font-bold text-slate-800 line-clamp-2 sm:line-clamp-1 group-hover:text-indigo-600 transition-colors leading-snug" 
+                    title={seguimiento.cliente_razon_social || undefined}
+                >
                     {seguimiento.cliente_razon_social}
                 </h4>
                 
                 {/* Título del embarque */}
-                <p className="text-xs font-medium text-slate-600 line-clamp-2 leading-relaxed bg-slate-50/70 p-2.5 rounded-xl border border-slate-100/60" title={seguimiento.titulo || undefined}>
+                <p 
+                    className="text-xs font-medium text-slate-600 line-clamp-2 leading-relaxed bg-slate-50/70 p-2 sm:p-2.5 rounded-xl border border-slate-100/60" 
+                    title={seguimiento.titulo || undefined}
+                >
                     {seguimiento.titulo}
                 </p>
             </div>
 
             {/* Modalidades de cotización */}
-            <div className="mt-3.5 space-y-1.5">
+            <div className="mt-3 sm:mt-3.5 space-y-1.5">
                 <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Modalidades:</span>
                 
-                <div className="flex flex-wrap gap-1.5">
+                <div className="flex flex-wrap gap-1 sm:gap-1.5">
                     {seguimiento.cotizaciones.map((c) => {
                         const isAereo = c.tipo_carga_nombre?.toUpperCase().includes('AEREO') || c.tipo_carga_nombre?.toUpperCase().includes('COURIER');
                         
                         return (
                             <span 
                                 key={c.id} 
-                                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors whitespace-nowrap ${
+                                className={`inline-flex items-center gap-1 px-2 sm:px-2.5 py-1 rounded-lg text-[10px] font-bold border transition-colors whitespace-nowrap ${
                                     c.estado === 'ACEPTADO' 
                                         ? 'bg-emerald-50 text-emerald-800 border-emerald-200 ring-1 ring-emerald-200' 
                                         : c.estado === 'RECHAZADO'
@@ -146,11 +196,11 @@ export default function SeguimientoCard({ seguimiento, onClick }: SeguimientoCar
                                 title={`${c.tipo_carga_nombre} · ${c.tipo_servicio_nombre} (${c.estado})`}
                             >
                                 {isAereo ? <Plane size={11} className="flex-shrink-0" /> : <Ship size={11} className="flex-shrink-0" />}
-                                <span className="truncate max-w-[120px]">{c.tipo_carga_nombre}</span>
+                                <span className="truncate max-w-[100px] sm:max-w-[120px]">{c.tipo_carga_nombre}</span>
                                 {c.incoterm && (
                                     <span className="text-[8px] bg-slate-200/60 text-slate-700 px-1 py-0.5 rounded font-mono font-extrabold">{c.incoterm}</span>
                                 )}
-                                {c.pais_origen && <span className="opacity-60 font-normal text-[9px]">({c.pais_origen})</span>}
+                                {c.pais_origen && <span className="opacity-60 font-normal text-[9px] hidden sm:inline">({c.pais_origen})</span>}
                             </span>
                         );
                     })}
@@ -179,8 +229,8 @@ export default function SeguimientoCard({ seguimiento, onClick }: SeguimientoCar
             )}
 
             {/* Footer: Comercial / Fecha */}
-            <div className="mt-4 pt-3 border-t border-slate-100/70 flex items-center justify-between text-[11px] text-slate-400">
-                <span className="flex items-center gap-1.5 font-medium text-slate-500 truncate max-w-[130px]" title={seguimiento.comercial_nombre || 'Comercial'}>
+            <div className="mt-3 sm:mt-4 pt-2.5 sm:pt-3 border-t border-slate-100/70 flex items-center justify-between text-[11px] text-slate-400">
+                <span className="flex items-center gap-1.5 font-medium text-slate-500 truncate max-w-[110px] sm:max-w-[130px]" title={seguimiento.comercial_nombre || 'Comercial'}>
                     <User size={12} className="text-slate-400 flex-shrink-0" />
                     <span className="truncate">{seguimiento.comercial_nombre || 'Comercial'}</span>
                 </span>
@@ -190,6 +240,40 @@ export default function SeguimientoCard({ seguimiento, onClick }: SeguimientoCar
                     {new Date(seguimiento.created_at).toLocaleDateString('es-PE', { day: '2-digit', month: '2-digit' })}
                 </span>
             </div>
+
+            {/* ── Quick Actions ── */}
+            {actions.length > 0 && onQuickAction && (
+                <div className={`
+                    mt-2.5 pt-2.5 border-t border-dashed border-slate-100
+                    flex flex-wrap gap-1.5
+                    transition-all duration-200
+                    md:opacity-0 md:group-hover:opacity-100
+                    md:translate-y-1 md:group-hover:translate-y-0
+                    md:pointer-events-none md:group-hover:pointer-events-auto
+                `}>
+                    {actions.map((action) => {
+                        const ActionIcon = action.Icon;
+                        return (
+                            <button
+                                key={action.target}
+                                onClick={(e) => handleQuickAction(e, action.target)}
+                                className={`
+                                    inline-flex items-center gap-1 px-2.5 py-1.5 
+                                    rounded-lg text-[11px] font-bold border 
+                                    transition-all duration-150 cursor-pointer
+                                    active:scale-95 select-none
+                                    min-h-[32px]
+                                    ${action.style} ${action.hoverStyle}
+                                `}
+                                title={`Mover a ${action.label}`}
+                            >
+                                <ActionIcon size={12} className="flex-shrink-0" />
+                                <span>{action.label}</span>
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
         </div>
     );
 }
