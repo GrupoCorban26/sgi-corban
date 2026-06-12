@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Numeric, Text, Index
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, ForeignKey, Numeric, Text, Index, VARCHAR
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func, text
 from .base import Base
@@ -30,7 +30,7 @@ class Cliente(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    ruc = Column(String(11), index=True)
+    ruc = Column(VARCHAR(11), index=True)
     razon_social = Column(String(255), nullable=False)
     direccion_fiscal = Column(String(255))
     distrito_id = Column(Integer, ForeignKey("core.distritos.id"))
@@ -62,10 +62,10 @@ class ClienteContacto(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     cliente_id = Column(Integer, ForeignKey("comercial.clientes.id"), nullable=True, index=True)
-    ruc = Column(String(11), nullable=False, index=True)
+    ruc = Column(VARCHAR(11), nullable=False, index=True)
     nombre = Column(String(150))
     cargo = Column(String(100))
-    telefono = Column(String(20), nullable=True, index=True)
+    telefono = Column(VARCHAR(20), nullable=True, index=True)
     correo = Column(String(100))
     origen = Column(String(30))
     estado_id = Column(Integer, ForeignKey("comercial.estado_contacto.id"), index=True)

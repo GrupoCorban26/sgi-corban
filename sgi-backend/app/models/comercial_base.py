@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, VARCHAR
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from .base import Base
@@ -29,11 +29,11 @@ class BaseContacto(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     lote_id = Column(Integer, ForeignKey("comercial.lotes.id"), nullable=False, index=True)
-    ruc = Column(String(11), nullable=False, index=True)
+    ruc = Column(VARCHAR(11), nullable=False, index=True)
     razon_social = Column(String(250))
     sector = Column(String(500))
     paises = Column(String(500))
-    telefono = Column(String(20), nullable=False, index=True)
+    telefono = Column(VARCHAR(20), nullable=False, index=True)
     nombre = Column(String(150))
     correo = Column(String(100))
     estado = Column(String(20), nullable=False, default='DISPONIBLE', index=True)
