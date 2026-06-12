@@ -102,38 +102,66 @@ class ClientesService:
             .scalar_subquery()
         )
 
-        # ── Último comentario (fuente dual unificada: gestiones de cartera + llamadas de base) ──
-        # Usamos un UNION ALL en una única subconsulta escalar. Esto reduce de 4 subconsultas por fila a solo 1,
-        # mejorando drásticamente el rendimiento en SQL Server.
-        from sqlalchemy import union_all
+        # ── Último comentario (fuente dual: gestiones de cartera + llamadas de base) ──
+        # Usamos 4 subconsultas correlacionadas individuales + CASE para elegir el más reciente.
+        # NOTA: NO usar union_all().subquery() aquí — SQL Server pierde la correlación
+        # con Cliente a través de la capa .subquery(), causando cross joins o errores SQL.
 
-        stmt_gest = select(
-            ClienteGestion.comentario.label("comentario"),
-            ClienteGestion.created_at.label("created_at")
-        ).where(
-            ClienteGestion.cliente_id == Cliente.id,
-            ClienteGestion.comentario.isnot(None)
-        ).correlate(Cliente)
+        # Gestión de cartera (cliente_gestiones)
+        subq_gest_comentario = (
+            select(ClienteGestion.comentario)
+            .where(ClienteGestion.cliente_id == Cliente.id, ClienteGestion.comentario.isnot(None))
+            .order_by(ClienteGestion.created_at.desc())
+            .limit(1)
+            .correlate(Cliente)
+            .scalar_subquery()
+        )
+        subq_gest_fecha = (
+            select(ClienteGestion.created_at)
+            .where(ClienteGestion.cliente_id == Cliente.id, ClienteGestion.comentario.isnot(None))
+            .order_by(ClienteGestion.created_at.desc())
+            .limit(1)
+            .correlate(Cliente)
+            .scalar_subquery()
+        )
 
-        stmt_ll = select(
-            HistorialLlamada.comentario.label("comentario"),
-            HistorialLlamada.created_at.label("created_at")
-        ).join(
-            BaseContacto, HistorialLlamada.base_id == BaseContacto.id
-        ).where(
-            BaseContacto.ruc == Cliente.ruc,
-            HistorialLlamada.comercial_id == Cliente.comercial_encargado_id,
-            HistorialLlamada.caso_id.isnot(None),
-            HistorialLlamada.comentario.isnot(None)
-        ).correlate(Cliente)
+        # Llamadas de base (historial_llamadas vía BaseContacto → RUC del comercial asignado)
+        subq_ll_comentario = (
+            select(HistorialLlamada.comentario)
+            .join(BaseContacto, HistorialLlamada.base_id == BaseContacto.id)
+            .where(
+                BaseContacto.ruc == Cliente.ruc,
+                HistorialLlamada.comercial_id == Cliente.comercial_encargado_id,
+                HistorialLlamada.caso_id.isnot(None),
+                HistorialLlamada.comentario.isnot(None),
+            )
+            .order_by(HistorialLlamada.created_at.desc())
+            .limit(1)
+            .correlate(Cliente)
+            .scalar_subquery()
+        )
+        subq_ll_fecha = (
+            select(HistorialLlamada.created_at)
+            .join(BaseContacto, HistorialLlamada.base_id == BaseContacto.id)
+            .where(
+                BaseContacto.ruc == Cliente.ruc,
+                HistorialLlamada.comercial_id == Cliente.comercial_encargado_id,
+                HistorialLlamada.caso_id.isnot(None),
+                HistorialLlamada.comentario.isnot(None),
+            )
+            .order_by(HistorialLlamada.created_at.desc())
+            .limit(1)
+            .correlate(Cliente)
+            .scalar_subquery()
+        )
 
-        subq_combined = union_all(stmt_gest, stmt_ll).subquery()
-
-        subq_ultimo_comentario = select(
-            subq_combined.c.comentario
-        ).order_by(
-            subq_combined.c.created_at.desc()
-        ).limit(1).scalar_subquery()
+        # Elegir el comentario más reciente entre ambas fuentes
+        subq_ultimo_comentario = case(
+            (subq_gest_fecha.is_(None), subq_ll_comentario),
+            (subq_ll_fecha.is_(None), subq_gest_comentario),
+            (subq_gest_fecha >= subq_ll_fecha, subq_gest_comentario),
+            else_=subq_ll_comentario
+        )
 
         stmt = select(
             Cliente,
