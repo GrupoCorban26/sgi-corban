@@ -47,6 +47,11 @@ api.interceptors.response.use(
             status: status || 0,
             message: error.response?.data?.detail || 'Error de conexión con el servidor',
             code: error.response?.data?.code || 'UNKNOWN_ERROR',
+            response: error.response || {
+                data: {
+                    detail: error.response?.data?.detail || error.message || 'Error de conexión con el servidor'
+                }
+            }
         };
 
         return Promise.reject(normalizedError);
