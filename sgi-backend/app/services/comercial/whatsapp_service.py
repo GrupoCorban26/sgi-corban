@@ -56,6 +56,8 @@ class WhatsAppService:
         }
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, headers=headers)
+            if response.status_code >= 400:
+                logger.error(f"WhatsApp API Error (Text): {response.status_code} - {response.text}")
             response.raise_for_status()
             return response.json()
 
@@ -98,6 +100,9 @@ class WhatsAppService:
         }
         async with httpx.AsyncClient() as client:
             response = await client.post(url, json=payload, headers=headers)
+            if response.status_code >= 400:
+                logger.error(f"WhatsApp API Error (Template): {response.status_code} - {response.text}")
+            response.raise_for_status()
             return response.json()
 
     @staticmethod

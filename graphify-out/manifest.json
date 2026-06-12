@@ -790,9 +790,9 @@
     "semantic_hash": "cb940c68e8c5ef0f64829b488042e049"
   },
   "sgi-backend/app/services/comercial/whatsapp_service.py": {
-    "mtime": 1780000217.6725857,
-    "ast_hash": "263e8237f05d4406a312b82cd45c5a39",
-    "semantic_hash": "263e8237f05d4406a312b82cd45c5a39"
+    "mtime": 1781272313.895996,
+    "ast_hash": "8dc8afa1fbb1dd05ee7160d7af19f9ee",
+    "semantic_hash": ""
   },
   "sgi-backend/app/services/contactos_service.py": {
     "mtime": 1780000217.6725857,
@@ -1695,9 +1695,9 @@
     "semantic_hash": "d1512c220af0ef8d65c795be75d13542"
   },
   "sgi-frontend/src/app/comercial/seguimiento/components/KanbanBoard.tsx": {
-    "mtime": 1780599586.935029,
-    "ast_hash": "6e9936b4dc4ff94723bced812d7e468f",
-    "semantic_hash": "6e9936b4dc4ff94723bced812d7e468f"
+    "mtime": 1781215982.3175378,
+    "ast_hash": "53cc915ac086c491c44d3a9ea4f90336",
+    "semantic_hash": ""
   },
   "sgi-frontend/src/app/comercial/seguimiento/components/ModalMoverTarjeta.tsx": {
     "mtime": 1781100177.0110447,
@@ -1710,14 +1710,14 @@
     "semantic_hash": "04497ce86751629099ba0fb65a24c3ae"
   },
   "sgi-frontend/src/app/comercial/seguimiento/components/SeguimientoCard.tsx": {
-    "mtime": 1781100163.8585749,
-    "ast_hash": "d601d1af3dca4eeccfdba773f735f829",
-    "semantic_hash": "d601d1af3dca4eeccfdba773f735f829"
+    "mtime": 1781215893.0193129,
+    "ast_hash": "3506f95da0b8963b788d8cd56737f8d2",
+    "semantic_hash": ""
   },
   "sgi-frontend/src/app/comercial/seguimiento/page.tsx": {
-    "mtime": 1781106208.0127735,
-    "ast_hash": "2d542195850667638ca04118f30dd988",
-    "semantic_hash": "2d542195850667638ca04118f30dd988"
+    "mtime": 1781216021.0556667,
+    "ast_hash": "5cb7e9f91b25f1802a6d3f97ba7007a9",
+    "semantic_hash": ""
   },
   "sgi-frontend/src/app/comercial/supervision/components/ComercialPanel.tsx": {
     "mtime": 1780000218.5039542,
