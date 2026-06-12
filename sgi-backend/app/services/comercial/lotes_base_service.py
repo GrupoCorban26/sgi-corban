@@ -4,7 +4,7 @@ import re
 import pandas as pd
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy import func, case, update, and_, or_
+from sqlalchemy import func, case, update, and_, or_, insert
 from fastapi import UploadFile, HTTPException
 
 from app.models.comercial_base import Lote, BaseContacto
@@ -102,7 +102,19 @@ class LotesBaseService:
             if 'ruc' not in df.columns or 'telefono' not in df.columns:
                 raise HTTPException(400, "El Excel debe contener las columnas 'ruc' y 'telefono'")
 
-            df['ruc'] = df['ruc'].apply(lambda x: str(int(x)).strip() if pd.notna(x) and x != '' else None)
+            def limpiar_ruc(val):
+                if pd.isna(val) or val == '':
+                    return None
+                val_str = str(val).strip()
+                # Si es float (ej: 20100055318.0), convertir a int primero
+                try:
+                    val_str = str(int(float(val_str)))
+                except (ValueError, OverflowError):
+                    # Si no se puede convertir a número, limpiar caracteres no-dígito
+                    val_str = re.sub(r'\D', '', val_str)
+                return val_str if val_str else None
+
+            df['ruc'] = df['ruc'].apply(limpiar_ruc)
             df['telefono'] = df['telefono'].apply(limpiar_telefono)
             
             # Mapeo de columnas adicionales
@@ -162,21 +174,36 @@ class LotesBaseService:
             self.db.add(nuevo_lote)
             await self.db.flush() # Para obtener el ID del lote
             
-            inserted = 0
+            # Preparar datos para bulk insert (mucho más rápido que add() individual)
+            def safe_str(val, max_len=None):
+                """Convierte a string seguro, truncando si excede el límite de la columna."""
+                if val is None or (isinstance(val, float) and pd.isna(val)):
+                    return None
+                s = str(val).strip()
+                return s[:max_len] if max_len and len(s) > max_len else s
+
+            registros = []
             for _, row in df.iterrows():
-                contacto = BaseContacto(
-                    lote_id=nuevo_lote.id,
-                    ruc=row['ruc'],
-                    razon_social=row.get('razon_social') or row.get('empresa'),
-                    sector=row.get('sector'),
-                    paises=row.get('paises_principales') or row.get('paises'),
-                    telefono=row['telefono'],
-                    nombre=row.get('nombre') or row.get('contacto'),
-                    correo=row.get('correo'),
-                    estado='DISPONIBLE'
-                )
-                self.db.add(contacto)
-                inserted += 1
+                registros.append({
+                    "lote_id": nuevo_lote.id,
+                    "ruc": row['ruc'][:11] if row['ruc'] else row['ruc'],
+                    "razon_social": safe_str(row.get('razon_social') or row.get('empresa'), 250),
+                    "sector": safe_str(row.get('sector'), 500),
+                    "paises": safe_str(row.get('paises_principales') or row.get('paises'), 500),
+                    "telefono": row['telefono'][:20] if row['telefono'] else row['telefono'],
+                    "nombre": safe_str(row.get('nombre') or row.get('contacto'), 150),
+                    "correo": safe_str(row.get('correo'), 100),
+                    "estado": "DISPONIBLE",
+                    "veces_llamadas": 0,
+                })
+
+            # Insertar en lotes de 500 para evitar límite de parámetros de SQL Server
+            BATCH_SIZE = 500
+            inserted = 0
+            for i in range(0, len(registros), BATCH_SIZE):
+                batch = registros[i:i + BATCH_SIZE]
+                await self.db.execute(insert(BaseContacto), batch)
+                inserted += len(batch)
 
             await self.db.commit()
 
