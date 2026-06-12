@@ -15,6 +15,7 @@ export interface ContactoAsignado {
     fecha_asignacion: string;
     historial_id: number;
     completado: boolean;
+    lote_nombre: string | null;
 }
 
 export interface CasoLlamada {

@@ -113,6 +113,11 @@ export default function FeedbackRow({
           {contacto.correo || '-'}
         </span>
       </td>
+      <td className="px-4 py-3">
+        <span className="text-xs text-gray-500 truncate max-w-[140px] block" title={contacto.lote_nombre || ''}>
+          {contacto.lote_nombre || '-'}
+        </span>
+      </td>
 
       {/* Contestó */}
       <td className="px-3 py-2">

@@ -1,7 +1,7 @@
 # Graph Report - sistema-gestion-integral  (2026-06-12)
 
 ## Corpus Check
-- 547 files · ~256,045 words
+- 547 files · ~255,990 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `6227fefd`
+- Built from commit: `1dadbf0e`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -231,8 +231,8 @@
 - 1-file cycle: `sgi-frontend/src/services/organizacion/empleado.ts -> sgi-frontend/src/services/organizacion/empleado.ts`
 - 1-file cycle: `sgi-backend/app/utils/horario_laboral.py -> sgi-backend/app/utils/horario_laboral.py`
 - 2-file cycle: `sgi-frontend/src/app/comercial/analytics/page.tsx -> sgi-frontend/src/hooks/comercial/useAnalyticsComercial.ts -> sgi-frontend/src/app/comercial/analytics/page.tsx`
-- 2-file cycle: `sgi-frontend/src/app/comercial/analytics/components/TabRadar.tsx -> sgi-frontend/src/app/comercial/analytics/page.tsx -> sgi-frontend/src/app/comercial/analytics/components/TabRadar.tsx`
 - 2-file cycle: `sgi-frontend/src/app/comercial/analytics/components/TabEmbudo.tsx -> sgi-frontend/src/app/comercial/analytics/page.tsx -> sgi-frontend/src/app/comercial/analytics/components/TabEmbudo.tsx`
+- 2-file cycle: `sgi-frontend/src/app/comercial/analytics/components/TabRadar.tsx -> sgi-frontend/src/app/comercial/analytics/page.tsx -> sgi-frontend/src/app/comercial/analytics/components/TabRadar.tsx`
 
 ## Communities (215 total, 30 thin omitted)
 
@@ -314,7 +314,7 @@ Nodes (39): InboxPage(), JefeSubordinado, useChatActions(), useChatConversations
 
 ### Community 19 - "Community 19"
 Cohesion: 0.10
-Nodes (57): AsyncSession, bool, Endpoints REST para el módulo de Supervisión WhatsApp (Evolution API v2).  Rut, int, Request, str, Usuario, Schemas Pydantic para el módulo de Supervisión WhatsApp (Evolution API v2). (+49 more)
+Nodes (58): AsyncSession, bool, Endpoints REST para el módulo de Supervisión WhatsApp (Evolution API v2).  Rut, int, Request, str, Usuario, Schemas Pydantic para el módulo de Supervisión WhatsApp (Evolution API v2). (+50 more)
 
 ### Community 20 - "Community 20"
 Cohesion: 0.14
@@ -362,7 +362,7 @@ Nodes (34): Servicio de Supervisión WhatsApp — Integración con Evolution API
 
 ### Community 31 - "Community 31"
 Cohesion: 0.14
-Nodes (32): useComerciales(), useConversaciones(), useInstanciaQR(), useInstancias(), useMensajes(), ComercialPanel(), ComercialPanelProps, estadoConfig (+24 more)
+Nodes (31): useComerciales(), useConversaciones(), useInstanciaQR(), useInstancias(), useMensajes(), ComercialPanel(), ComercialPanelProps, estadoConfig (+23 more)
 
 ### Community 32 - "Community 32"
 Cohesion: 0.09
@@ -513,8 +513,8 @@ Cohesion: 0.14
 Nodes (19): AsyncSession, bool, int, str, UploadFile, get_paises(), ImportacionBase, ImportacionPagination (+11 more)
 
 ### Community 69 - "Community 69"
-Cohesion: 0.19
-Nodes (17): leadsWebService, useAnalyticsBuzon(), TabCanal, TabCanalesEntrada(), TabCanalesEntradaProps, AnalyticsBuzonFiltros, AnalyticsBuzonResponse, AnalyticsComparativo (+9 more)
+Cohesion: 0.24
+Nodes (13): leadsWebService, useAnalyticsBuzon(), AnalyticsBuzonFiltros, AnalyticsComparativo, AnalyticsPorCanal, ComparativoItem, ItemConteo, LeadsPorComercial (+5 more)
 
 ### Community 70 - "Community 70"
 Cohesion: 0.12
@@ -598,7 +598,7 @@ Nodes (20): compilerOptions, allowJs, baseUrl, esModuleInterop, incremental, iso
 
 ### Community 90 - "Community 90"
 Cohesion: 0.14
-Nodes (19): AreaChartCard(), AreaChartCardProps, AreaSeries, ChartDataRecord, ChartDataRecord, LineChartCard(), LineChartCardProps, LineSeries (+11 more)
+Nodes (19): BarChartCard(), BarChartCardProps, BarConfig, ChartDataRecord, ChartDataRecord, LineChartCard(), LineChartCardProps, LineSeries (+11 more)
 
 ### Community 91 - "Community 91"
 Cohesion: 0.20
@@ -621,8 +621,8 @@ Cohesion: 0.13
 Nodes (22): Gestion, GestionCreate, useGestiones(), Contacto, maskPhone(), ModalContactosCliente(), ModalContent(), ModalContentProps (+14 more)
 
 ### Community 96 - "Community 96"
-Cohesion: 0.09
-Nodes (29): AnalyticsComercialPage(), TabActual, Router de Analytics Comercial (Fase 4 - Storytelling). Endpoints para el Radar d, useAnalyticsCotizaciones(), useEmbudoComercial(), useEmpresasGrupo(), useRadarComercial(), TabDetalleCotizacionesProps (+21 more)
+Cohesion: 0.11
+Nodes (26): AnalyticsComercialPage(), TabActual, Router de Analytics Comercial (Fase 4 - Storytelling). Endpoints para el Radar d, useAnalyticsCotizaciones(), useEmbudoComercial(), useEmpresasGrupo(), useRadarComercial(), TabRadar() (+18 more)
 
 ### Community 97 - "Community 97"
 Cohesion: 0.12
@@ -730,7 +730,7 @@ Nodes (8): Config, ImportResult, OrdenResponse, Resultado de una importación de
 
 ### Community 130 - "Community 130"
 Cohesion: 0.22
-Nodes (7): BarChartCard(), BarChartCardProps, BarConfig, ChartDataRecord, StatCard(), StatCardProps, TabRendimientoCotizacionesProps
+Nodes (10): AreaChartCard(), AreaChartCardProps, AreaSeries, ChartDataRecord, StatCard(), StatCardProps, TabCanal, TabCanalesEntrada() (+2 more)
 
 ### Community 131 - "Community 131"
 Cohesion: 0.20
@@ -761,8 +761,8 @@ Cohesion: 0.61
 Nodes (6): DELETE(), GET(), PATCH(), POST(), proxyRequest(), PUT()
 
 ### Community 140 - "Community 140"
-Cohesion: 0.57
-Nodes (6): COLORES_EMBUDO, COLORES_MOTIVOS, COLORES_ORIGEN, TabEmbudo(), TabEmbudoProps, EmbudoResponse
+Cohesion: 0.19
+Nodes (10): TabDetalleCotizacionesProps, COLORES_EMBUDO, COLORES_MOTIVOS, COLORES_ORIGEN, TabEmbudo(), TabEmbudoProps, TabRendimientoCotizacionesProps, ComercialCotizacionesRendimiento (+2 more)
 
 ### Community 144 - "Community 144"
 Cohesion: 0.33
@@ -812,7 +812,7 @@ Nodes (3): Backend (.env), 🔐 Configuración de Variables de Entorno, Frontend
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `FastAPI` connect `Community 51` to `Community 1`, `Community 2`, `Community 4`, `Community 5`, `Community 6`, `Community 8`, `Community 9`, `Community 10`, `Community 11`, `Community 12`, `Community 14`, `Community 19`, `Community 24`, `Community 27`, `Community 28`, `Community 31`, `Community 32`, `Community 34`, `Community 35`, `Community 36`, `Community 37`, `Community 38`, `Community 39`, `Community 40`, `Community 41`, `Community 42`, `Community 45`, `Community 48`, `Community 56`, `Community 58`, `Community 59`, `Community 61`, `Community 62`, `Community 63`, `Community 65`, `Community 67`, `Community 68`, `Community 69`, `Community 70`, `Community 74`, `Community 77`, `Community 78`, `Community 82`, `Community 86`, `Community 87`, `Community 93`, `Community 96`, `Community 102`, `Community 103`, `Community 109`, `Community 122`?**
+- **Why does `FastAPI` connect `Community 51` to `Community 1`, `Community 2`, `Community 4`, `Community 5`, `Community 6`, `Community 8`, `Community 9`, `Community 10`, `Community 11`, `Community 12`, `Community 14`, `Community 19`, `Community 24`, `Community 27`, `Community 28`, `Community 32`, `Community 34`, `Community 35`, `Community 36`, `Community 37`, `Community 38`, `Community 39`, `Community 40`, `Community 41`, `Community 42`, `Community 45`, `Community 48`, `Community 56`, `Community 58`, `Community 59`, `Community 61`, `Community 62`, `Community 63`, `Community 65`, `Community 67`, `Community 68`, `Community 69`, `Community 70`, `Community 74`, `Community 77`, `Community 78`, `Community 82`, `Community 86`, `Community 87`, `Community 93`, `Community 96`, `Community 102`, `Community 103`, `Community 109`, `Community 122`?**
   _High betweenness centrality (0.224) - this node is a cross-community bridge._
 - **Why does `SQLAlchemy` connect `Community 3` to `Community 1`, `Community 2`, `Community 4`, `Community 5`, `Community 134`, `Community 9`, `Community 13`, `Community 14`, `Community 149`, `Community 22`, `Community 150`, `Community 24`, `Community 155`, `Community 28`, `Community 156`, `Community 30`, `Community 29`, `Community 32`, `Community 33`, `Community 34`, `Community 31`, `Community 36`, `Community 38`, `Community 39`, `Community 42`, `Community 44`, `Community 45`, `Community 49`, `Community 50`, `Community 51`, `Community 53`, `Community 54`, `Community 55`, `Community 56`, `Community 57`, `Community 58`, `Community 59`, `Community 60`, `Community 62`, `Community 63`, `Community 64`, `Community 67`, `Community 70`, `Community 72`, `Community 74`, `Community 76`, `Community 77`, `Community 78`, `Community 86`, `Community 93`, `Community 102`, `Community 119`, `Community 122`?**
   _High betweenness centrality (0.161) - this node is a cross-community bridge._

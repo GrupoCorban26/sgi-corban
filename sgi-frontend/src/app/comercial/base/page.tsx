@@ -157,6 +157,7 @@ export default function BaseComercialPage() {
                   <th className="px-4 py-3 text-left font-semibold">Razón Social</th>
                   <th className="px-4 py-3 text-left font-semibold">Teléfono</th>
                   <th className="px-4 py-3 text-left font-semibold">Correo</th>
+                  <th className="px-4 py-3 text-left font-semibold">Lote</th>
                   <th className="px-4 py-3 text-left font-semibold">Contestó</th>
                   <th className="px-4 py-3 text-left font-semibold">Caso</th>
                   <th className="px-4 py-3 text-left font-semibold">Comentario</th>

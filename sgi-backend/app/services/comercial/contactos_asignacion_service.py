@@ -1,12 +1,13 @@
 import asyncio
 import logging
+import os
 import re
 from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func, update, and_
 from fastapi import HTTPException
-from app.models.comercial_base import BaseContacto
+from app.models.comercial_base import BaseContacto, Lote
 from app.models.comercial import Cliente, CasoLlamada, ClienteContacto
 from app.models.historial_llamadas import HistorialLlamada
 from app.models.comercial_catalogos import EstadoCliente, OrigenCliente
@@ -42,9 +43,12 @@ class ContactosAsignacionService:
         stmt = select(
             HistorialLlamada,
             BaseContacto,
-            CasoLlamada
+            CasoLlamada,
+            Lote.nombre_archivo
         ).join(
             BaseContacto, HistorialLlamada.base_id == BaseContacto.id
+        ).join(
+            Lote, BaseContacto.lote_id == Lote.id
         ).outerjoin(
             CasoLlamada, HistorialLlamada.caso_id == CasoLlamada.id
         ).where(
@@ -56,7 +60,9 @@ class ContactosAsignacionService:
         contacto_map = {}
         
         for row in result.all():
-            hl, bc, caso = row
+            hl, bc, caso, nombre_archivo = row
+            # Obtener nombre del lote sin extensión
+            lote_nombre = os.path.splitext(nombre_archivo)[0] if nombre_archivo else None
             # Como ordenamos por created_at desc, la primera vez que vemos bc.id es el último intento de llamada
             if bc.id not in contacto_map:
                 contacto_map[bc.id] = {
@@ -76,7 +82,8 @@ class ContactosAsignacionService:
                     "fecha_asignacion": bc.fecha_asignacion or hl.created_at,
                     "completado": hl.caso_id is not None,
                     "veces_llamadas": bc.veces_llamadas,
-                    "ultimo_llamado_at": hl.created_at if hl.caso_id is not None else None
+                    "ultimo_llamado_at": hl.created_at if hl.caso_id is not None else None,
+                    "lote_nombre": lote_nombre
                 }
 
         # Ordenar los datos en Python:

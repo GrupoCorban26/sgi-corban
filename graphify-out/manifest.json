@@ -750,9 +750,9 @@
     "semantic_hash": "977864c3d33b5a1611223e249c513e1c"
   },
   "sgi-backend/app/services/comercial/lotes_base_service.py": {
-    "mtime": 1781010605.2273216,
-    "ast_hash": "d637faebdee3c37f92fc80a7dc01d3b4",
-    "semantic_hash": "d637faebdee3c37f92fc80a7dc01d3b4"
+    "mtime": 1781286841.9764354,
+    "ast_hash": "e89aa0641fb4f2402e3a4ae7b855a6dc",
+    "semantic_hash": ""
   },
   "sgi-backend/app/services/comercial/media_service.py": {
     "mtime": 1780000217.6682508,
